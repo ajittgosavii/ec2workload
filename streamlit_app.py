@@ -546,7 +546,40 @@ def initialize_session_state():
             'DEV_vcpus': 1, 'DEV_memory_gb': 2, 'DEV_storage_gb': 50, 'DEV_os': OPERATING_SYSTEMS["Linux (Amazon Linux 2)"], 'DEV_region': AWS_REGIONS["US East (N. Virginia)"],
             'ri_sp_option': "On-Demand", # New: RI/SP option
             'growth_rate_annual': 0,      # New: Annual growth rate
-            'growth_years': 5             # New: Number of years for projection
+            'growth_years': 5,             # New: Number of years for projection
+            
+            # New On-Premise Metrics
+            'onprem_cpu_cores': 2,
+            'onprem_current_storage_gb': 100,
+            'onprem_cpu_model': "Intel Xeon E5",
+            'onprem_storage_type': "SSD",
+            'onprem_cpu_speed_ghz': 2.5,
+            'onprem_raid_level': "RAID 1",
+            'onprem_total_ram_gb': 8,
+            'onprem_ram_type': "DDR4",
+            'onprem_ram_speed_mhz': 2400,
+            'onprem_annual_growth_rate_percent': 10,
+            'onprem_planning_horizon_years': 5,
+            'onprem_peak_cpu_utilization_percent': 70,
+            'onprem_average_cpu_utilization_percent': 40,
+            'onprem_active_cpu_cores': 2,
+            'onprem_peak_ram_utilization_percent': 60,
+            'onprem_average_ram_utilization_percent': 30,
+            'onprem_sga_buffer_pool_gb': 0,
+            'onprem_peak_iops': 1000,
+            'onprem_average_iops': 500,
+            'onprem_peak_throughput_mbps': 100,
+            'onprem_network_bandwidth_gbps': 10,
+            'onprem_network_latency_ms': 1,
+            'onprem_max_concurrent_connections': 1000,
+            'onprem_average_concurrent_connections': 500,
+
+            # New Advanced Settings
+            'enable_encryption_at_rest': True,
+            'enable_performance_insights': True,
+            'enable_enhanced_monitoring': False,
+            'monthly_data_transfer_gb': 500,
+            'backup_retention_days': 7
         }
     if 'analysis_results' not in st.session_state:
         st.session_state.analysis_results = None
@@ -597,7 +630,7 @@ def render_workload_configuration():
 
     st.markdown("---")
 
-    env_tabs = st.tabs(["Production (PROD)", "User Acceptance Testing (UAT)", "Development (DEV)"])
+    env_tabs = st.tabs(["Production (PROD)", "User Acceptance Testing (UAT)", "Development (DEV)", "On-Premise Details", "Advanced Settings"])
 
     for i, env in enumerate(['PROD', 'UAT', 'DEV']):
         with env_tabs[i]:
@@ -631,6 +664,102 @@ def render_workload_configuration():
             )
             st.markdown("---")
     
+    with env_tabs[3]: # On-Premise Details Tab
+        st.markdown("#### Existing On-Premise Workload Details")
+        st.markdown("##### Compute")
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.session_state.workload_inputs['onprem_cpu_cores'] = st.number_input("CPU Cores", min_value=1, max_value=256, value=st.session_state.workload_inputs['onprem_cpu_cores'], step=1, key="onprem_cpu_cores")
+            st.session_state.workload_inputs['onprem_cpu_model'] = st.text_input("CPU Model", value=st.session_state.workload_inputs['onprem_cpu_model'], key="onprem_cpu_model")
+        with col2:
+            st.session_state.workload_inputs['onprem_current_storage_gb'] = st.number_input("Current Storage (GB)", min_value=1, max_value=65536, value=st.session_state.workload_inputs['onprem_current_storage_gb'], step=100, key="onprem_current_storage_gb")
+            st.session_state.workload_inputs['onprem_storage_type'] = st.selectbox("Storage Type", options=["HDD", "SSD", "NVMe", "SAN", "NAS"], index=["HDD", "SSD", "NVMe", "SAN", "NAS"].index(st.session_state.workload_inputs['onprem_storage_type']), key="onprem_storage_type")
+        with col3:
+            st.session_state.workload_inputs['onprem_cpu_speed_ghz'] = st.number_input("CPU Speed (GHz)", min_value=0.1, max_value=5.0, value=st.session_state.workload_inputs['onprem_cpu_speed_ghz'], step=0.1, format="%.1f", key="onprem_cpu_speed_ghz")
+            st.session_state.workload_inputs['onprem_raid_level'] = st.text_input("RAID Level (If Applicable)", value=st.session_state.workload_inputs['onprem_raid_level'], key="onprem_raid_level")
+
+        st.markdown("##### Memory Resources")
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.session_state.workload_inputs['onprem_total_ram_gb'] = st.number_input("Total RAM (GB)", min_value=1, max_value=4096, value=st.session_state.workload_inputs['onprem_total_ram_gb'], step=4, key="onprem_total_ram_gb")
+        with col2:
+            st.session_state.workload_inputs['onprem_ram_type'] = st.text_input("RAM Type", value=st.session_state.workload_inputs['onprem_ram_type'], key="onprem_ram_type")
+        with col3:
+            st.session_state.workload_inputs['onprem_ram_speed_mhz'] = st.number_input("RAM Speed (MHz)", min_value=1000, max_value=5000, value=st.session_state.workload_inputs['onprem_ram_speed_mhz'], step=100, key="onprem_ram_speed_mhz")
+
+        st.markdown("##### Growth & Planning (On-Premise Baseline)")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.session_state.workload_inputs['onprem_annual_growth_rate_percent'] = st.number_input("Annual Growth Rate (%)", min_value=0, max_value=50, value=st.session_state.workload_inputs['onprem_annual_growth_rate_percent'], step=1, key="onprem_annual_growth_rate_percent")
+        with col2:
+            st.session_state.workload_inputs['onprem_planning_horizon_years'] = st.number_input("Planning Horizon (years)", min_value=0, max_value=10, value=st.session_state.workload_inputs['onprem_planning_horizon_years'], step=1, key="onprem_planning_horizon_years")
+
+        st.markdown("##### CPU Performance")
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.session_state.workload_inputs['onprem_peak_cpu_utilization_percent'] = st.number_input("Peak CPU Utilization (%)", min_value=0, max_value=100, value=st.session_state.workload_inputs['onprem_peak_cpu_utilization_percent'], step=1, key="onprem_peak_cpu_utilization_percent")
+        with col2:
+            st.session_state.workload_inputs['onprem_average_cpu_utilization_percent'] = st.number_input("Average CPU Utilization (%)", min_value=0, max_value=100, value=st.session_state.workload_inputs['onprem_average_cpu_utilization_percent'], step=1, key="onprem_average_cpu_utilization_percent")
+        with col3:
+            st.session_state.workload_inputs['onprem_active_cpu_cores'] = st.number_input("Active CPU Cores", min_value=0, max_value=256, value=st.session_state.workload_inputs['onprem_active_cpu_cores'], step=1, key="onprem_active_cpu_cores")
+
+        st.markdown("##### RAM Utilization")
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.session_state.workload_inputs['onprem_peak_ram_utilization_percent'] = st.number_input("Peak RAM Utilization (%)", min_value=0, max_value=100, value=st.session_state.workload_inputs['onprem_peak_ram_utilization_percent'], step=1, key="onprem_peak_ram_utilization_percent")
+        with col2:
+            st.session_state.workload_inputs['onprem_average_ram_utilization_percent'] = st.number_input("Average RAM Utilization (%)", min_value=0, max_value=100, value=st.session_state.workload_inputs['onprem_average_ram_utilization_percent'], step=1, key="onprem_average_ram_utilization_percent")
+        with col3:
+            st.session_state.workload_inputs['onprem_sga_buffer_pool_gb'] = st.number_input("SGA/Buffer Pool Size (GB)", min_value=0.0, max_value=1024.0, value=st.session_state.workload_inputs['onprem_sga_buffer_pool_gb'], step=0.1, format="%.1f", key="onprem_sga_buffer_pool_gb")
+        
+        st.markdown("##### I/O Performance")
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.session_state.workload_inputs['onprem_peak_iops'] = st.number_input("Peak IOPS", min_value=0, max_value=1000000, value=st.session_state.workload_inputs['onprem_peak_iops'], step=100, key="onprem_peak_iops")
+        with col2:
+            st.session_state.workload_inputs['onprem_average_iops'] = st.number_input("Average IOPS", min_value=0, max_value=500000, value=st.session_state.workload_inputs['onprem_average_iops'], step=100, key="onprem_average_iops")
+        with col3:
+            st.session_state.workload_inputs['onprem_peak_throughput_mbps'] = st.number_input("Peak Throughput (MB/s)", min_value=0, max_value=10000, value=st.session_state.workload_inputs['onprem_peak_throughput_mbps'], step=10, key="onprem_peak_throughput_mbps")
+
+        st.markdown("##### Network & Connection")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.session_state.workload_inputs['onprem_network_bandwidth_gbps'] = st.number_input("Network Bandwidth (Gbps)", min_value=0.1, max_value=100.0, value=st.session_state.workload_inputs['onprem_network_bandwidth_gbps'], step=0.1, format="%.1f", key="onprem_network_bandwidth_gbps")
+            st.session_state.workload_inputs['onprem_max_concurrent_connections'] = st.number_input("Max Concurrent Connections", min_value=0, max_value=100000, value=st.session_state.workload_inputs['onprem_max_concurrent_connections'], step=100, key="onprem_max_concurrent_connections")
+        with col2:
+            st.session_state.workload_inputs['onprem_network_latency_ms'] = st.number_input("Network Latency (ms)", min_value=0.0, max_value=1000.0, value=st.session_state.workload_inputs['onprem_network_latency_ms'], step=0.1, format="%.1f", key="onprem_network_latency_ms")
+            st.session_state.workload_inputs['onprem_average_concurrent_connections'] = st.number_input("Average Concurrent Connections", min_value=0, max_value=50000, value=st.session_state.workload_inputs['onprem_average_concurrent_connections'], step=100, key="onprem_average_concurrent_connections")
+        st.markdown("---")
+
+    with env_tabs[4]: # Advanced Settings Tab
+        st.markdown("#### AWS Advanced Settings")
+        st.session_state.workload_inputs['enable_encryption_at_rest'] = st.checkbox(
+            "Enable Encryption at Rest (EBS)",
+            value=st.session_state.workload_inputs['enable_encryption_at_rest'],
+            help="Enables encryption for EBS volumes."
+        )
+        st.session_state.workload_inputs['enable_performance_insights'] = st.checkbox(
+            "Enable Performance Insights (RDS/EC2)",
+            value=st.session_state.workload_inputs['enable_performance_insights'],
+            help="Enables database performance monitoring with Performance Insights."
+        )
+        st.session_state.workload_inputs['enable_enhanced_monitoring'] = st.checkbox(
+            "Enable Enhanced Monitoring (RDS/EC2)",
+            value=st.session_state.workload_inputs['enable_enhanced_monitoring'],
+            help="Provides more detailed metrics for monitoring instances."
+        )
+        st.session_state.workload_inputs['monthly_data_transfer_gb'] = st.number_input(
+            "Monthly Data Transfer Out (GB)",
+            min_value=0, max_value=100000, value=st.session_state.workload_inputs['monthly_data_transfer_gb'], step=100,
+            help="Estimated outbound data transfer in GB per month. This affects networking costs."
+        )
+        st.session_state.workload_inputs['backup_retention_days'] = st.number_input(
+            "Backup Retention (days, 0=default)",
+            min_value=0, max_value=365, value=st.session_state.workload_inputs['backup_retention_days'], step=1,
+            help="Number of days to retain backups for RDS/EC2, 0 means default AWS retention."
+        )
+        st.markdown("---")
+
     col_save, col_load = st.columns(2)
     with col_save:
         if st.button("💾 Save Configuration", key="save_config"):
@@ -714,6 +843,58 @@ def render_analysis_results(recommendations, key_suffix=""):
     df_results = pd.DataFrame(data)
     st.dataframe(df_results, hide_index=True, use_container_width=True)
 
+    # Display On-Premise Details and Advanced Settings for context
+    st.markdown("### Workload Configuration Summary (Inputs)")
+    
+    inputs_df_data = []
+    inputs = st.session_state.workload_inputs # Get current inputs
+
+    # General Workload Info
+    inputs_df_data.append({"Category": "General", "Metric": "Workload Name", "Value": inputs.get('workload_name', 'N/A')})
+    inputs_df_data.append({"Category": "General", "Metric": "Workload Type", "Value": inputs.get('workload_type', 'N/A')})
+    inputs_df_data.append({"Category": "General", "Metric": "Pricing Model / Commitment", "Value": inputs.get('ri_sp_option', 'N/A')})
+    inputs_df_data.append({"Category": "General", "Metric": "Annual Growth Rate (%)", "Value": f"{inputs.get('growth_rate_annual', 0)}%"})
+    inputs_df_data.append({"Category": "General", "Metric": "Projection Years", "Value": inputs.get('growth_years', 0)})
+
+    # On-Premise Details
+    inputs_df_data.append({"Category": "On-Premise Compute", "Metric": "CPU Cores", "Value": inputs.get('onprem_cpu_cores', 'N/A')})
+    inputs_df_data.append({"Category": "On-Premise Compute", "Metric": "Current Storage (GB)", "Value": inputs.get('onprem_current_storage_gb', 'N/A')})
+    inputs_df_data.append({"Category": "On-Premise Compute", "Metric": "CPU Model", "Value": inputs.get('onprem_cpu_model', 'N/A')})
+    inputs_df_data.append({"Category": "On-Premise Compute", "Metric": "Storage Type", "Value": inputs.get('onprem_storage_type', 'N/A')})
+    inputs_df_data.append({"Category": "On-Premise Compute", "Metric": "CPU Speed (GHz)", "Value": inputs.get('onprem_cpu_speed_ghz', 'N/A')})
+    inputs_df_data.append({"Category": "On-Premise Compute", "Metric": "RAID Level", "Value": inputs.get('onprem_raid_level', 'N/A')})
+
+    inputs_df_data.append({"Category": "On-Premise Memory", "Metric": "Total RAM (GB)", "Value": inputs.get('onprem_total_ram_gb', 'N/A')})
+    inputs_df_data.append({"Category": "On-Premise Memory", "Metric": "RAM Type", "Value": inputs.get('onprem_ram_type', 'N/A')})
+    inputs_df_data.append({"Category": "On-Premise Memory", "Metric": "RAM Speed (MHz)", "Value": inputs.get('onprem_ram_speed_mhz', 'N/A')})
+
+    inputs_df_data.append({"Category": "On-Premise CPU Perf", "Metric": "Peak CPU Utilization (%)", "Value": f"{inputs.get('onprem_peak_cpu_utilization_percent', 0)}%"})
+    inputs_df_data.append({"Category": "On-Premise CPU Perf", "Metric": "Average CPU Utilization (%)", "Value": f"{inputs.get('onprem_average_cpu_utilization_percent', 0)}%"})
+    inputs_df_data.append({"Category": "On-Premise CPU Perf", "Metric": "Active CPU Cores", "Value": inputs.get('onprem_active_cpu_cores', 'N/A')})
+    inputs_df_data.append({"Category": "On-Premise RAM Util", "Metric": "Peak RAM Utilization (%)", "Value": f"{inputs.get('onprem_peak_ram_utilization_percent', 0)}%"})
+    inputs_df_data.append({"Category": "On-Premise RAM Util", "Metric": "Average RAM Utilization (%)", "Value": f"{inputs.get('onprem_average_ram_utilization_percent', 0)}%"})
+    inputs_df_data.append({"Category": "On-Premise RAM Util", "Metric": "SGA/Buffer Pool Size (GB)", "Value": inputs.get('onprem_sga_buffer_pool_gb', 'N/A')})
+
+    inputs_df_data.append({"Category": "On-Premise I/O Perf", "Metric": "Peak IOPS", "Value": inputs.get('onprem_peak_iops', 'N/A')})
+    inputs_df_data.append({"Category": "On-Premise I/O Perf", "Metric": "Average IOPS", "Value": inputs.get('onprem_average_iops', 'N/A')})
+    inputs_df_data.append({"Category": "On-Premise I/O Perf", "Metric": "Peak Throughput (MB/s)", "Value": inputs.get('onprem_peak_throughput_mbps', 'N/A')})
+
+    inputs_df_data.append({"Category": "On-Premise Network", "Metric": "Network Bandwidth (Gbps)", "Value": inputs.get('onprem_network_bandwidth_gbps', 'N/A')})
+    inputs_df_data.append({"Category": "On-Premise Network", "Metric": "Network Latency (ms)", "Value": inputs.get('onprem_network_latency_ms', 'N/A')})
+    inputs_df_data.append({"Category": "On-Premise Network", "Metric": "Max Concurrent Connections", "Value": inputs.get('onprem_max_concurrent_connections', 'N/A')})
+    inputs_df_data.append({"Category": "On-Premise Network", "Metric": "Average Concurrent Connections", "Value": inputs.get('onprem_average_concurrent_connections', 'N/A')})
+
+    # Advanced Settings
+    inputs_df_data.append({"Category": "Advanced Settings", "Metric": "Enable Encryption at Rest", "Value": "Yes" if inputs.get('enable_encryption_at_rest') else "No"})
+    inputs_df_data.append({"Category": "Advanced Settings", "Metric": "Enable Performance Insights", "Value": "Yes" if inputs.get('enable_performance_insights') else "No"})
+    inputs_df_data.append({"Category": "Advanced Settings", "Metric": "Enable Enhanced Monitoring", "Value": "Yes" if inputs.get('enable_enhanced_monitoring') else "No"})
+    inputs_df_data.append({"Category": "Advanced Settings", "Metric": "Monthly Data Transfer (GB)", "Value": inputs.get('monthly_data_transfer_gb', 'N/A')})
+    inputs_df_data.append({"Category": "Advanced Settings", "Metric": "Backup Retention (days)", "Value": inputs.get('backup_retention_days', 'N/A')})
+
+
+    inputs_df = pd.DataFrame(inputs_df_data)
+    st.dataframe(inputs_df, hide_index=True, use_container_width=True)
+
     # Cost Breakdown Chart (Pie Chart) for PROD
     st.markdown("### PROD Environment Cost Breakdown")
     prod_rec = recommendations.get('PROD')
@@ -723,17 +904,13 @@ def render_analysis_results(recommendations, key_suffix=""):
             'Cost': [prod_rec['instance_cost'], prod_rec['ebs_cost'], prod_rec['os_cost']]
         }
         df_costs = pd.DataFrame(cost_breakdown_data)
-        
         # Filter out 0 cost components for better visualization if OS cost is always 0
         df_costs = df_costs[df_costs['Cost'] > 0]
-
-        fig_costs = px.pie(df_costs, values='Cost', names='Component', title='PROD Monthly Cost Distribution',
-                           hole=0.4, color_discrete_sequence=px.colors.qualitative.Pastel)
+        fig_costs = px.pie(df_costs, values='Cost', names='Component', title='PROD Monthly Cost Distribution', hole=0.4, color_discrete_sequence=px.colors.qualitative.Pastel)
         fig_costs.update_traces(textinfo='percent+label', marker=dict(line=dict(color='#000000', width=1)))
         st.plotly_chart(fig_costs, use_container_width=True, key=f"prod_cost_chart_{key_suffix}")
     else:
         st.info("PROD environment recommendations not available for cost breakdown.")
-
 
     # Workload Growth Projection
     st.markdown("### Workload Growth Projections (PROD)")
@@ -755,12 +932,10 @@ def render_analysis_results(recommendations, key_suffix=""):
                 "Projected Storage (GB)": details['storage_gb'],
                 "Recommended Instance": details['recommended_instance']
             })
-        
         df_projected = pd.DataFrame(proj_data).set_index("Year")
-        
+
         # Plot projected costs
-        fig_proj = px.line(df_projected, y="Estimated Cost (Monthly)", title="Projected Monthly Cost Over Time (PROD)",
-                           markers=True, text="Estimated Cost (Monthly)")
+        fig_proj = px.line(df_projected, y="Estimated Cost (Monthly)", title="Projected Monthly Cost Over Time (PROD)", markers=True, text="Estimated Cost (Monthly)")
         fig_proj.update_traces(texttemplate='%{text:$.2f}', textposition='top center')
         fig_proj.update_layout(hovermode="x unified", xaxis_title="Year", yaxis_title="Estimated Monthly Cost ($)")
         st.plotly_chart(fig_proj, use_container_width=True, key=f"proj_cost_chart_{key_suffix}")
@@ -772,7 +947,6 @@ def render_analysis_results(recommendations, key_suffix=""):
         </details>
         """, unsafe_allow_html=True)
         st.dataframe(df_projected, use_container_width=True)
-
     else:
         st.info("No growth projection data available or growth rate not set.")
 
@@ -780,620 +954,588 @@ def render_analysis_results(recommendations, key_suffix=""):
 def render_bulk_analysis():
     """Renders the UI for bulk analysis."""
     st.markdown("## 📥 Bulk Workload Analysis")
-    
+
     # Define CSV template
     csv_columns = [
         "Workload Name", "Workload Type",
         "PROD_vCPUs", "PROD_Memory_GiB", "PROD_Storage_GB", "PROD_OS", "PROD_Region",
         "UAT_vCPUs", "UAT_Memory_GiB", "UAT_Storage_GB", "UAT_OS", "UAT_Region",
         "DEV_vCPUs", "DEV_Memory_GiB", "DEV_Storage_GB", "DEV_OS", "DEV_Region",
-        "RI_SP_Option", "Annual Growth Rate (%)", "Projection Years"
+        "RI_SP_Option", "Annual Growth Rate (%)", "Projection Years",
+        # New On-Premise Metrics
+        "OnPrem_CPU_Cores", "OnPrem_Current_Storage_GB", "OnPrem_CPU_Model", "OnPrem_Storage_Type",
+        "OnPrem_CPU_Speed_GHz", "OnPrem_RAID_Level", "OnPrem_Total_RAM_GB", "OnPrem_RAM_Type",
+        "OnPrem_RAM_Speed_MHz", "OnPrem_Annual_Growth_Rate_Percent", "OnPrem_Planning_Horizon_Years",
+        "OnPrem_Peak_CPU_Utilization_Percent", "OnPrem_Average_CPU_Utilization_Percent",
+        "OnPrem_Active_CPU_Cores", "OnPrem_Peak_RAM_Utilization_Percent",
+        "OnPrem_Average_RAM_Utilization_Percent", "OnPrem_SGA_Buffer_Pool_GB", "OnPrem_Peak_IOPS",
+        "OnPrem_Average_IOPS", "OnPrem_Peak_Throughput_MBPS", "OnPrem_Network_Bandwidth_Gbps",
+        "OnPrem_Network_Latency_ms", "OnPrem_Max_Concurrent_Connections", "OnPrem_Average_Concurrent_Connections",
+        # New Advanced Settings
+        "Enable_Encryption_at_Rest", "Enable_Performance_Insights", "Enable_Enhanced_Monitoring",
+        "Monthly_Data_Transfer_GB", "Backup_Retention_Days"
     ]
-    
     sample_data = [
-        ["Sample Workload 1", "Web Application", 4, 8.0, 100, "Linux (Amazon Linux 2)", "US East (N. Virginia)", 
-         2, 4.0, 50, "Linux (Amazon Linux 2)", "US East (N. Virginia)",
-         1, 2.0, 25, "Linux (Amazon Linux 2)", "US East (N. Virginia)",
-         "On-Demand", 10, 5],
-        ["Sample Workload 2", "Database Server", 8, 32.0, 500, "Linux (RHEL)", "US West (Oregon)",
-         4, 16.0, 250, "Linux (RHEL)", "US West (Oregon)",
-         2, 8.0, 100, "Linux (RHEL)", "US West (Oregon)",
-         "1-Year No Upfront RI/SP", 5, 3]
+        ["Sample Workload 1", "Web Application", 4, 8.0, 100, "Linux (Amazon Linux 2)", "us-east-1",
+         2, 4.0, 50, "Linux (Amazon Linux 2)", "us-east-1",
+         1, 2.0, 25, "Linux (Amazon Linux 2)", "us-east-1",
+         "On-Demand", 10, 5,
+         # On-Premise Metrics
+         2, 100, "Intel Xeon E5", "SSD", 2.5, "RAID 1", 8, "DDR4", 2400, 10, 5, 70, 40, 2, 60, 30, 0, 1000, 500, 100, 10, 1, 1000, 500,
+         # Advanced Settings
+         True, True, False, 500, 7],
+        ["Sample Workload 2", "Database Server", 8, 32.0, 500, "Linux (RHEL)", "us-west-2",
+         4, 16.0, 250, "Linux (RHEL)", "us-west-2",
+         2, 8.0, 100, "Linux (RHEL)", "us-west-2",
+         "1-Year No Upfront RI/SP", 5, 3,
+         # On-Premise Metrics
+         4, 500, "AMD EPYC", "NVMe", 3.0, "RAID 5", 32, "DDR4", 2933, 5, 3, 80, 50, 4, 70, 40, 10, 5000, 2000, 500, 25, 0.5, 5000, 2000,
+         # Advanced Settings
+         True, True, True, 1000, 14]
     ]
-
     df_template = pd.DataFrame(sample_data, columns=csv_columns)
-    csv_template = df_template.to_csv(index=False).encode('utf-8')
 
-    st.markdown("""
-        To perform a bulk analysis, please download the sample CSV template below.
-        Ensure your CSV file's columns match the template *exactly* (case-sensitive) for proper processing.
-    """)
     st.download_button(
-        label="Download Sample CSV Template",
-        data=csv_template,
-        file_name="bulk_analysis_template.csv",
+        label="Download Bulk Upload Template (CSV)",
+        data=df_template.to_csv(index=False).encode('utf-8'),
+        file_name="bulk_workload_template.csv",
         mime="text/csv",
-        key="download_csv_template"
+        help="Download a CSV template to fill in multiple workload requirements."
     )
 
-    uploaded_file = st.file_uploader("Upload CSV File", type="csv", key="bulk_upload_file")
+    uploaded_file = st.file_uploader("Upload Workloads CSV", type="csv", key="bulk_csv_uploader")
 
     if uploaded_file is not None:
         try:
-            df = pd.read_csv(uploaded_file)
-            st.session_state.bulk_upload_df = df
-            st.success("File uploaded successfully!")
-            st.dataframe(df.head())
-
-            if st.button("🚀 Start Bulk Analysis", type="primary", key="start_bulk_analysis"):
-                st.session_state.bulk_results = []
-                total_workloads = len(df)
-                progress_text = st.empty()
-                progress_bar = st.progress(0)
-
-                st.session_state.calculator.fetch_current_prices() # Fetch prices once for bulk
-
-                for i, row in df.iterrows():
-                    progress_text.text(f"Analyzing workload {i+1} of {total_workloads}...")
-                    progress_bar.progress((i + 1) / total_workloads)
-
-                    # Map CSV columns to workload_inputs structure
-                    temp_inputs = {
-                        'workload_name': row.get('Workload Name', f'Workload_{i+1}'),
-                        'workload_type': row.get('Workload Type', 'Other'),
-                        'PROD_vcpus': row.get('PROD_vCPUs', 1),
-                        'PROD_memory_gb': row.get('PROD_Memory_GiB', 1.0),
-                        'PROD_storage_gb': row.get('PROD_Storage_GB', 50),
-                        'PROD_os': row.get('PROD_OS', OPERATING_SYSTEMS["Linux (Amazon Linux 2)"]),
-                        'PROD_region': AWS_REGIONS.get(row.get('PROD_Region', "US East (N. Virginia)"), AWS_REGIONS["US East (N. Virginia)"]),
-                        'UAT_vcpus': row.get('UAT_vCPUs', 1),
-                        'UAT_memory_gb': row.get('UAT_Memory_GiB', 1.0),
-                        'UAT_storage_gb': row.get('UAT_Storage_GB', 50),
-                        'UAT_os': row.get('UAT_OS', OPERATING_SYSTEMS["Linux (Amazon Linux 2)"]),
-                        'UAT_region': AWS_REGIONS.get(row.get('UAT_Region', "US East (N. Virginia)"), AWS_REGIONS["US East (N. Virginia)"]),
-                        'DEV_vcpus': row.get('DEV_vCPUs', 1),
-                        'DEV_memory_gb': row.get('DEV_Memory_GiB', 1.0),
-                        'DEV_storage_gb': row.get('DEV_Storage_GB', 50),
-                        'DEV_os': row.get('DEV_OS', OPERATING_SYSTEMS["Linux (Amazon Linux 2)"]),
-                        'DEV_region': AWS_REGIONS.get(row.get('DEV_Region', "US East (N. Virginia)"), AWS_REGIONS["US East (N. Virginia)"]),
-                        'ri_sp_option': row.get('RI_SP_Option', 'On-Demand'),
-                        'growth_rate_annual': row.get('Annual Growth Rate (%)', 0),
-                        'growth_years': row.get('Projection Years', 5)
-                    }
-
-                    # Temporarily set calculator's inputs for bulk processing
-                    st.session_state.calculator.inputs = temp_inputs
-                    
-                    try:
-                        results = st.session_state.calculator.generate_all_recommendations()
-                        st.session_state.bulk_results.append({
-                            'workload_name': temp_inputs['workload_name'],
-                            'inputs': temp_inputs, # Store inputs for later use (e.g., report generation, projections)
-                            'recommendations': results
-                        })
-                    except Exception as e:
-                        logger.error(f"Error processing workload {temp_inputs['workload_name']}: {e}")
-                        st.session_state.bulk_results.append({
-                            'workload_name': temp_inputs['workload_name'],
-                            'inputs': temp_inputs, # Store inputs even if error
-                            'recommendations': {'error': str(e)}
-                        })
-
-                progress_text.empty()
-                progress_bar.empty()
-                st.success("Bulk analysis completed!")
-                st.experimental_rerun() # Rerun to display results in next block
-
-        except pd.errors.EmptyDataError:
-            st.error("The uploaded CSV file is empty.")
-            st.session_state.bulk_upload_df = None
+            df_uploaded = pd.read_csv(uploaded_file)
+            st.session_state.bulk_upload_df = df_uploaded
+            st.success(f"Successfully uploaded {len(df_uploaded)} workloads.")
+            st.dataframe(df_uploaded, use_container_width=True, hide_index=True)
+            if st.button("🚀 Analyze All Workloads", key="analyze_bulk_btn"):
+                analyze_bulk_workloads(df_uploaded)
         except Exception as e:
-            st.error(f"Error reading CSV file: {e}. Please ensure it's a valid CSV.")
-            st.session_state.bulk_upload_df = None
+            st.error(f"Error reading CSV file: {e}")
+
+def analyze_bulk_workloads(df_workloads):
+    """Processes multiple workloads from a DataFrame and generates recommendations."""
+    st.session_state.bulk_results = []
+    total_workloads = len(df_workloads)
+    analysis_progress_text = st.empty()
+    analysis_progress_bar = st.progress(0)
+
+    for i, row in df_workloads.iterrows():
+        workload_name = row.get("Workload Name", f"Workload {i+1}")
+        analysis_progress_text.text(f"Analyzing workload: {workload_name} ({i+1}/{total_workloads})...")
+        analysis_progress_bar.progress((i + 1) / total_workloads)
+
+        # Map CSV columns to session state keys
+        current_workload_inputs = {
+            'workload_name': workload_name,
+            'workload_type': row.get("Workload Type", WORKLOAD_TYPES[0]),
+            'PROD_vcpus': row.get("PROD_vCPUs", 0),
+            'PROD_memory_gb': row.get("PROD_Memory_GiB", 0.0),
+            'PROD_storage_gb': row.get("PROD_Storage_GB", 0),
+            'PROD_os': row.get("PROD_OS", OPERATING_SYSTEMS["Linux (Amazon Linux 2)"]),
+            'PROD_region': AWS_REGIONS.get(row.get("PROD_Region", "US East (N. Virginia)"), row.get("PROD_Region", "us-east-1")), # Handle both name and value
+            'UAT_vcpus': row.get("UAT_vCPUs", 0),
+            'UAT_memory_gb': row.get("UAT_Memory_GiB", 0.0),
+            'UAT_storage_gb': row.get("UAT_Storage_GB", 0),
+            'UAT_os': row.get("UAT_OS", OPERATING_SYSTEMS["Linux (Amazon Linux 2)"]),
+            'UAT_region': AWS_REGIONS.get(row.get("UAT_Region", "US East (N. Virginia)"), row.get("UAT_Region", "us-east-1")),
+            'DEV_vcpus': row.get("DEV_vCPUs", 0),
+            'DEV_memory_gb': row.get("DEV_Memory_GiB", 0.0),
+            'DEV_storage_gb': row.get("DEV_Storage_GB", 0),
+            'DEV_os': row.get("DEV_OS", OPERATING_SYSTEMS["Linux (Amazon Linux 2)"]),
+            'DEV_region': AWS_REGIONS.get(row.get("DEV_Region", "US East (N. Virginia)"), row.get("DEV_Region", "us-east-1")),
+            'ri_sp_option': row.get("RI_SP_Option", "On-Demand"),
+            'growth_rate_annual': row.get("Annual Growth Rate (%)", 0),
+            'growth_years': row.get("Projection Years", 5),
+            
+            # On-Premise Metrics from CSV
+            'onprem_cpu_cores': row.get("OnPrem_CPU_Cores", 0),
+            'onprem_current_storage_gb': row.get("OnPrem_Current_Storage_GB", 0),
+            'onprem_cpu_model': row.get("OnPrem_CPU_Model", "N/A"),
+            'onprem_storage_type': row.get("OnPrem_Storage_Type", "N/A"),
+            'onprem_cpu_speed_ghz': row.get("OnPrem_CPU_Speed_GHz", 0.0),
+            'onprem_raid_level': row.get("OnPrem_RAID_Level", "N/A"),
+            'onprem_total_ram_gb': row.get("OnPrem_Total_RAM_GB", 0),
+            'onprem_ram_type': row.get("OnPrem_RAM_Type", "N/A"),
+            'onprem_ram_speed_mhz': row.get("OnPrem_RAM_Speed_MHz", 0),
+            'onprem_annual_growth_rate_percent': row.get("OnPrem_Annual_Growth_Rate_Percent", 0),
+            'onprem_planning_horizon_years': row.get("OnPrem_Planning_Horizon_Years", 0),
+            'onprem_peak_cpu_utilization_percent': row.get("OnPrem_Peak_CPU_Utilization_Percent", 0),
+            'onprem_average_cpu_utilization_percent': row.get("OnPrem_Average_CPU_Utilization_Percent", 0),
+            'onprem_active_cpu_cores': row.get("OnPrem_Active_CPU_Cores", 0),
+            'onprem_peak_ram_utilization_percent': row.get("OnPrem_Peak_RAM_Utilization_Percent", 0),
+            'onprem_average_ram_utilization_percent': row.get("OnPrem_Average_RAM_Utilization_Percent", 0),
+            'onprem_sga_buffer_pool_gb': row.get("OnPrem_SGA_Buffer_Pool_GB", 0.0),
+            'onprem_peak_iops': row.get("OnPrem_Peak_IOPS", 0),
+            'onprem_average_iops': row.get("OnPrem_Average_IOPS", 0),
+            'onprem_peak_throughput_mbps': row.get("OnPrem_Peak_Throughput_MBPS", 0),
+            'onprem_network_bandwidth_gbps': row.get("OnPrem_Network_Bandwidth_Gbps", 0.0),
+            'onprem_network_latency_ms': row.get("OnPrem_Network_Latency_ms", 0.0),
+            'onprem_max_concurrent_connections': row.get("OnPrem_Max_Concurrent_Connections", 0),
+            'onprem_average_concurrent_connections': row.get("OnPrem_Average_Concurrent_Connections", 0),
+            
+            # Advanced Settings from CSV
+            'enable_encryption_at_rest': row.get("Enable_Encryption_at_Rest", False),
+            'enable_performance_insights': row.get("Enable_Performance_Insights", False),
+            'enable_enhanced_monitoring': row.get("Enable_Enhanced_Monitoring", False),
+            'monthly_data_transfer_gb': row.get("Monthly_Data_Transfer_GB", 0),
+            'backup_retention_days': row.get("Backup_Retention_Days", 0)
+        }
+        
+        # Save current_workload_inputs to session state calculator inputs
+        st.session_state.calculator.inputs = current_workload_inputs
+        
+        try:
+            results = st.session_state.calculator.generate_all_recommendations()
+            st.session_state.bulk_results.append({
+                'workload_name': workload_name,
+                'inputs': current_workload_inputs, # Store inputs for reports if needed later
+                'recommendations': results
+            })
+        except Exception as e:
+            st.session_state.bulk_results.append({
+                'workload_name': workload_name,
+                'inputs': current_workload_inputs,
+                'recommendations': {'error': f"Error processing workload: {e}"}
+            })
+            logger.error(f"Error processing bulk workload {workload_name}: {e}")
+
+    analysis_progress_text.empty()
+    analysis_progress_bar.empty()
+    st.success("✅ Bulk analysis completed successfully!")
+
 
 def display_bulk_analysis_results(bulk_results):
-    """Displays results for bulk analysis."""
-    st.markdown("## 📈 Bulk Analysis Results Summary")
-
-    if not bulk_results:
-        st.info("No bulk analysis results to display.")
-        return
-
+    """Displays the results of bulk analysis."""
+    st.markdown("### Bulk Analysis Summary")
     summary_data = []
-    for workload_result in bulk_results:
-        name = workload_result['workload_name']
-        recs = workload_result['recommendations']
-
-        if 'error' in recs:
-            summary_data.append({
-                "Workload Name": name,
-                "PROD Recommended Instance": "Error",
-                "PROD Monthly Cost": "Error",
-                "RI/SP Option": workload_result['inputs'].get('ri_sp_option', 'N/A'),
-                "Status": "Failed"
-            })
+    for item in bulk_results:
+        workload_name = item['workload_name']
+        prod_rec = item['recommendations'].get('PROD', {})
+        total_cost_prod = prod_rec.get('total_cost', float('inf'))
+        
+        if total_cost_prod == float('inf'):
+            cost_str = "N/A (No suitable instance)"
+            instance_str = "No suitable instance found"
         else:
-            prod_rec = recs.get('PROD', {})
-            total_cost = prod_rec.get('total_cost', float('inf'))
-            instance_type = prod_rec.get('instance_type', 'N/A')
-            
-            if total_cost == float('inf'):
-                cost_str = "N/A"
-            else:
-                cost_str = f"${total_cost:,.2f}"
+            cost_str = f"${total_cost_prod:,.2f}/month"
+            instance_str = f"{prod_rec.get('instance_type', 'N/A')} ({prod_rec.get('vcpus',0)} vCPUs, {prod_rec.get('memory_gb',0):.1f} GiB)"
 
-            summary_data.append({
-                "Workload Name": name,
-                "PROD Recommended Instance": instance_type,
-                "PROD Monthly Cost": cost_str,
-                "RI/SP Option": workload_result['inputs'].get('ri_sp_option', 'N/A'),
-                "Status": "Success"
-            })
+        summary_data.append({
+            "Workload Name": workload_name,
+            "PROD Recommended Instance": instance_str,
+            "PROD Monthly Cost": cost_str,
+            "Status": "Success" if total_cost_prod != float('inf') else "Failed"
+        })
     
     df_summary = pd.DataFrame(summary_data)
-    st.dataframe(df_summary, hide_index=True, use_container_width=True)
+    st.dataframe(df_summary, use_container_width=True, hide_index=True)
 
-    csv_data = df_summary.to_csv(index=False).encode('utf-8')
-    st.download_button(
-        label="Download Summary CSV",
-        data=csv_data,
-        file_name="bulk_analysis_summary.csv",
-        mime="text/csv",
-        key="download_bulk_summary"
-    )
-
-    st.markdown("---")
     st.markdown("### Detailed Bulk Results")
-    if st.button("Expand All Workloads", key="expand_all_bulk"):
-        for workload_result in bulk_results:
-            name = workload_result['workload_name']
-            st.markdown(f"#### Workload: {name}")
-            # Temporarily set session_state.workload_inputs for render_analysis_results
-            # to correctly pick up growth_rate_annual and growth_years from bulk inputs
-            original_single_inputs = st.session_state.workload_inputs.copy()
-            st.session_state.workload_inputs = workload_result['inputs']
+    for i, item in enumerate(bulk_results):
+        workload_name = item['workload_name']
+        st.markdown(f"#### {workload_name}")
+        # Pass the full inputs and recommendations to render_analysis_results
+        # For bulk analysis, we might want to show the specific inputs that led to this result
+        # For now, `render_analysis_results` takes `recommendations` and uses `st.session_state.workload_inputs` for detailed inputs.
+        # This needs a slight adjustment if `render_analysis_results` is to be truly standalone for bulk.
+        # For now, we will set session_state.workload_inputs temporarily to the inputs for the current bulk item
+        # and then call render_analysis_results. This is a bit hacky but works for demonstration.
+        
+        # Store original inputs
+        original_workload_inputs = st.session_state.workload_inputs.copy()
+        # Set inputs for current bulk item
+        st.session_state.workload_inputs = item['inputs']
+        render_analysis_results(item['recommendations'], key_suffix=f"bulk_{i}")
+        # Restore original inputs
+        st.session_state.workload_inputs = original_workload_inputs
+        
+        st.markdown("---")
 
-            if 'error' in workload_result['recommendations']:
-                st.error(f"Error for {name}: {workload_result['recommendations']['error']}")
-            else:
-                render_analysis_results(workload_result['recommendations'], key_suffix=name.replace(' ', '_'))
-            st.markdown("---")
-            # Restore original single workload inputs
-            st.session_state.workload_inputs = original_single_inputs
 
-
-def generate_pdf_report(analysis_results, workload_inputs, buffer):
-    """Generates a PDF report for the analysis results."""
+def generate_pdf_report(workload_name, inputs, recommendations):
+    """Generates a PDF report for the given workload."""
     if not REPORTLAB_AVAILABLE:
-        st.error("ReportLab library not installed. Cannot generate PDF report. Please install with `pip install reportlab`.")
-        return
+        st.error("`reportlab` library not found. Please install it (`pip install reportlab`) to generate PDF reports.")
+        return None
 
-    doc = SimpleDocTemplate(buffer, pagesize=A4,
-                            rightMargin=inch/2, leftMargin=inch/2,
-                            topMargin=inch/2, bottomMargin=inch/2)
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter)
     styles = getSampleStyleSheet()
-
-    # Custom styles
-    styles.add(ParagraphStyle(name='TitleStyle', fontSize=24, leading=28, alignment=TA_CENTER,
-                              fontName='Helvetica-Bold', spaceAfter=24))
-    styles.add(ParagraphStyle(name='Heading1', fontSize=18, leading=22, spaceAfter=12,
-                              fontName='Helvetica-Bold', textColor=colors.HexColor('#4c51bf')))
-    styles.add(ParagraphStyle(name='Heading2', fontSize=14, leading=18, spaceAfter=8,
-                              fontName='Helvetica-Bold', textColor=colors.HexColor('#667eea')))
-    styles.add(ParagraphStyle(name='BodyText', fontSize=10, leading=12, spaceAfter=6,
-                              fontName='Helvetica'))
-    styles.add(ParagraphStyle(name='SmallText', fontSize=8, leading=10, spaceAfter=4,
-                              fontName='Helvetica'))
-    styles.add(ParagraphStyle(name='TableHeading', fontSize=10, leading=12, alignment=TA_CENTER,
-                              fontName='Helvetica-Bold', textColor=colors.white))
-    styles.add(ParagraphStyle(name='TableData', fontSize=9, leading=10, alignment=TA_LEFT,
-                              fontName='Helvetica'))
     
+    # Custom styles
+    styles.add(ParagraphStyle(name='TitleStyle', fontSize=20, leading=24, alignment=TA_CENTER,
+                              spaceAfter=20, fontName='Helvetica-Bold'))
+    styles.add(ParagraphStyle(name='Heading1', fontSize=16, leading=18, spaceAfter=12,
+                              fontName='Helvetica-Bold', textColor=colors.HexColor('#4c51bf')))
+    styles.add(ParagraphStyle(name='Heading2', fontSize=14, leading=16, spaceAfter=8,
+                              fontName='Helvetica-Bold', textColor=colors.HexColor('#2d3748')))
+    styles.add(ParagraphStyle(name='Normal', fontSize=10, leading=12, spaceAfter=6,
+                              fontName='Helvetica'))
+    styles.add(ParagraphStyle(name='Small', fontSize=9, leading=10, spaceAfter=4,
+                              fontName='Helvetica'))
+    styles.add(ParagraphStyle(name='Code', fontSize=9, leading=10, spaceAfter=4,
+                              fontName='Courier', backColor=colors.HexColor('#edf2f7'),
+                              borderColor=colors.HexColor('#e2e8f0'), borderWidth=0.5,
+                              leftIndent=6, rightIndent=6, firstLineIndent=6,
+                              leadingOffset=2, alignment=TA_LEFT))
+    styles.add(ParagraphStyle(name='TableCaption', fontSize=10, leading=12, alignment=TA_CENTER, spaceBefore=6, spaceAfter=6))
+
+
     story = []
 
-    # Title Page
-    story.append(Paragraph("Enterprise AWS Workload Sizing Report", styles['TitleStyle']))
-    story.append(Paragraph(f"Workload Name: {workload_inputs.get('workload_name', 'N/A')}", styles['Heading1']))
-    story.append(Paragraph(f"Report Date: {datetime.now().strftime('%Y-%m-%d %H:%M')}", styles['BodyText']))
-    story.append(Spacer(0, 0.5*inch))
-    
-    story.append(Paragraph("Overview", styles['Heading2']))
-    story.append(Paragraph("This report provides an analysis of recommended AWS EC2 instances and estimated monthly costs for various environments (Production, UAT, Development) based on your specified workload requirements.", styles['BodyText']))
-    story.append(Spacer(0, 0.2*inch))
+    # Title
+    story.append(Paragraph("Enterprise AWS EC2 Workload Sizing Report", styles['TitleStyle']))
+    story.append(Paragraph(f"Workload Name: <b>{workload_name}</b>", styles['Heading1']))
+    story.append(Paragraph(f"Report Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", styles['Normal']))
+    story.append(Spacer(1, 0.2 * inch))
 
-    story.append(Paragraph("Input Parameters", styles['Heading2']))
-    input_data = [
-        ["Parameter", "Value"],
-        ["Workload Type", workload_inputs.get('workload_type', 'N/A')],
-        ["Pricing Model/Commitment", workload_inputs.get('ri_sp_option', 'N/A')],
-        ["Annual Growth Rate (%)", f"{workload_inputs.get('growth_rate_annual', 0)}%"],
-        ["Projection Years", workload_inputs.get('growth_years', 0)]
-    ]
-    
+    # Workload Configuration
+    story.append(Paragraph("1. Workload Configuration (Input Parameters)", styles['Heading1']))
+    story.append(Paragraph(f"Workload Type: {inputs.get('workload_type', 'N/A')}", styles['Normal']))
+    story.append(Paragraph(f"Pricing Model / Commitment: {inputs.get('ri_sp_option', 'N/A')}", styles['Normal']))
+    story.append(Paragraph(f"Annual Growth Rate: {inputs.get('growth_rate_annual', 0)}%", styles['Normal']))
+    story.append(Paragraph(f"Projection Years: {inputs.get('growth_years', 0)}", styles['Normal']))
+    story.append(Spacer(1, 0.1 * inch))
+
+    # Environment Details
     for env in ['PROD', 'UAT', 'DEV']:
-        input_data.append([f"{env} vCPUs", workload_inputs.get(f'{env}_vcpus', 'N/A')])
-        input_data.append([f"{env} Memory (GiB)", workload_inputs.get(f'{env}_memory_gb', 'N/A')])
-        input_data.append([f"{env} Storage (GB)", workload_inputs.get(f'{env}_storage_gb', 'N/A')])
-        input_data.append([f"{env} OS", workload_inputs.get(f'{env}_os', 'N/A')])
-        region_code = workload_inputs.get(f'{env}_region', '')
-        region_name = next((name for name, code in AWS_REGIONS.items() if code == region_code), region_code)
-        input_data.append([f"{env} Region", region_name])
-    
-    input_table = Table(input_data, colWidths=[2.5*inch, 4*inch])
-    input_table.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#4c51bf')),
-        ('TEXTCOLOR', (0,0), (-1,0), colors.white),
-        ('ALIGN', (0,0), (-1,0), 'CENTER'),
-        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0,0), (-1,0), 10),
-        ('BOTTOMPADDING', (0,0), (-1,0), 6),
-        ('BACKGROUND', (0,1), (-1,-1), colors.HexColor('#e2e8f0')),
-        ('TEXTCOLOR', (0,1), (-1,-1), colors.black),
-        ('ALIGN', (0,1), (0,-1), 'LEFT'),
-        ('ALIGN', (1,1), (-1,-1), 'LEFT'),
-        ('FONTNAME', (0,1), (-1,-1), 'Helvetica'),
-        ('FONTSIZE', (0,1), (-1,-1), 9),
-        ('LEFTPADDING', (0,0), (-1,-1), 6),
-        ('RIGHTPADDING', (0,0), (-1,-1), 6),
-        ('TOPPADDING', (0,0), (-1,-1), 3),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 3),
-        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#cbd5e0')),
-        ('BOX', (0,0), (-1,-1), 0.5, colors.HexColor('#cbd5e0')),
-    ]))
-    story.append(input_table)
-    story.append(PageBreak())
+        story.append(Paragraph(f"<b>{env} Environment:</b>", styles['Normal']))
+        story.append(Paragraph(f"  - Required vCPUs: {inputs.get(f'{env}_vcpus', 'N/A')}", styles['Small']))
+        story.append(Paragraph(f"  - Required Memory (GiB): {inputs.get(f'{env}_memory_gb', 'N/A')}", styles['Small']))
+        story.append(Paragraph(f"  - Required Storage (GB): {inputs.get(f'{env}_storage_gb', 'N/A')}", styles['Small']))
+        story.append(Paragraph(f"  - Operating System: {inputs.get(f'{env}_os', 'N/A')}", styles['Small']))
+        story.append(Paragraph(f"  - Preferred AWS Region: {next((k for k, v in AWS_REGIONS.items() if v == inputs.get(f'{env}_region')), 'N/A')}", styles['Small']))
+        story.append(Spacer(1, 0.05 * inch))
 
-    # Recommendations Section
-    story.append(Paragraph("Recommended AWS Instances and Costs", styles['Heading1']))
-    story.append(Spacer(0, 0.2*inch))
+    # On-Premise Details
+    story.append(Paragraph("2. On-Premise Workload Details", styles['Heading1']))
+    story.append(Paragraph("<b>Compute:</b>", styles['Heading2']))
+    story.append(Paragraph(f"  - CPU Cores: {inputs.get('onprem_cpu_cores', 'N/A')}", styles['Normal']))
+    story.append(Paragraph(f"  - Current Storage (GB): {inputs.get('onprem_current_storage_gb', 'N/A')}", styles['Normal']))
+    story.append(Paragraph(f"  - CPU Model: {inputs.get('onprem_cpu_model', 'N/A')}", styles['Normal']))
+    story.append(Paragraph(f"  - Storage Type: {inputs.get('onprem_storage_type', 'N/A')}", styles['Normal']))
+    story.append(Paragraph(f"  - CPU Speed (GHz): {inputs.get('onprem_cpu_speed_ghz', 'N/A')}", styles['Normal']))
+    story.append(Paragraph(f"  - RAID Level: {inputs.get('onprem_raid_level', 'N/A')}", styles['Normal']))
+    story.append(Spacer(1, 0.1 * inch))
 
-    for env in ['PROD', 'UAT', 'DEV']:
-        rec = analysis_results.get(env)
-        if rec and rec['total_cost'] != float('inf'):
-            story.append(Paragraph(f"**{env} Environment**", styles['Heading2']))
-            
-            rec_data = [
-                ["Parameter", "Value"],
-                ["Recommended Instance Type", rec.get('instance_type', 'N/A')],
-                ["vCPUs", rec.get('vcpus', 'N/A')],
-                ["Memory (GiB)", f"{rec.get('memory_gb', 'N/A'):.1f}"],
-                ["Storage (GB)", rec.get('storage_gb', 'N/A')],
-                ["Operating System", rec.get('os', 'N/A')],
-                ["Region", next(k for k, v in AWS_REGIONS.items() if v == rec['region'])],
-                ["Pricing Model", rec.get('ri_sp_option', 'N/A')],
-                ["Monthly EC2 Instance Cost", f"${rec.get('instance_cost', 0):,.2f}"],
-                ["Monthly EBS Storage Cost", f"${rec.get('ebs_cost', 0):,.2f}"],
-                ["Monthly OS Cost", f"${rec.get('os_cost', 0):,.2f}"], # Still 0 in this simplified model
-                ["Total Monthly Cost", f"${rec.get('total_cost', 0):,.2f}"]
-            ]
-            rec_table = Table(rec_data, colWidths=[2.5*inch, 4*inch])
-            rec_table.setStyle(TableStyle([
-                ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#667eea')),
-                ('TEXTCOLOR', (0,0), (-1,0), colors.white),
-                ('ALIGN', (0,0), (-1,0), 'CENTER'),
-                ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0,0), (-1,0), 10),
-                ('BOTTOMPADDING', (0,0), (-1,0), 6),
-                ('BACKGROUND', (0,1), (-1,-1), colors.HexColor('#f7fafc')),
-                ('TEXTCOLOR', (0,1), (-1,-1), colors.black),
-                ('ALIGN', (0,1), (0,-1), 'LEFT'),
-                ('ALIGN', (1,1), (-1,-1), 'LEFT'),
-                ('FONTNAME', (0,1), (-1,-1), 'Helvetica'),
-                ('FONTSIZE', (0,1), (-1,-1), 9),
-                ('LEFTPADDING', (0,0), (-1,-1), 6),
-                ('RIGHTPADDING', (0,0), (-1,-1), 6),
-                ('TOPPADDING', (0,0), (-1,-1), 3),
-                ('BOTTOMPADDING', (0,0), (-1,-1), 3),
-                ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#e2e8f0')),
-                ('BOX', (0,0), (-1,-1), 0.5, colors.HexColor('#e2e8f0')),
-            ]))
-            story.append(rec_table)
-            story.append(Spacer(0, 0.4*inch))
+    story.append(Paragraph("<b>Memory Resources:</b>", styles['Heading2']))
+    story.append(Paragraph(f"  - Total RAM (GB): {inputs.get('onprem_total_ram_gb', 'N/A')}", styles['Normal']))
+    story.append(Paragraph(f"  - RAM Type: {inputs.get('onprem_ram_type', 'N/A')}", styles['Normal']))
+    story.append(Paragraph(f"  - RAM Speed (MHz): {inputs.get('onprem_ram_speed_mhz', 'N/A')}", styles['Normal']))
+    story.append(Spacer(1, 0.1 * inch))
+
+    story.append(Paragraph("<b>Growth & Planning:</b>", styles['Heading2']))
+    story.append(Paragraph(f"  - Annual Growth Rate (%): {inputs.get('onprem_annual_growth_rate_percent', 'N/A')}", styles['Normal']))
+    story.append(Paragraph(f"  - Planning Horizon (years): {inputs.get('onprem_planning_horizon_years', 'N/A')}", styles['Normal']))
+    story.append(Spacer(1, 0.1 * inch))
+
+    story.append(Paragraph("<b>CPU Performance:</b>", styles['Heading2']))
+    story.append(Paragraph(f"  - Peak CPU Utilization (%): {inputs.get('onprem_peak_cpu_utilization_percent', 'N/A')}", styles['Normal']))
+    story.append(Paragraph(f"  - Average CPU Utilization (%): {inputs.get('onprem_average_cpu_utilization_percent', 'N/A')}", styles['Normal']))
+    story.append(Paragraph(f"  - Active CPU Cores: {inputs.get('onprem_active_cpu_cores', 'N/A')}", styles['Normal']))
+    story.append(Spacer(1, 0.1 * inch))
+
+    story.append(Paragraph("<b>RAM Utilization:</b>", styles['Heading2']))
+    story.append(Paragraph(f"  - Peak RAM Utilization (%): {inputs.get('onprem_peak_ram_utilization_percent', 'N/A')}", styles['Normal']))
+    story.append(Paragraph(f"  - Average RAM Utilization (%): {inputs.get('onprem_average_ram_utilization_percent', 'N/A')}", styles['Normal']))
+    story.append(Paragraph(f"  - SGA/Buffer Pool Size (GB): {inputs.get('onprem_sga_buffer_pool_gb', 'N/A')}", styles['Normal']))
+    story.append(Spacer(1, 0.1 * inch))
+
+    story.append(Paragraph("<b>I/O Performance:</b>", styles['Heading2']))
+    story.append(Paragraph(f"  - Peak IOPS: {inputs.get('onprem_peak_iops', 'N/A')}", styles['Normal']))
+    story.append(Paragraph(f"  - Average IOPS: {inputs.get('onprem_average_iops', 'N/A')}", styles['Normal']))
+    story.append(Paragraph(f"  - Peak Throughput (MB/s): {inputs.get('onprem_peak_throughput_mbps', 'N/A')}", styles['Normal']))
+    story.append(Spacer(1, 0.1 * inch))
+
+    story.append(Paragraph("<b>Network & Connection:</b>", styles['Heading2']))
+    story.append(Paragraph(f"  - Network Bandwidth (Gbps): {inputs.get('onprem_network_bandwidth_gbps', 'N/A')}", styles['Normal']))
+    story.append(Paragraph(f"  - Network Latency (ms): {inputs.get('onprem_network_latency_ms', 'N/A')}", styles['Normal']))
+    story.append(Paragraph(f"  - Max Concurrent Connections: {inputs.get('onprem_max_concurrent_connections', 'N/A')}", styles['Normal']))
+    story.append(Paragraph(f"  - Average Concurrent Connections: {inputs.get('onprem_average_concurrent_connections', 'N/A')}", styles['Normal']))
+    story.append(Spacer(1, 0.2 * inch))
+
+    # Advanced Settings
+    story.append(Paragraph("3. AWS Advanced Settings", styles['Heading1']))
+    story.append(Paragraph(f"  - Enable Encryption at Rest: {'Yes' if inputs.get('enable_encryption_at_rest') else 'No'}", styles['Normal']))
+    story.append(Paragraph(f"  - Enable Performance Insights: {'Yes' if inputs.get('enable_performance_insights') else 'No'}", styles['Normal']))
+    story.append(Paragraph(f"  - Enable Enhanced Monitoring: {'Yes' if inputs.get('enable_enhanced_monitoring') else 'No'}", styles['Normal']))
+    story.append(Paragraph(f"  - Monthly Data Transfer (GB): {inputs.get('monthly_data_transfer_gb', 'N/A')}", styles['Normal']))
+    story.append(Paragraph(f"  - Backup Retention (days): {inputs.get('backup_retention_days', 'N/A')}", styles['Normal']))
+    story.append(Spacer(1, 0.2 * inch))
+
+    # Recommendations
+    story.append(Paragraph("4. AWS Recommendations", styles['Heading1']))
+
+    table_data = [['Environment', 'Recommended Instance', 'OS', 'Region', 'Storage (GB)', 'Monthly Cost']]
+    for env, rec in recommendations.items():
+        if rec['total_cost'] == float('inf'):
+            cost_str = "N/A (No suitable instance)"
+            instance_str = "No suitable instance found"
         else:
-            story.append(Paragraph(f"**{env} Environment:** No suitable instance found or error occurred.", styles['BodyText']))
-            story.append(Spacer(0, 0.2*inch))
+            cost_str = f"${rec['total_cost']:,.2f}"
+            instance_str = f"{rec['instance_type']} ({rec['vcpus']} vCPUs, {rec['memory_gb']:.1f} GiB)"
+        
+        table_data.append([
+            env,
+            instance_str,
+            rec['os'],
+            next(k for k, v in AWS_REGIONS.items() if v == rec['region']),
+            rec['storage_gb'],
+            cost_str
+        ])
 
-    # Growth Projection Section
-    prod_rec = analysis_results.get('PROD', {})
-    if 'projected_costs' in prod_rec and workload_inputs.get('growth_years', 0) > 0:
-        story.append(PageBreak())
-        story.append(Paragraph("Workload Growth Projections (PROD)", styles['Heading1']))
-        story.append(Paragraph(f"Projected resource requirements and estimated monthly costs for the PROD environment based on an annual growth rate of {workload_inputs.get('growth_rate_annual', 0)}% over {workload_inputs.get('growth_years', 0)} years.", styles['BodyText']))
-        story.append(Spacer(0, 0.2*inch))
+    table_style = TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4c51bf')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#f7fafc')),
+        ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#e2e8f0')),
+        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#e2e8f0')),
+        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 1), (-1, -1), 9),
+        ('LEFTPADDING', (0, 0), (-1, -1), 6),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+    ])
 
-        proj_headers = ["Year", "Projected vCPUs", "Projected Memory (GiB)", "Projected Storage (GB)", "Recommended Instance", "Estimated Monthly Cost"]
-        proj_data = [proj_headers]
+    table = Table(table_data)
+    table.setStyle(table_style)
+    story.append(table)
+    story.append(Spacer(1, 0.2 * inch))
 
-        for year_str, details in prod_rec['projected_costs'].items():
-            cost_value = details['estimated_cost']
-            cost_display = f"${cost_value:,.2f}" if isinstance(cost_value, (int, float)) else "N/A"
-            proj_data.append([
+    # Cost Breakdown (PROD)
+    prod_rec = recommendations.get('PROD')
+    if prod_rec and prod_rec['total_cost'] != float('inf'):
+        story.append(Paragraph("5. PROD Environment Cost Breakdown", styles['Heading1']))
+        story.append(Paragraph(f"Monthly Instance Cost: ${prod_rec['instance_cost']:,.2f}", styles['Normal']))
+        story.append(Paragraph(f"Monthly EBS Storage Cost: ${prod_rec['ebs_cost']:,.2f}", styles['Normal']))
+        story.append(Paragraph(f"Monthly OS Cost (included): ${prod_rec['os_cost']:,.2f}", styles['Normal']))
+        story.append(Paragraph(f"<b>Total PROD Monthly Cost: ${prod_rec['total_cost']:,.2f}</b>", styles['Normal']))
+        story.append(Spacer(1, 0.2 * inch))
+
+    # Growth Projections
+    if 'projected_costs' in recommendations.get('PROD', {}) and inputs.get('growth_years', 0) > 0:
+        story.append(Paragraph("6. Workload Growth Projections (PROD)", styles['Heading1']))
+        story.append(Paragraph(f"Based on an annual growth rate of {inputs.get('growth_rate_annual', 0)}% over {inputs.get('growth_years', 0)} years.", styles['Normal']))
+        
+        proj_table_data = [['Year', 'Projected vCPUs', 'Projected Memory (GiB)', 'Projected Storage (GB)', 'Estimated Monthly Cost', 'Recommended Instance']]
+        for year_str, details in recommendations['PROD']['projected_costs'].items():
+            proj_cost = details['estimated_cost'] if isinstance(details['estimated_cost'], (int, float)) else 'N/A'
+            if isinstance(proj_cost, (int, float)):
+                proj_cost_str = f"${proj_cost:,.2f}"
+            else:
+                proj_cost_str = proj_cost
+            proj_table_data.append([
                 year_str,
                 details['vcpus'],
-                f"{details['memory_gb']:.1f}",
+                details['memory_gb'],
                 details['storage_gb'],
-                details['recommended_instance'],
-                cost_display
+                proj_cost_str,
+                details['recommended_instance']
             ])
         
-        proj_table = Table(proj_data, colWidths=[1*inch, 1.2*inch, 1.4*inch, 1.4*inch, 1.4*inch, 1.6*inch])
-        proj_table.setStyle(TableStyle([
-            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#4c51bf')),
-            ('TEXTCOLOR', (0,0), (-1,0), colors.white),
-            ('ALIGN', (0,0), (-1,0), 'CENTER'),
-            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0,0), (-1,0), 10),
-            ('BOTTOMPADDING', (0,0), (-1,0), 6),
-            ('BACKGROUND', (0,1), (-1,-1), colors.HexColor('#e2e8f0')),
-            ('TEXTCOLOR', (0,1), (-1,-1), colors.black),
-            ('ALIGN', (0,1), (-1,-1), 'CENTER'),
-            ('FONTNAME', (0,1), (-1,-1), 'Helvetica'),
-            ('FONTSIZE', (0,1), (-1,-1), 9),
-            ('LEFTPADDING', (0,0), (-1,-1), 3),
-            ('RIGHTPADDING', (0,0), (-1,-1), 3),
-            ('TOPPADDING', (0,0), (-1,-1), 3),
-            ('BOTTOMPADDING', (0,0), (-1,-1), 3),
-            ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#cbd5e0')),
-            ('BOX', (0,0), (-1,-1), 0.5, colors.HexColor('#cbd5e0')),
-        ]))
+        proj_table = Table(proj_table_data)
+        proj_table.setStyle(table_style) # Re-use general table style
         story.append(proj_table)
-        story.append(Spacer(0, 0.4*inch))
-    else:
-        story.append(Paragraph("No growth projection data available.", styles['BodyText']))
-        story.append(Spacer(0, 0.2*inch))
-
+        story.append(Spacer(1, 0.2 * inch))
 
     # Footer
     story.append(PageBreak())
-    story.append(Paragraph("--- End of Report ---", styles['SmallText'], alignment=TA_CENTER))
+    story.append(Paragraph("--- End of Report ---", styles['TableCaption']))
+    story.append(Paragraph("Enterprise AWS Workload Sizing Platform v3.0", styles['Small']))
+    story.append(Paragraph("Comprehensive cloud migration planning for enterprise infrastructure", styles['Small']))
 
     try:
         doc.build(story)
-        logger.info("PDF report generated successfully.")
+        buffer.seek(0)
+        return buffer
     except Exception as e:
-        logger.error(f"Error building PDF: {e}")
-        st.error(f"Error generating PDF report: {e}")
+        st.error(f"Error generating PDF: {e}")
+        return None
 
 def render_reports_export():
-    """Renders the UI for reports and export."""
-    st.markdown("## 📋 Reports & Export")
+    """Renders options to export reports."""
+    st.markdown("## 📄 Reports & Export")
 
+    # Single Workload Report
+    st.markdown("### Single Workload Report")
     if st.session_state.analysis_results:
-        st.markdown("### Single Workload Report")
-        if REPORTLAB_AVAILABLE:
-            pdf_buffer = BytesIO()
-            generate_pdf_report(st.session_state.analysis_results['recommendations'], st.session_state.analysis_results['inputs'], pdf_buffer)
-            st.download_button(
-                label="Download PDF Report",
-                data=pdf_buffer.getvalue(),
-                file_name=f"workload_report_{st.session_state.analysis_results['inputs'].get('workload_name', 'single').replace(' ', '_').lower()}.pdf",
-                mime="application/pdf"
-            )
-        else:
-            st.warning("Install `reportlab` to enable PDF report generation (`pip install reportlab`).")
-
-        # Export to CSV
-        csv_data = []
-        # Use inputs from analysis_results for consistency
-        current_workload_inputs = st.session_state.analysis_results['inputs']
-        current_recommendations = st.session_state.analysis_results['recommendations']
-
-        for env, rec in current_recommendations.items():
-            if rec['total_cost'] != float('inf'):
-                row = {
-                    "Workload Name": current_workload_inputs.get('workload_name', 'Single Workload'),
-                    "Environment": env,
-                    "Recommended Instance": rec['instance_type'],
-                    "vCPUs": rec['vcpus'],
-                    "Memory (GiB)": rec['memory_gb'],
-                    "Storage (GB)": rec['storage_gb'],
-                    "OS": rec['os'],
-                    "Region": next(k for k, v in AWS_REGIONS.items() if v == rec['region']),
-                    "Pricing Model": rec['ri_sp_option'],
-                    "Monthly EC2 Instance Cost": rec['instance_cost'],
-                    "Monthly EBS Storage Cost": rec['ebs_cost'],
-                    "Monthly OS Cost": rec['os_cost'],
-                    "Total Monthly Cost": rec['total_cost']
-                }
-                csv_data.append(row)
+        workload_name = st.session_state.analysis_results['inputs'].get('workload_name', 'Single_Workload_Analysis')
         
-        # Add growth projections to CSV if available
-        prod_rec = current_recommendations.get('PROD', {})
-        if 'projected_costs' in prod_rec and current_workload_inputs.get('growth_years', 0) > 0:
-            for year_str, details in prod_rec['projected_costs'].items():
-                cost_value = details['estimated_cost']
-                csv_data.append({
-                    "Workload Name": current_workload_inputs.get('workload_name', 'Single Workload'),
-                    "Environment": f"PROD - {year_str} Projection",
-                    "Recommended Instance": details['recommended_instance'],
-                    "vCPUs": details['vcpus'],
-                    "Memory (GiB)": details['memory_gb'],
-                    "Storage (GB)": details['storage_gb'],
-                    "OS": prod_rec['os'],
-                    "Region": next(k for k, v in AWS_REGIONS.items() if v == prod_rec['region']),
-                    "Pricing Model": prod_rec['ri_sp_option'],
-                    "Monthly EC2 Instance Cost": "N/A", # Not broken down in projections
-                    "Monthly EBS Storage Cost": "N/A",
-                    "Monthly OS Cost": "N/A",
-                    "Total Monthly Cost": cost_value if isinstance(cost_value, (int, float)) else "N/A"
-                })
+        if st.button("Generate PDF Report (Current Workload)", key="generate_pdf_single"):
+            with st.spinner("Generating PDF..."):
+                pdf_buffer = generate_pdf_report(
+                    workload_name=workload_name,
+                    inputs=st.session_state.analysis_results['inputs'],
+                    recommendations=st.session_state.analysis_results['recommendations']
+                )
+                if pdf_buffer:
+                    st.download_button(
+                        label="Download PDF Report",
+                        data=pdf_buffer.getvalue(),
+                        file_name=f"{workload_name}_AWS_Sizing_Report.pdf",
+                        mime="application/pdf",
+                        key="download_single_pdf"
+                    )
+                    st.success("PDF report generated!")
+                else:
+                    st.error("Failed to generate PDF report.")
+    else:
+        st.info("Please generate recommendations for a single workload first to enable PDF report generation.")
 
-        if csv_data:
-            df_export = pd.DataFrame(csv_data)
-            csv_export = df_export.to_csv(index=False).encode('utf-8')
-            st.download_button(
-                label="Download Single Workload CSV",
-                data=csv_export,
-                file_name=f"workload_details_{current_workload_inputs.get('workload_name', 'single').replace(' ', '_').lower()}.csv",
-                mime="text/csv"
-            )
-
+    # Bulk Workload Reports
+    st.markdown("### Bulk Workload Reports")
     if st.session_state.bulk_results:
-        st.markdown("### Bulk Analysis Export")
-        
-        # Prepare data for detailed bulk CSV
-        bulk_detailed_data = []
-        for workload_result in st.session_state.bulk_results:
-            workload_name = workload_result['workload_name']
-            inputs = workload_result['inputs']
-            recs = workload_result['recommendations']
+        # Option 1: Export all bulk results to a single CSV
+        if st.button("Export Bulk Results to CSV", key="export_bulk_csv"):
+            bulk_export_data = []
+            for item in st.session_state.bulk_results:
+                row_data = {
+                    "Workload Name": item['workload_name'],
+                    "Workload Type": item['inputs'].get('workload_type', ''),
+                    "PROD_vCPUs_Req": item['inputs'].get('PROD_vcpus', 0),
+                    "PROD_Memory_GiB_Req": item['inputs'].get('PROD_memory_gb', 0.0),
+                    "PROD_Storage_GB_Req": item['inputs'].get('PROD_storage_gb', 0),
+                    "PROD_OS_Req": item['inputs'].get('PROD_os', ''),
+                    "PROD_Region_Req": next(k for k,v in AWS_REGIONS.items() if v == item['inputs'].get('PROD_region')),
+                    "RI_SP_Option": item['inputs'].get('ri_sp_option', 'On-Demand'),
+                    "Annual Growth Rate (%)": item['inputs'].get('growth_rate_annual', 0),
+                    "Projection Years": item['inputs'].get('growth_years', 0),
 
-            if 'error' in recs:
-                bulk_detailed_data.append({
-                    "Workload Name": workload_name,
-                    "Environment": "N/A",
-                    "Status": "Error",
-                    "Error Message": recs['error'],
-                    "Recommended Instance": "N/A",
-                    "vCPUs": "N/A", "Memory (GiB)": "N/A", "Storage (GB)": "N/A",
-                    "OS": "N/A", "Region": "N/A", "Pricing Model": "N/A",
-                    "Monthly EC2 Instance Cost": "N/A", "Monthly EBS Storage Cost": "N/A", "Monthly OS Cost": "N/A",
-                    "Total Monthly Cost": "N/A",
-                    "Annual Growth Rate (%)": inputs.get('growth_rate_annual', 'N/A'),
-                    "Projection Years": inputs.get('growth_years', 'N/A')
-                })
-                continue
+                    # On-Premise Metrics for Export
+                    "OnPrem_CPU_Cores": item['inputs'].get('onprem_cpu_cores', 0),
+                    "OnPrem_Current_Storage_GB": item['inputs'].get('onprem_current_storage_gb', 0),
+                    "OnPrem_CPU_Model": item['inputs'].get('onprem_cpu_model', ''),
+                    "OnPrem_Storage_Type": item['inputs'].get('onprem_storage_type', ''),
+                    "OnPrem_CPU_Speed_GHz": item['inputs'].get('onprem_cpu_speed_ghz', 0.0),
+                    "OnPrem_RAID_Level": item['inputs'].get('onprem_raid_level', ''),
+                    "OnPrem_Total_RAM_GB": item['inputs'].get('onprem_total_ram_gb', 0),
+                    "OnPrem_RAM_Type": item['inputs'].get('onprem_ram_type', ''),
+                    "OnPrem_RAM_Speed_MHz": item['inputs'].get('onprem_ram_speed_mhz', 0),
+                    "OnPrem_Annual_Growth_Rate_Percent": item['inputs'].get('onprem_annual_growth_rate_percent', 0),
+                    "OnPrem_Planning_Horizon_Years": item['inputs'].get('onprem_planning_horizon_years', 0),
+                    "OnPrem_Peak_CPU_Utilization_Percent": item['inputs'].get('onprem_peak_cpu_utilization_percent', 0),
+                    "OnPrem_Average_CPU_Utilization_Percent": item['inputs'].get('onprem_average_cpu_utilization_percent', 0),
+                    "OnPrem_Active_CPU_Cores": item['inputs'].get('onprem_active_cpu_cores', 0),
+                    "OnPrem_Peak_RAM_Utilization_Percent": item['inputs'].get('onprem_peak_ram_utilization_percent', 0),
+                    "OnPrem_Average_RAM_Utilization_Percent": item['inputs'].get('onprem_average_ram_utilization_percent', 0),
+                    "OnPrem_SGA_Buffer_Pool_GB": item['inputs'].get('onprem_sga_buffer_pool_gb', 0.0),
+                    "OnPrem_Peak_IOPS": item['inputs'].get('onprem_peak_iops', 0),
+                    "OnPrem_Average_IOPS": item['inputs'].get('onprem_average_iops', 0),
+                    "OnPrem_Peak_Throughput_MBPS": item['inputs'].get('onprem_peak_throughput_mbps', 0),
+                    "OnPrem_Network_Bandwidth_Gbps": item['inputs'].get('onprem_network_bandwidth_gbps', 0.0),
+                    "OnPrem_Network_Latency_ms": item['inputs'].get('onprem_network_latency_ms', 0.0),
+                    "OnPrem_Max_Concurrent_Connections": item['inputs'].get('onprem_max_concurrent_connections', 0),
+                    "OnPrem_Average_Concurrent_Connections": item['inputs'].get('onprem_average_concurrent_connections', 0),
 
-            for env, rec in recs.items():
-                row = {
-                    "Workload Name": workload_name,
-                    "Environment": env,
-                    "Status": "Success",
-                    "Error Message": "",
-                    "Recommended Instance": rec.get('instance_type', 'N/A'),
-                    "vCPUs": rec.get('vcpus', 'N/A'),
-                    "Memory (GiB)": rec.get('memory_gb', 'N/A'),
-                    "Storage (GB)": rec.get('storage_gb', 'N/A'),
-                    "OS": rec.get('os', 'N/A'),
-                    "Region": next((k for k, v in AWS_REGIONS.items() if v == rec.get('region')), rec.get('region', 'N/A')),
-                    "Pricing Model": rec.get('ri_sp_option', 'N/A'),
-                    "Monthly EC2 Instance Cost": rec.get('instance_cost', 'N/A'),
-                    "Monthly EBS Storage Cost": rec.get('ebs_cost', 'N/A'),
-                    "Monthly OS Cost": rec.get('os_cost', 'N/A'),
-                    "Total Monthly Cost": rec.get('total_cost', 'N/A') if rec.get('total_cost', float('inf')) != float('inf') else 'N/A',
-                    "Annual Growth Rate (%)": inputs.get('growth_rate_annual', 'N/A'),
-                    "Projection Years": inputs.get('growth_years', 'N/A')
+                    # Advanced Settings for Export
+                    "Enable_Encryption_at_Rest": "Yes" if item['inputs'].get('enable_encryption_at_rest') else "No",
+                    "Enable_Performance_Insights": "Yes" if item['inputs'].get('enable_performance_insights') else "No",
+                    "Enable_Enhanced_Monitoring": "Yes" if item['inputs'].get('enable_enhanced_monitoring') else "No",
+                    "Monthly_Data_Transfer_GB": item['inputs'].get('monthly_data_transfer_gb', 0),
+                    "Backup_Retention_Days": item['inputs'].get('backup_retention_days', 0),
+
+                    # AWS Recommendations Summary
+                    "PROD_Recommended_Instance": item['recommendations'].get('PROD', {}).get('instance_type', 'N/A'),
+                    "PROD_vCPUs_Rec": item['recommendations'].get('PROD', {}).get('vcpus', 0),
+                    "PROD_Memory_GiB_Rec": item['recommendations'].get('PROD', {}).get('memory_gb', 0.0),
+                    "PROD_Monthly_Cost_USD": item['recommendations'].get('PROD', {}).get('total_cost', float('inf'))
                 }
-                bulk_detailed_data.append(row)
+                bulk_export_data.append(row_data)
 
-                # Add projected costs for PROD if available
-                if env == 'PROD' and 'projected_costs' in rec and inputs.get('growth_years', 0) > 0:
-                    for year_str, proj_details in rec['projected_costs'].items():
-                        proj_cost_value = proj_details['estimated_cost']
-                        bulk_detailed_data.append({
-                            "Workload Name": workload_name,
-                            "Environment": f"PROD - {year_str} Projection",
-                            "Status": "Success",
-                            "Error Message": "",
-                            "Recommended Instance": proj_details['recommended_instance'],
-                            "vCPUs": proj_details['vcpus'],
-                            "Memory (GiB)": proj_details['memory_gb'],
-                            "Storage (GB)": proj_details['storage_gb'],
-                            "OS": rec['os'],
-                            "Region": next((k for k, v in AWS_REGIONS.items() if v == rec.get('region')), rec.get('region', 'N/A')),
-                            "Pricing Model": rec.get('ri_sp_option', 'N/A'),
-                            "Monthly EC2 Instance Cost": "N/A",
-                            "Monthly EBS Storage Cost": "N/A",
-                            "Monthly OS Cost": "N/A",
-                            "Total Monthly Cost": proj_cost_value if isinstance(proj_cost_value, (int, float)) else "N/A",
-                            "Annual Growth Rate (%)": inputs.get('growth_rate_annual', 'N/A'),
-                            "Projection Years": inputs.get('projection_years', 'N/A') # Corrected from proj_details to inputs
-                        })
-
-        if bulk_detailed_data:
-            df_bulk_export = pd.DataFrame(bulk_detailed_data)
-            bulk_csv_export = df_bulk_export.to_csv(index=False).encode('utf-8')
+            df_bulk_export = pd.DataFrame(bulk_export_data)
+            csv_export = df_bulk_export.to_csv(index=False).encode('utf-8')
             st.download_button(
-                label="Download Detailed Bulk Results CSV",
-                data=bulk_csv_export,
-                file_name="bulk_analysis_detailed_results.csv",
-                mime="text/csv"
+                label="Download All Bulk Results as CSV",
+                data=csv_export,
+                file_name=f"bulk_aws_sizing_results_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                mime="text/csv",
+                key="download_all_bulk_csv"
             )
-        else:
-            st.info("No bulk results to export.")
+            st.success("Bulk results CSV ready for download!")
+        
+        # Option 2: Generate individual PDF reports for each bulk workload (can be slow for many)
+        if st.button("Generate Individual PDF Reports for Bulk Workloads (ZIP)", key="generate_bulk_pdfs"):
+            if REPORTLAB_AVAILABLE:
+                with st.spinner("Generating individual PDFs and zipping... This may take a while for many workloads."):
+                    zip_buffer = BytesIO()
+                    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
+                        for item in st.session_state.bulk_results:
+                            workload_name = item['workload_name']
+                            pdf_buffer = generate_pdf_report(
+                                workload_name=workload_name,
+                                inputs=item['inputs'],
+                                recommendations=item['recommendations']
+                            )
+                            if pdf_buffer:
+                                zf.writestr(f"{workload_name}_AWS_Sizing_Report.pdf", pdf_buffer.getvalue())
+                    zip_buffer.seek(0)
+                    st.download_button(
+                        label="Download All PDF Reports (ZIP)",
+                        data=zip_buffer.getvalue(),
+                        file_name=f"bulk_aws_sizing_reports_{datetime.now().strftime('%Y%m%d_%H%M')}.zip",
+                        mime="application/zip",
+                        key="download_bulk_pdfs_zip"
+                    )
+                    st.success("All PDF reports generated and zipped!")
+                else:
+                    st.error("Failed to generate bulk PDF reports.")
+            else:
+                st.error("`reportlab` library not found. Cannot generate PDF reports.")
+    else:
+        st.info("No bulk analysis results available to export.")
 
 
-# Main application
+# Main Application Logic
 def main():
-    """Main application entry point."""
     initialize_session_state()
 
     st.markdown("""
     <div class="main-header">
-        <h1>🏢 Enterprise AWS Workload Sizing Platform</h1>
-        <p>Comprehensive infrastructure assessment and cloud migration planning for enterprise workloads</p>
+        <h1>Enterprise AWS EC2 Workload Sizing Platform</h1>
+        <p>Comprehensive cloud migration planning for enterprise infrastructure</p>
     </div>
     """, unsafe_allow_html=True)
 
-    with st.sidebar:
-        st.markdown("### 🔧 Global Configuration")
-
-        calculator = st.session_state.calculator
-        cred_status, cred_message = calculator.validate_aws_credentials()
-
-        if cred_status:
-            st.markdown(f'<span class="status-badge status-success">AWS Connected</span>', unsafe_allow_html=True)
+    if st.sidebar.button("⚙️ Re-fetch Latest AWS Prices", help="Click to refresh AWS pricing data from the AWS Pricing API. This may take a few minutes.", key="fetch_prices_btn"):
+        st.session_state.calculator.fetch_current_prices()
+        if st.session_state.calculator.all_ec2_prices and st.session_state.calculator.all_ebs_prices:
+            st.sidebar.success("✅ Latest AWS prices fetched successfully!")
         else:
-            st.markdown(f'<span class="status-badge status-error">AWS Not Connected</span>', unsafe_allow_html=True)
+            st.sidebar.error("❌ Failed to fetch AWS prices. Check AWS credentials or network.")
 
-        st.markdown(f"<small>{cred_message}</small>", unsafe_allow_html=True)
-        st.markdown("---")
+    # Check AWS credentials status
+    status, message = st.session_state.calculator.validate_aws_credentials()
+    if status:
+        st.sidebar.success(f"AWS Connection: {message}")
+    else:
+        st.sidebar.error(f"AWS Connection: {message} Please ensure AWS credentials are set up (e.g., via ~/.aws/credentials or environment variables).")
+        st.info("AWS credentials are required to fetch real-time pricing and generate accurate recommendations. Please configure them to proceed.")
 
-        if st.session_state.analysis_results or st.session_state.bulk_results:
-            st.markdown("### 📈 Quick Stats")
-
-            total_workloads = 0
-            total_monthly_cost = 0.0
-
-            if st.session_state.bulk_results:
-                for res in st.session_state.bulk_results:
-                    # Check for errors in bulk results before processing
-                    if 'error' not in res['recommendations']:
-                        total_workloads += 1
-                        if 'PROD' in res['recommendations'] and 'total_cost' in res['recommendations']['PROD'] and res['recommendations']['PROD']['total_cost'] != float('inf'):
-                            total_monthly_cost += res['recommendations']['PROD']['total_cost']
-            
-            # For single analysis, only count if it's not a bulk result (i.e., if bulk_results is empty or None)
-            if st.session_state.analysis_results and not st.session_state.bulk_results:
-                if 'PROD' in st.session_state.analysis_results['recommendations'] and st.session_state.analysis_results['recommendations']['PROD']['total_cost'] != float('inf'):
-                    total_workloads += 1 
-                    total_monthly_cost += st.session_state.analysis_results['recommendations']['PROD']['total_cost']
-
-            st.metric("Workloads Analyzed", total_workloads)
-            st.metric("Monthly Cost (PROD)", f"${total_monthly_cost:,.2f}")
-            st.metric("Annual Cost (PROD)", f"${total_monthly_cost * 12:,.2f}")
-
-        st.markdown("---")
-        st.markdown("""
-        ### 🚀 Platform Features
-
-        **Workload Support:**
-        - Web Applications
-        - Application Servers
-        - Database Servers
-        - File Servers
-        - Compute Intensive
-
-        **Operating Systems:**
-        - Linux (Amazon Linux, Ubuntu, RHEL)
-        - Windows Server
-
-        **Global Coverage:**
-        - US: East, West (N. Cal), West (Oregon)
-        - Europe: Ireland, Frankfurt
-        - Asia Pacific: Singapore, Sydney, Tokyo, Seoul, Mumbai, Hong Kong
-        """)
-
-    tab1, tab2, tab3 = st.tabs(["⚙️ Workload Configuration", "📁 Bulk Analysis", "📋 Reports & Export"])
+    tab1, tab2, tab3 = st.tabs(["Single Workload Analysis", "Bulk Analysis", "Reports & Export"])
 
     with tab1:
         render_workload_configuration()
-
-        if st.button("🚀 Generate Recommendations", type="primary", key="generate_single"):
-            with st.spinner("🔄 Analyzing workload requirements..."):
+        if st.button("✨ Generate Recommendations", type="primary", key="generate_single_recommendation"):
+            if not status: # Re-check status before analysis
+                st.error("Cannot generate recommendations. AWS credentials are not properly configured.")
+            elif not st.session_state.calculator.all_ec2_prices:
+                st.info("Fetching AWS prices for the first time or refresh needed. Please wait...")
+                st.session_state.calculator.fetch_current_prices()
+                if not st.session_state.calculator.all_ec2_prices:
+                    st.error("Failed to fetch AWS prices. Cannot proceed with recommendations.")
+                    return
+            
+            with st.spinner("Analyzing workload and generating recommendations..."):
                 try:
-                    st.session_state.calculator.fetch_current_prices()
-                    # Ensure the calculator has the current inputs from session state
+                    # Pass inputs from session state
                     st.session_state.calculator.inputs = st.session_state.workload_inputs.copy() 
                     results = st.session_state.calculator.generate_all_recommendations()
                     st.session_state.analysis_results = {
@@ -1422,7 +1564,7 @@ def main():
 
     st.markdown("---")
     st.markdown("""
-    <div style="text-align: center; color: #6b7280; font-size: 0.875rem; padding: 2rem 0;\">
+    <div style="text-align: center; color: #6b7280; font-size: 0.875rem; padding: 2rem 0;">
         <strong>Enterprise AWS Workload Sizing Platform v3.0</strong><br>
         Comprehensive cloud migration planning for enterprise infrastructure
     </div>
