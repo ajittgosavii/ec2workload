@@ -284,7 +284,7 @@ class EnterpriseEC2WorkloadSizingCalculator:
         }
     }
     
-    # Base Pricing (Linux baseline)
+    # Base Pricing (Linux baseline) - Updated with Asia Pacific regions
     BASE_PRICING = {
         "instance": {
             # M6i Intel instances
@@ -312,10 +312,22 @@ class EnterpriseEC2WorkloadSizingCalculator:
             "c6a.4xlarge": 0.5508, "c6a.8xlarge": 1.1016,
         },
         "ebs": {
+            # US Regions
             "us-east-1": {"gp3": {"gb": 0.08, "iops": 0.005, "throughput": 0.04}, "io2": {"gb": 0.125, "iops": 0.065}},
             "us-west-1": {"gp3": {"gb": 0.088, "iops": 0.0055, "throughput": 0.044}, "io2": {"gb": 0.138, "iops": 0.0715}},
             "us-west-2": {"gp3": {"gb": 0.084, "iops": 0.0052, "throughput": 0.042}, "io2": {"gb": 0.131, "iops": 0.068}},
+            
+            # Europe Regions
             "eu-west-1": {"gp3": {"gb": 0.089, "iops": 0.0054, "throughput": 0.043}, "io2": {"gb": 0.138, "iops": 0.070}},
+            "eu-central-1": {"gp3": {"gb": 0.092, "iops": 0.0055, "throughput": 0.044}, "io2": {"gb": 0.142, "iops": 0.072}},
+            
+            # Asia Pacific Regions
+            "ap-southeast-1": {"gp3": {"gb": 0.095, "iops": 0.0057, "throughput": 0.046}, "io2": {"gb": 0.145, "iops": 0.073}},
+            "ap-southeast-2": {"gp3": {"gb": 0.095, "iops": 0.0057, "throughput": 0.046}, "io2": {"gb": 0.145, "iops": 0.073}},
+            "ap-northeast-1": {"gp3": {"gb": 0.096, "iops": 0.0058, "throughput": 0.047}, "io2": {"gb": 0.148, "iops": 0.075}},
+            "ap-northeast-2": {"gp3": {"gb": 0.094, "iops": 0.0056, "throughput": 0.045}, "io2": {"gb": 0.143, "iops": 0.072}},
+            "ap-south-1": {"gp3": {"gb": 0.087, "iops": 0.0052, "throughput": 0.042}, "io2": {"gb": 0.135, "iops": 0.068}},
+            "ap-east-1": {"gp3": {"gb": 0.103, "iops": 0.0062, "throughput": 0.050}, "io2": {"gb": 0.158, "iops": 0.080}},
         }
     }
     
@@ -564,15 +576,36 @@ class EnterpriseEC2WorkloadSizingCalculator:
             return round(base_cost, 2)
     
     def estimate_network_cost(self, env):
-        """Estimate monthly network costs."""
+        """Estimate monthly network costs based on workload profile and region."""
+        # Base costs by environment
         base_cost = {"PROD": 50, "STAGING": 20, "QA": 15, "DEV": 10, "DR": 25}
+        
+        # Workload multipliers
         workload_multiplier = {
             "web_application": 1.5, "application_server": 1.2, "database_server": 1.0,
             "file_server": 2.0, "compute_intensive": 0.8
         }
+        
+        # Regional multipliers (data transfer costs vary by region)
+        regional_multiplier = {
+            # US Regions (baseline)
+            "us-east-1": 1.0, "us-west-1": 1.05, "us-west-2": 1.02,
+            # Europe Regions (slightly higher)
+            "eu-west-1": 1.1, "eu-central-1": 1.15,
+            # Asia Pacific Regions (higher data transfer costs)
+            "ap-southeast-1": 1.2,  # Singapore
+            "ap-southeast-2": 1.25, # Sydney  
+            "ap-northeast-1": 1.3,  # Tokyo
+            "ap-northeast-2": 1.25, # Seoul
+            "ap-south-1": 1.15,     # Mumbai
+            "ap-east-1": 1.35       # Hong Kong (highest)
+        }
+        
         base = base_cost.get(env, 20)
-        multiplier = workload_multiplier.get(self.inputs["workload_type"], 1.0)
-        return round(base * multiplier, 2)
+        workload_mult = workload_multiplier.get(self.inputs["workload_type"], 1.0)
+        region_mult = regional_multiplier.get(self.inputs["region"], 1.0)
+        
+        return round(base * workload_mult * region_mult, 2)
     
     def calculate_optimization_score(self, instance, required_vcpus, required_ram):
         """Calculate optimization score (0-100%)."""
@@ -801,14 +834,30 @@ def render_workload_configuration():
             )
             calculator.inputs["operating_system"] = os_options[selected_os_idx]
             
-            region_options = ["us-east-1", "us-west-1", "us-west-2", "eu-west-1"]
+            # Updated region selection with Asia Pacific regions
+            region_options = [
+                "us-east-1", "us-west-1", "us-west-2", 
+                "eu-west-1", "eu-central-1",
+                "ap-southeast-1", "ap-southeast-2", "ap-northeast-1", 
+                "ap-northeast-2", "ap-south-1", "ap-east-1"
+            ]
+            region_labels = [
+                "US East (N. Virginia)", "US West (N. California)", "US West (Oregon)",
+                "Europe (Ireland)", "Europe (Frankfurt)", 
+                "Asia Pacific (Singapore)", "Asia Pacific (Sydney)", "Asia Pacific (Tokyo)",
+                "Asia Pacific (Seoul)", "Asia Pacific (Mumbai)", "Asia Pacific (Hong Kong)"
+            ]
+            
             current_region_idx = region_options.index(calculator.inputs["region"])
             
-            calculator.inputs["region"] = st.selectbox(
+            selected_region_idx = st.selectbox(
                 "AWS Region",
-                region_options,
-                index=current_region_idx
+                range(len(region_options)),
+                index=current_region_idx,
+                format_func=lambda x: region_labels[x],
+                help="Select AWS region for deployment and pricing"
             )
+            calculator.inputs["region"] = region_options[selected_region_idx]
     
     selected_profile = calculator.WORKLOAD_PROFILES[calculator.inputs["workload_type"]]
     st.info(f"**{selected_profile['name']}**: {selected_profile['description']}")
@@ -957,22 +1006,23 @@ def render_bulk_analysis():
     
     st.markdown("Upload a CSV or Excel file containing multiple workload configurations for batch analysis.")
     
+    # Updated template with Asia Pacific examples
     if st.button("📥 Download Template"):
         template_data = {
-            'Workload Name': ['Web Frontend', 'API Gateway', 'Database Server', 'File Server'],
-            'Workload Type': ['web_application', 'application_server', 'database_server', 'file_server'],
-            'Operating System': ['linux', 'linux', 'windows', 'windows'],
-            'AWS Region': ['us-east-1', 'us-east-1', 'us-east-1', 'us-west-2'],
-            'Current CPU Cores': [8, 16, 32, 4],
-            'Peak CPU Utilization (%)': [75, 60, 80, 40],
-            'Current RAM (GB)': [32, 64, 128, 16],
-            'Peak RAM Utilization (%)': [80, 70, 85, 60],
-            'Current Storage (GB)': [500, 1000, 5000, 10000],
-            'Storage Growth Rate': [0.15, 0.10, 0.20, 0.25],
-            'Peak IOPS': [5000, 8000, 15000, 3000],
-            'Peak Throughput (MB/s)': [250, 400, 800, 200],
-            'Growth Projection Years': [3, 3, 5, 3],
-            'Prefer AMD': [True, True, False, True]
+            'Workload Name': ['Web Frontend', 'API Gateway', 'Database Server', 'File Server', 'Analytics Engine', 'Mobile Backend'],
+            'Workload Type': ['web_application', 'application_server', 'database_server', 'file_server', 'compute_intensive', 'application_server'],
+            'Operating System': ['linux', 'linux', 'windows', 'windows', 'linux', 'linux'],
+            'AWS Region': ['us-east-1', 'eu-west-1', 'ap-southeast-1', 'us-west-2', 'ap-northeast-1', 'ap-south-1'],
+            'Current CPU Cores': [8, 16, 32, 4, 24, 12],
+            'Peak CPU Utilization (%)': [75, 60, 80, 40, 90, 65],
+            'Current RAM (GB)': [32, 64, 128, 16, 96, 48],
+            'Peak RAM Utilization (%)': [80, 70, 85, 60, 88, 75],
+            'Current Storage (GB)': [500, 1000, 5000, 10000, 2000, 800],
+            'Storage Growth Rate': [0.15, 0.10, 0.20, 0.25, 0.30, 0.12],
+            'Peak IOPS': [5000, 8000, 15000, 3000, 12000, 6000],
+            'Peak Throughput (MB/s)': [250, 400, 800, 200, 600, 300],
+            'Growth Projection Years': [3, 3, 5, 3, 2, 4],
+            'Prefer AMD': [True, True, False, True, True, False]
         }
         
         template_df = pd.DataFrame(template_data)
@@ -1294,6 +1344,11 @@ def main():
         **Operating Systems:**
         - Linux (Amazon Linux, Ubuntu, RHEL)
         - Windows Server
+        
+        **Global Coverage:**
+        - US: East, West (N. Cal), West (Oregon)
+        - Europe: Ireland, Frankfurt
+        - Asia Pacific: Singapore, Sydney, Tokyo, Seoul, Mumbai, Hong Kong
         """)
     
     tab1, tab2, tab3 = st.tabs(["⚙️ Workload Configuration", "📁 Bulk Analysis", "📋 Reports & Export"])
