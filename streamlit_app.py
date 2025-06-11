@@ -13,6 +13,18 @@ import json
 import logging
 from functools import lru_cache
 from botocore.exceptions import NoCredentialsError, PartialCredentialsError, ClientError
+import hashlib
+import hmac
+
+# Firebase imports
+try:
+    import firebase_admin
+    from firebase_admin import credentials, auth, firestore
+    import pyrebase
+    FIREBASE_AVAILABLE = True
+except ImportError:
+    FIREBASE_AVAILABLE = False
+    st.error("Firebase libraries not installed. Please install: pip install firebase-admin pyrebase4")
 
 # Try to import reportlab for PDF generation
 try:
@@ -75,6 +87,16 @@ st.markdown("""
         opacity: 0.9;
     }
     
+    .auth-container {
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 2rem;
+        margin: 2rem auto;
+        max-width: 400px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+    }
+    
     .metric-card {
         background: white;
         border: 1px solid #e2e8f0;
@@ -134,6 +156,11 @@ st.markdown("""
         color: #991b1b;
     }
     
+    .status-warning {
+        background: #fef3c7;
+        color: #92400e;
+    }
+    
     .stButton>button {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white;
@@ -163,8 +190,191 @@ st.markdown("""
         color: #374151;
         font-weight: 600;
     }
+    
+    .user-info {
+        background: #f0f9ff;
+        border: 1px solid #0284c7;
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
 </style>
 """, unsafe_allow_html=True)
+
+class FirebaseAuthenticator:
+    """Firebase authentication manager."""
+    
+    def __init__(self):
+        self.firebase_app = None
+        self.auth_client = None
+        self.db = None
+        self.initialized = False
+        
+    def initialize_firebase(self):
+        """Initialize Firebase with Streamlit secrets."""
+        if self.initialized:
+            return True
+            
+        try:
+            # Check if Firebase is available
+            if not FIREBASE_AVAILABLE:
+                st.error("Firebase libraries not available. Please install firebase-admin and pyrebase4.")
+                return False
+                
+            # Get Firebase config from Streamlit secrets
+            firebase_config = {
+                "type": st.secrets["firebase"]["type"],
+                "project_id": st.secrets["firebase"]["project_id"],
+                "private_key_id": st.secrets["firebase"]["private_key_id"],
+                "private_key": st.secrets["firebase"]["private_key"].replace('\\n', '\n'),
+                "client_email": st.secrets["firebase"]["client_email"],
+                "client_id": st.secrets["firebase"]["client_id"],
+                "auth_uri": st.secrets["firebase"]["auth_uri"],
+                "token_uri": st.secrets["firebase"]["token_uri"],
+                "auth_provider_x509_cert_url": st.secrets["firebase"]["auth_provider_x509_cert_url"],
+                "client_x509_cert_url": st.secrets["firebase"]["client_x509_cert_url"]
+            }
+            
+            # Initialize Firebase Admin
+            if not firebase_admin._apps:
+                cred = credentials.Certificate(firebase_config)
+                self.firebase_app = firebase_admin.initialize_app(cred)
+            else:
+                self.firebase_app = firebase_admin.get_app()
+                
+            # Initialize Firestore
+            self.db = firestore.client()
+            
+            # Initialize Pyrebase for client-side auth
+            pyrebase_config = {
+                "apiKey": st.secrets["firebase"]["api_key"],
+                "authDomain": st.secrets["firebase"]["auth_domain"],
+                "projectId": st.secrets["firebase"]["project_id"],
+                "storageBucket": st.secrets["firebase"]["storage_bucket"],
+                "messagingSenderId": st.secrets["firebase"]["messaging_sender_id"],
+                "appId": st.secrets["firebase"]["app_id"],
+                "databaseURL": ""  # Not using Realtime Database
+            }
+            
+            firebase_client = pyrebase.initialize_app(pyrebase_config)
+            self.auth_client = firebase_client.auth()
+            
+            self.initialized = True
+            return True
+            
+        except Exception as e:
+            st.error(f"Failed to initialize Firebase: {str(e)}")
+            return False
+    
+    def sign_up(self, email, password, display_name):
+        """Create a new user account."""
+        try:
+            # Create user with email and password
+            user = self.auth_client.create_user_with_email_and_password(email, password)
+            
+            # Send email verification
+            self.auth_client.send_email_verification(user['idToken'])
+            
+            # Update profile with display name
+            self.auth_client.update_profile(user['idToken'], display_name=display_name)
+            
+            # Store additional user info in Firestore
+            user_data = {
+                'uid': user['localId'],
+                'email': email,
+                'display_name': display_name,
+                'created_at': datetime.now(),
+                'role': 'user',
+                'last_login': datetime.now()
+            }
+            
+            self.db.collection('users').document(user['localId']).set(user_data)
+            
+            return True, "Account created successfully! Please check your email for verification."
+            
+        except Exception as e:
+            error_message = str(e)
+            if "EMAIL_EXISTS" in error_message:
+                return False, "Email already exists. Please use a different email or sign in."
+            elif "WEAK_PASSWORD" in error_message:
+                return False, "Password is too weak. Please use at least 6 characters."
+            elif "INVALID_EMAIL" in error_message:
+                return False, "Invalid email format."
+            else:
+                return False, f"Sign up failed: {error_message}"
+    
+    def sign_in(self, email, password):
+        """Sign in an existing user."""
+        try:
+            user = self.auth_client.sign_in_with_email_and_password(email, password)
+            
+            # Get user info from Firebase Auth
+            user_info = self.auth_client.get_account_info(user['idToken'])
+            
+            # Check if email is verified
+            if not user_info['users'][0].get('emailVerified', False):
+                return False, "Please verify your email before signing in.", None
+            
+            # Update last login in Firestore
+            self.db.collection('users').document(user['localId']).update({
+                'last_login': datetime.now()
+            })
+            
+            # Get user data from Firestore
+            user_doc = self.db.collection('users').document(user['localId']).get()
+            user_data = user_doc.to_dict() if user_doc.exists else {}
+            
+            return True, "Sign in successful!", {
+                'uid': user['localId'],
+                'email': user_info['users'][0]['email'],
+                'display_name': user_data.get('display_name', ''),
+                'role': user_data.get('role', 'user'),
+                'id_token': user['idToken']
+            }
+            
+        except Exception as e:
+            error_message = str(e)
+            if "INVALID_EMAIL" in error_message:
+                return False, "Invalid email format.", None
+            elif "EMAIL_NOT_FOUND" in error_message:
+                return False, "Email not found. Please check your email or sign up.", None
+            elif "INVALID_PASSWORD" in error_message:
+                return False, "Invalid password. Please try again.", None
+            elif "USER_DISABLED" in error_message:
+                return False, "User account has been disabled.", None
+            else:
+                return False, f"Sign in failed: {error_message}", None
+    
+    def reset_password(self, email):
+        """Send password reset email."""
+        try:
+            self.auth_client.send_password_reset_email(email)
+            return True, "Password reset email sent. Please check your inbox."
+        except Exception as e:
+            error_message = str(e)
+            if "EMAIL_NOT_FOUND" in error_message:
+                return False, "Email not found."
+            else:
+                return False, f"Password reset failed: {error_message}"
+    
+    def verify_token(self, id_token):
+        """Verify Firebase ID token."""
+        try:
+            decoded_token = auth.verify_id_token(id_token)
+            return True, decoded_token
+        except Exception as e:
+            return False, None
+    
+    def sign_out(self):
+        """Sign out current user."""
+        try:
+            # Clear session state
+            for key in ['user_info', 'authenticated', 'id_token']:
+                if key in st.session_state:
+                    del st.session_state[key]
+            return True
+        except Exception as e:
+            return False
 
 class EnterpriseEC2WorkloadSizingCalculator:
     """Enterprise-grade AWS EC2 workload sizing calculator."""
@@ -364,10 +574,10 @@ class EnterpriseEC2WorkloadSizingCalculator:
             region = region or self.inputs.get("region", "us-east-1")
             
             # Try to get credentials from Streamlit secrets first
-            if hasattr(st, 'secrets') and 'AWS_ACCESS_KEY_ID' in st.secrets:
+            if hasattr(st, 'secrets') and 'aws' in st.secrets:
                 try:
-                    access_key = st.secrets["AWS_ACCESS_KEY_ID"]
-                    secret_key = st.secrets["AWS_SECRET_ACCESS_KEY"]
+                    access_key = st.secrets["aws"]["access_key_id"]
+                    secret_key = st.secrets["aws"]["secret_access_key"]
                     sts = boto3.client('sts', 
                                      aws_access_key_id=access_key,
                                      aws_secret_access_key=secret_key,
@@ -700,9 +910,168 @@ class EnhancedPDFReportGenerator:
         buffer.seek(0)
         return buffer.getvalue()
 
+# Authentication Functions
+def render_authentication():
+    """Render authentication interface."""
+    st.markdown("""
+    <div class="main-header">
+        <h1>🏢 Enterprise AWS Workload Sizing Platform</h1>
+        <p>Secure access to comprehensive infrastructure assessment and cloud migration planning</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Initialize Firebase
+    if 'firebase_auth' not in st.session_state:
+        st.session_state.firebase_auth = FirebaseAuthenticator()
+    
+    firebase_auth = st.session_state.firebase_auth
+    
+    if not firebase_auth.initialize_firebase():
+        st.error("Failed to initialize authentication system. Please check your Firebase configuration.")
+        return False
+    
+    # Check if user is already authenticated
+    if st.session_state.get('authenticated', False):
+        return True
+    
+    # Authentication tabs
+    auth_tab1, auth_tab2, auth_tab3 = st.tabs(["🔐 Sign In", "📝 Sign Up", "🔄 Reset Password"])
+    
+    with auth_tab1:
+        render_sign_in(firebase_auth)
+    
+    with auth_tab2:
+        render_sign_up(firebase_auth)
+    
+    with auth_tab3:
+        render_password_reset(firebase_auth)
+    
+    return False
+
+def render_sign_in(firebase_auth):
+    """Render sign in form."""
+    st.markdown("""
+    <div class="auth-container">
+        <h3 style="text-align: center; margin-bottom: 1rem;">Sign In</h3>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    with st.form("sign_in_form"):
+        email = st.text_input("Email", placeholder="your.email@company.com")
+        password = st.text_input("Password", type="password", placeholder="Enter your password")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            sign_in_button = st.form_submit_button("🔐 Sign In", use_container_width=True)
+        with col2:
+            remember_me = st.checkbox("Remember me")
+        
+        if sign_in_button:
+            if email and password:
+                with st.spinner("Signing in..."):
+                    success, message, user_data = firebase_auth.sign_in(email, password)
+                    
+                    if success:
+                        st.session_state.authenticated = True
+                        st.session_state.user_info = user_data
+                        st.session_state.id_token = user_data['id_token']
+                        st.success(message)
+                        time.sleep(1)
+                        st.rerun()
+                    else:
+                        st.error(message)
+            else:
+                st.error("Please enter both email and password.")
+
+def render_sign_up(firebase_auth):
+    """Render sign up form."""
+    st.markdown("""
+    <div class="auth-container">
+        <h3 style="text-align: center; margin-bottom: 1rem;">Create Account</h3>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    with st.form("sign_up_form"):
+        display_name = st.text_input("Full Name", placeholder="John Doe")
+        email = st.text_input("Email", placeholder="your.email@company.com")
+        password = st.text_input("Password", type="password", placeholder="Minimum 6 characters")
+        confirm_password = st.text_input("Confirm Password", type="password", placeholder="Confirm your password")
+        
+        terms_accepted = st.checkbox("I accept the Terms of Service and Privacy Policy")
+        
+        sign_up_button = st.form_submit_button("📝 Create Account", use_container_width=True)
+        
+        if sign_up_button:
+            if not all([display_name, email, password, confirm_password]):
+                st.error("Please fill in all fields.")
+            elif password != confirm_password:
+                st.error("Passwords do not match.")
+            elif len(password) < 6:
+                st.error("Password must be at least 6 characters long.")
+            elif not terms_accepted:
+                st.error("Please accept the Terms of Service and Privacy Policy.")
+            else:
+                with st.spinner("Creating account..."):
+                    success, message = firebase_auth.sign_up(email, password, display_name)
+                    
+                    if success:
+                        st.success(message)
+                        st.info("Please check your email and verify your account before signing in.")
+                    else:
+                        st.error(message)
+
+def render_password_reset(firebase_auth):
+    """Render password reset form."""
+    st.markdown("""
+    <div class="auth-container">
+        <h3 style="text-align: center; margin-bottom: 1rem;">Reset Password</h3>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    with st.form("password_reset_form"):
+        email = st.text_input("Email", placeholder="your.email@company.com")
+        
+        reset_button = st.form_submit_button("🔄 Send Reset Email", use_container_width=True)
+        
+        if reset_button:
+            if email:
+                with st.spinner("Sending reset email..."):
+                    success, message = firebase_auth.reset_password(email)
+                    
+                    if success:
+                        st.success(message)
+                    else:
+                        st.error(message)
+            else:
+                st.error("Please enter your email address.")
+
+def render_user_info():
+    """Render user information in sidebar."""
+    if st.session_state.get('authenticated', False):
+        user_info = st.session_state.get('user_info', {})
+        
+        st.markdown(f"""
+        <div class="user-info">
+            <strong>👤 {user_info.get('display_name', 'User')}</strong><br>
+            <small>{user_info.get('email', '')}</small><br>
+            <small>Role: {user_info.get('role', 'user').title()}</small>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        if st.button("🚪 Sign Out", key="sign_out", use_container_width=True):
+            firebase_auth = st.session_state.firebase_auth
+            if firebase_auth.sign_out():
+                st.success("Signed out successfully!")
+                time.sleep(1)
+                st.rerun()
+
 # Initialize session state
 def initialize_session_state():
     """Initialize session state."""
+    if 'authenticated' not in st.session_state:
+        st.session_state.authenticated = False
+    if 'user_info' not in st.session_state:
+        st.session_state.user_info = {}
     if 'calculator' not in st.session_state:
         st.session_state.calculator = EnterpriseEC2WorkloadSizingCalculator()
     if 'pdf_generator' not in st.session_state and REPORTLAB_AVAILABLE:
@@ -1295,6 +1664,12 @@ def main():
     """Main application entry point."""
     initialize_session_state()
     
+    # Check authentication
+    if not st.session_state.get('authenticated', False):
+        if not render_authentication():
+            return
+    
+    # Main application
     st.markdown("""
     <div class="main-header">
         <h1>🏢 Enterprise AWS Workload Sizing Platform</h1>
@@ -1304,6 +1679,9 @@ def main():
     
     with st.sidebar:
         st.markdown("### 🔧 Global Configuration")
+        
+        # User info
+        render_user_info()
         
         calculator = st.session_state.calculator
         cred_status, cred_message = calculator.validate_aws_credentials()
@@ -1388,8 +1766,8 @@ def main():
     st.markdown("---")
     st.markdown("""
     <div style="text-align: center; color: #6b7280; font-size: 0.875rem; padding: 2rem 0;">
-        <strong>Enterprise AWS Workload Sizing Platform v3.0</strong><br>
-        Comprehensive cloud migration planning for enterprise infrastructure
+        <strong>Enterprise AWS Workload Sizing Platform v3.0 with Firebase Authentication</strong><br>
+        Secure, comprehensive cloud migration planning for enterprise infrastructure
     </div>
     """, unsafe_allow_html=True)
 
