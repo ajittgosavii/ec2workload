@@ -24,26 +24,130 @@ from functools import lru_cache
 from botocore.exceptions import NoCredentialsError, PartialCredentialsError, ClientError
 import hashlib
 import hmac
+import streamlit as st
+import firebase_admin
+from firebase_admin import credentials, auth
+import pyrebase
 
-# Firebase imports with better error handling
-FIREBASE_AVAILABLE = False
-try:
-    import firebase_admin
-    from firebase_admin import credentials, auth, firestore
-    import pyrebase
-    FIREBASE_AVAILABLE = True
-except ImportError as e:
-    FIREBASE_AVAILABLE = False
-    st.warning(f"""
-    🔒 **Authentication System Not Available**
+import streamlit as st
+import firebase_admin
+from firebase_admin import credentials, auth
+import pyrebase
+import json
+
+# ========== FIREBASE CONFIGURATION ==========
+def init_firebase():
+    """Initialize Firebase Admin SDK"""
+    if not firebase_admin._apps:
+        try:
+            # Use Streamlit secrets for Firebase config
+            firebase_config = {
+                "type": st.secrets["firebase"]["type"],
+                "project_id": st.secrets["firebase"]["project_id"],
+                "private_key_id": st.secrets["firebase"]["private_key_id"],
+                "private_key": st.secrets["firebase"]["private_key"].replace('\\n', '\n'),
+                "client_email": st.secrets["firebase"]["client_email"],
+                "client_id": st.secrets["firebase"]["client_id"],
+                "auth_uri": st.secrets["firebase"]["auth_uri"],
+                "token_uri": st.secrets["firebase"]["token_uri"],
+            }
+            
+            cred = credentials.Certificate(firebase_config)
+            firebase_admin.initialize_app(cred)
+            return True
+        except Exception as e:
+            st.error(f"Firebase initialization failed: {e}")
+            return False
+    return True
+
+def init_pyrebase():
+    """Initialize Pyrebase for client-side auth"""
+    try:
+        firebase_web_config = {
+            "apiKey": st.secrets["firebase_web"]["apiKey"],
+            "authDomain": st.secrets["firebase_web"]["authDomain"],
+            "projectId": st.secrets["firebase_web"]["projectId"],
+            "storageBucket": st.secrets["firebase_web"]["storageBucket"],
+            "messagingSenderId": st.secrets["firebase_web"]["messagingSenderId"],
+            "appId": st.secrets["firebase_web"]["appId"],
+            "databaseURL": ""  # Add if using Realtime Database
+        }
+        
+        firebase = pyrebase.initialize_app(firebase_web_config)
+        return firebase.auth()
+    except Exception as e:
+        st.error(f"Pyrebase initialization failed: {e}")
+        return None
+
+# Initialize Firebase when the app starts
+firebase_available = init_firebase()
+auth_client = init_pyrebase()
+
+# ========== AUTHENTICATION FUNCTIONS ==========
+def check_authentication():
+    """Check if user is authenticated"""
+    return 'user' in st.session_state and st.session_state.user is not None
+
+def show_login_form():
+    """Display login form"""
+    st.title("🔐 Login")
     
-    Firebase libraries are not installed. To enable authentication, please install:
-    ```
-    pip install firebase-admin pyrebase4
-    ```
+    with st.form("login_form"):
+        email = st.text_input("Email")
+        password = st.text_input("Password", type="password")
+        submit = st.form_submit_button("Login")
+        
+        if submit and email and password:
+            try:
+                # Authenticate with Pyrebase
+                user = auth_client.sign_in_with_email_and_password(email, password)
+                st.session_state.user = user
+                st.success("Login successful!")
+                st.rerun()
+            except Exception as e:
+                st.error("Login failed. Please check your credentials.")
+
+def logout():
+    """Logout user"""
+    if 'user' in st.session_state:
+        del st.session_state.user
+    st.rerun()
+
+# ========== MAIN APP LOGIC ==========
+def main():
+    """Main application logic"""
     
-    **For now, you can use the platform in demo mode without authentication.**
-    """)
+    # Check if Firebase is available
+    if not firebase_available or not auth_client:
+        st.error("🔒 **Authentication System Not Available**")
+        st.info("Firebase libraries are not properly configured.")
+        st.stop()
+    
+    # Check authentication status
+    if not check_authentication():
+        show_login_form()
+        return
+    
+    # ===== AUTHENTICATED USER CONTENT =====
+    st.title("🎉 Welcome to Your App!")
+    
+    # Add logout button in sidebar
+    with st.sidebar:
+        st.write(f"Logged in as: {st.session_state.user['email']}")
+        if st.button("Logout"):
+            logout()
+    
+    # Your main app content goes here
+    st.write("This is your protected content!")
+    st.write("Add your app functionality below this line.")
+    
+    # ===== YOUR APP CONTENT STARTS HERE =====
+    # Replace this section with your actual app code
+    
+
+# ========== RUN THE APP ==========
+if __name__ == "__main__":
+    main()
 
 # Try to import reportlab for PDF generation
 try:
