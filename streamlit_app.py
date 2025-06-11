@@ -11,9 +11,9 @@ import math
 import boto3
 import json
 import logging
-import zipfile
 from functools import lru_cache
 from botocore.exceptions import NoCredentialsError, PartialCredentialsError, ClientError
+import zipfile  # Added missing import
 
 # Try to import reportlab for PDF generation
 try:
@@ -657,12 +657,27 @@ def render_workload_configuration():
                     options=list(OPERATING_SYSTEMS.values()),
                     index=list(OPERATING_SYSTEMS.values()).index(st.session_state.workload_inputs[f'{env}_os']), key=f'{env}_os_select'
                 )
-            st.session_state.workload_inputs[f'{env}_region'] = st.selectbox(
+            
+            # Fix for StopIteration error
+            current_region_code = st.session_state.workload_inputs[f'{env}_region']
+            default_region_key = "US East (N. Virginia)"
+            try:
+                # Find the user-friendly name corresponding to the stored region code
+                current_region_name = next(k for k, v in AWS_REGIONS.items() if v == current_region_code)
+            except StopIteration:
+                # If the code isn't found (e.g., from an old config), default to a safe value
+                logger.warning(f"Region code '{current_region_code}' not found for {env}. Defaulting to '{default_region_key}'.")
+                current_region_name = default_region_key
+                st.session_state.workload_inputs[f'{env}_region'] = AWS_REGIONS[default_region_key]
+
+            selected_region_name = st.selectbox(
                 f"Preferred AWS Region ({env})",
                 options=list(AWS_REGIONS.keys()),
-                format_func=lambda x: x,
-                index=list(AWS_REGIONS.keys()).index(next(k for k, v in AWS_REGIONS.items() if v == st.session_state.workload_inputs[f'{env}_region'])), key=f'{env}_region_select'
+                index=list(AWS_REGIONS.keys()).index(current_region_name), 
+                key=f'{env}_region_select'
             )
+            st.session_state.workload_inputs[f'{env}_region'] = AWS_REGIONS[selected_region_name]
+
             st.markdown("---")
     
     with env_tabs[3]: # On-Premise Details Tab
@@ -792,7 +807,7 @@ def render_workload_configuration():
                 st.session_state.workload_inputs = {k: loaded_inputs.get(k,v) for k,v in st.session_state.workload_inputs.items()}
                 st.session_state.analysis_results = None # Clear previous results
                 st.success("Configuration loaded successfully! Click 'Generate Recommendations' to apply.")
-                st.experimental_rerun() # Rerun to update UI with loaded values
+                st.rerun() # Rerun to update UI with loaded values
             except json.JSONDecodeError:
                 st.error("Invalid JSON file. Please upload a valid configuration file.")
             except Exception as e:
@@ -1138,23 +1153,13 @@ def display_bulk_analysis_results(bulk_results):
     st.markdown("### Detailed Bulk Results")
     for i, item in enumerate(bulk_results):
         workload_name = item['workload_name']
-        st.markdown(f"#### {workload_name}")
-        # Pass the full inputs and recommendations to render_analysis_results
-        # For bulk analysis, we might want to show the specific inputs that led to this result
-        # For now, `render_analysis_results` takes `recommendations` and uses `st.session_state.workload_inputs` for detailed inputs.
-        # This needs a slight adjustment if `render_analysis_results` is to be truly standalone for bulk.
-        # For now, we will set session_state.workload_inputs temporarily to the inputs for the current bulk item
-        # and then call render_analysis_results. This is a bit hacky but works for demonstration.
-        
-        # Store original inputs
-        original_workload_inputs = st.session_state.workload_inputs.copy()
-        # Set inputs for current bulk item
-        st.session_state.workload_inputs = item['inputs']
-        render_analysis_results(item['recommendations'], key_suffix=f"bulk_{i}")
-        # Restore original inputs
-        st.session_state.workload_inputs = original_workload_inputs
-        
-        st.markdown("---")
+        with st.expander(f"View Details for: {workload_name}"):
+            # Temporarily set session_state.workload_inputs for render_analysis_results
+            original_workload_inputs = st.session_state.workload_inputs.copy()
+            st.session_state.workload_inputs = item['inputs']
+            render_analysis_results(item['recommendations'], key_suffix=f"bulk_{i}")
+            # Restore original inputs
+            st.session_state.workload_inputs = original_workload_inputs
 
 
 def generate_pdf_report(workload_name, inputs, recommendations):
@@ -1382,8 +1387,7 @@ def render_reports_export():
                         label="Download PDF Report",
                         data=pdf_buffer.getvalue(),
                         file_name=f"{workload_name}_AWS_Sizing_Report.pdf",
-                        mime="application/pdf",
-                        key="download_single_pdf"
+                        mime="application/pdf"
                     )
                     st.success("PDF report generated!")
                 else:
@@ -1405,11 +1409,10 @@ def render_reports_export():
                     "PROD_Memory_GiB_Req": item['inputs'].get('PROD_memory_gb', 0.0),
                     "PROD_Storage_GB_Req": item['inputs'].get('PROD_storage_gb', 0),
                     "PROD_OS_Req": item['inputs'].get('PROD_os', ''),
-                    "PROD_Region_Req": next(k for k,v in AWS_REGIONS.items() if v == item['inputs'].get('PROD_region')),
+                    "PROD_Region_Req": next((k for k,v in AWS_REGIONS.items() if v == item['inputs'].get('PROD_region')),''),
                     "RI_SP_Option": item['inputs'].get('ri_sp_option', 'On-Demand'),
                     "Annual Growth Rate (%)": item['inputs'].get('growth_rate_annual', 0),
                     "Projection Years": item['inputs'].get('growth_years', 0),
-
                     # On-Premise Metrics for Export
                     "OnPrem_CPU_Cores": item['inputs'].get('onprem_cpu_cores', 0),
                     "OnPrem_Current_Storage_GB": item['inputs'].get('onprem_current_storage_gb', 0),
@@ -1435,14 +1438,12 @@ def render_reports_export():
                     "OnPrem_Network_Latency_ms": item['inputs'].get('onprem_network_latency_ms', 0.0),
                     "OnPrem_Max_Concurrent_Connections": item['inputs'].get('onprem_max_concurrent_connections', 0),
                     "OnPrem_Average_Concurrent_Connections": item['inputs'].get('onprem_average_concurrent_connections', 0),
-
                     # Advanced Settings for Export
                     "Enable_Encryption_at_Rest": "Yes" if item['inputs'].get('enable_encryption_at_rest') else "No",
                     "Enable_Performance_Insights": "Yes" if item['inputs'].get('enable_performance_insights') else "No",
                     "Enable_Enhanced_Monitoring": "Yes" if item['inputs'].get('enable_enhanced_monitoring') else "No",
                     "Monthly_Data_Transfer_GB": item['inputs'].get('monthly_data_transfer_gb', 0),
                     "Backup_Retention_Days": item['inputs'].get('backup_retention_days', 0),
-
                     # AWS Recommendations Summary
                     "PROD_Recommended_Instance": item['recommendations'].get('PROD', {}).get('instance_type', 'N/A'),
                     "PROD_vCPUs_Rec": item['recommendations'].get('PROD', {}).get('vcpus', 0),
@@ -1457,8 +1458,7 @@ def render_reports_export():
                 label="Download All Bulk Results as CSV",
                 data=csv_export,
                 file_name=f"bulk_aws_sizing_results_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
-                mime="text/csv",
-                key="download_all_bulk_csv"
+                mime="text/csv"
             )
             st.success("Bulk results CSV ready for download!")
         
@@ -1466,26 +1466,32 @@ def render_reports_export():
         if st.button("Generate Individual PDF Reports for Bulk Workloads (ZIP)", key="generate_bulk_pdfs"):
             if REPORTLAB_AVAILABLE:
                 with st.spinner("Generating individual PDFs and zipping... This may take a while for many workloads."):
-                    zip_buffer = BytesIO()
-                    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
-                        for item in st.session_state.bulk_results:
-                            workload_name = item['workload_name']
-                            pdf_buffer = generate_pdf_report(
-                                workload_name=workload_name,
-                                inputs=item['inputs'],
-                                recommendations=item['recommendations']
+                    try:
+                        zip_buffer = BytesIO()
+                        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
+                            for item in st.session_state.bulk_results:
+                                workload_name = item['workload_name']
+                                pdf_buffer = generate_pdf_report(
+                                    workload_name=workload_name,
+                                    inputs=item['inputs'],
+                                    recommendations=item['recommendations']
+                                )
+                                if pdf_buffer:
+                                    zf.writestr(f"{workload_name}_AWS_Sizing_Report.pdf", pdf_buffer.getvalue())
+                        
+                        if len(zf.infolist()) > 0:
+                            zip_buffer.seek(0)
+                            st.download_button(
+                                label="Download All PDF Reports (ZIP)",
+                                data=zip_buffer.getvalue(),
+                                file_name=f"bulk_aws_sizing_reports_{datetime.now().strftime('%Y%m%d_%H%M')}.zip",
+                                mime="application/zip"
                             )
-                            if pdf_buffer:
-                                zf.writestr(f"{workload_name}_AWS_Sizing_Report.pdf", pdf_buffer.getvalue())
-                    zip_buffer.seek(0)
-                    st.download_button(
-                        label="Download All PDF Reports (ZIP)",
-                        data=zip_buffer.getvalue(),
-                        file_name=f"bulk_aws_sizing_reports_{datetime.now().strftime('%Y%m%d_%H%M')}.zip",
-                        mime="application/zip",
-                        key="download_bulk_pdfs_zip"
-                    )
-                    st.success("All PDF reports generated and zipped!")
+                            st.success("All PDF reports generated and zipped!")
+                        else:
+                            st.warning("No reports were generated. Check for errors in individual workloads.")
+                    except Exception as e:
+                        st.error(f"An error occurred while creating the ZIP file: {e}")
             else:
                 st.error("`reportlab` library not found. Cannot generate PDF reports.")
     else:
@@ -1503,20 +1509,23 @@ def main():
     </div>
     """, unsafe_allow_html=True)
 
-    if st.sidebar.button("⚙️ Re-fetch Latest AWS Prices", help="Click to refresh AWS pricing data from the AWS Pricing API. This may take a few minutes.", key="fetch_prices_btn"):
-        st.session_state.calculator.fetch_current_prices()
-        if st.session_state.calculator.all_ec2_prices and st.session_state.calculator.all_ebs_prices:
-            st.sidebar.success("✅ Latest AWS prices fetched successfully!")
-        else:
-            st.sidebar.error("❌ Failed to fetch AWS prices. Check AWS credentials or network.")
+    with st.sidebar:
+        st.markdown("### 🔧 Global Configuration")
+        if st.button("⚙️ Re-fetch Latest AWS Prices", help="Click to refresh AWS pricing data from the AWS Pricing API. This may take a few minutes.", key="fetch_prices_btn"):
+            with st.spinner("Fetching latest prices..."):
+                st.session_state.calculator.fetch_current_prices()
+                if st.session_state.calculator.all_ec2_prices and st.session_state.calculator.all_ebs_prices:
+                    st.success("✅ Latest AWS prices fetched!")
+                else:
+                    st.error("❌ Failed to fetch AWS prices.")
 
-    # Check AWS credentials status
-    status, message = st.session_state.calculator.validate_aws_credentials()
-    if status:
-        st.sidebar.success(f"AWS Connection: {message}")
-    else:
-        st.sidebar.error(f"AWS Connection: {message} Please ensure AWS credentials are set up (e.g., via ~/.aws/credentials or environment variables).")
-        st.info("AWS credentials are required to fetch real-time pricing and generate accurate recommendations. Please configure them to proceed.")
+        # Check AWS credentials status
+        status, message = st.session_state.calculator.validate_aws_credentials()
+        if status:
+            st.success(f"AWS Connection: {message}")
+        else:
+            st.error(f"AWS Connection: {message}")
+            st.info("Please ensure AWS credentials are set up (e.g., via ~/.aws/credentials or environment variables).")
 
     tab1, tab2, tab3 = st.tabs(["Single Workload Analysis", "Bulk Analysis", "Reports & Export"])
 
@@ -1525,35 +1534,32 @@ def main():
         if st.button("✨ Generate Recommendations", type="primary", key="generate_single_recommendation"):
             if not status: # Re-check status before analysis
                 st.error("Cannot generate recommendations. AWS credentials are not properly configured.")
-            elif not st.session_state.calculator.all_ec2_prices:
-                st.info("Fetching AWS prices for the first time or refresh needed. Please wait...")
-                st.session_state.calculator.fetch_current_prices()
+            else:
+                if not st.session_state.calculator.all_ec2_prices:
+                    st.info("Fetching AWS prices for the first time or refresh needed. Please wait...")
+                    st.session_state.calculator.fetch_current_prices()
+                
                 if not st.session_state.calculator.all_ec2_prices:
                     st.error("Failed to fetch AWS prices. Cannot proceed with recommendations.")
-                    return
-            
-            with st.spinner("Analyzing workload and generating recommendations..."):
-                try:
-                    # Pass inputs from session state
-                    st.session_state.calculator.inputs = st.session_state.workload_inputs.copy() 
-                    results = st.session_state.calculator.generate_all_recommendations()
-                    st.session_state.analysis_results = {
-                        'inputs': st.session_state.workload_inputs.copy(),
-                        'recommendations': results
-                    }
+                else:
+                    with st.spinner("Analyzing workload and generating recommendations..."):
+                        try:
+                            st.session_state.calculator.inputs = st.session_state.workload_inputs.copy() 
+                            results = st.session_state.calculator.generate_all_recommendations()
+                            st.session_state.analysis_results = {
+                                'inputs': st.session_state.workload_inputs.copy(),
+                                'recommendations': results
+                            }
+                            st.success("✅ Analysis completed successfully!")
+                        except Exception as e:
+                            st.error(f"❌ Error during analysis: {str(e)}")
 
-                    st.success("✅ Analysis completed successfully!")
-                except Exception as e:
-                    st.error(f"❌ Error during analysis: {str(e)}")
-
-        # This block will now be the *only* place render_analysis_results is called for single analysis.
         if st.session_state.analysis_results:
             st.markdown("---")
             render_analysis_results(st.session_state.analysis_results['recommendations'], key_suffix="single_workload")
 
     with tab2:
         render_bulk_analysis()
-
         if st.session_state.bulk_results:
             st.markdown("---")
             display_bulk_analysis_results(st.session_state.bulk_results)
