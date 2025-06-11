@@ -1262,12 +1262,13 @@ def create_pdf_report(recommendations, workload_inputs, bulk_results_df=None):
                             topMargin=inch/2, bottomMargin=inch/2)
     styles = getSampleStyleSheet()
     
-    # Custom styles
-    styles.add(ParagraphStyle(name='Heading1Centered', alignment=TA_CENTER, fontSize=20, leading=24, fontName='Helvetica-Bold'))
-    
     # --- FIX ---
-    # Modify existing styles instead of adding new ones with duplicate names.
-    # Use a standard font like 'Helvetica-Bold' instead of a custom one like 'Inter-SemiBold'.
+    # Define custom styles that are not present in the default stylesheet.
+    # Modify existing styles for customization.
+    styles.add(ParagraphStyle(name='Heading1Centered', alignment=TA_CENTER, fontSize=20, leading=24, fontName='Helvetica-Bold'))
+    styles.add(ParagraphStyle(name='Small', fontSize=8, leading=10, fontName='Helvetica'))
+    
+    # Modify existing styles
     styles['h2'].fontName = 'Helvetica-Bold'
     styles['h2'].fontSize = 14
     styles['h2'].leading = 16
