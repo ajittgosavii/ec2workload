@@ -1,4 +1,13 @@
 import streamlit as st
+
+# Configure page - MUST be first Streamlit command
+st.set_page_config(
+    page_title="Enterprise AWS EC2 Workload Sizing Platform", 
+    layout="wide",
+    page_icon="🏢",
+    initial_sidebar_state="expanded"
+)
+
 import pandas as pd
 from io import BytesIO
 import io
@@ -41,14 +50,6 @@ except ImportError:
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-# Configure page
-st.set_page_config(
-    page_title="Enterprise AWS EC2 Workload Sizing Platform", 
-    layout="wide",
-    page_icon="🏢",
-    initial_sidebar_state="expanded"
-)
 
 # Enhanced custom CSS
 st.markdown("""
@@ -219,6 +220,11 @@ class FirebaseAuthenticator:
             # Check if Firebase is available
             if not FIREBASE_AVAILABLE:
                 st.error("Firebase libraries not available. Please install firebase-admin and pyrebase4.")
+                return False
+                
+            # Check if secrets are available
+            if 'firebase' not in st.secrets:
+                st.error("Firebase configuration not found in secrets. Please configure Firebase secrets.")
                 return False
                 
             # Get Firebase config from Streamlit secrets
