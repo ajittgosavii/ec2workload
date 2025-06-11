@@ -11,6 +11,7 @@ import math
 import boto3
 import json
 import logging
+import zipfile
 from functools import lru_cache
 from botocore.exceptions import NoCredentialsError, PartialCredentialsError, ClientError
 
@@ -1485,8 +1486,6 @@ def render_reports_export():
                         key="download_bulk_pdfs_zip"
                     )
                     st.success("All PDF reports generated and zipped!")
-                else:
-                    st.error("Failed to generate bulk PDF reports.")
             else:
                 st.error("`reportlab` library not found. Cannot generate PDF reports.")
     else:
