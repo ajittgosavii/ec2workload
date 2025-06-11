@@ -41,6 +41,15 @@ except ImportError as e:
     requests = None
     FIREBASE_AVAILABLE = False
 
+# Try to import pyrebase for client-side auth
+PYREBASE_AVAILABLE = False
+try:
+    import pyrebase
+    PYREBASE_AVAILABLE = True
+except ImportError:
+    pyrebase = None
+    PYREBASE_AVAILABLE = False
+
 # Try to import reportlab for PDF generation
 try:
     from reportlab.lib.pagesizes import letter, A4
@@ -239,6 +248,7 @@ class FirebaseAuthenticator:
         self.db = None
         self.initialized = False
         self.firebase_available = FIREBASE_AVAILABLE
+        self.pyrebase_available = PYREBASE_AVAILABLE
         
     def initialize_firebase(self):
         """Initialize Firebase with Streamlit secrets."""
@@ -251,54 +261,29 @@ class FirebaseAuthenticator:
         try:
             # Check if secrets are available
             if 'firebase' not in st.secrets:
-                st.error("Firebase configuration not found in Streamlit secrets. Please configure Firebase secrets in your Streamlit Cloud app.")
-                with st.expander("📝 How to Configure Firebase Secrets"):
-                    st.markdown("""
-                    **Step 1: Create Firebase Project**
-                    1. Go to [Firebase Console](https://console.firebase.google.com/)
-                    2. Create a new project
-                    3. Enable Authentication → Email/Password
-                    4. Enable Firestore Database
-                    
-                    **Step 2: Get Configuration**
-                    1. Project Settings → Service Accounts → Generate new private key
-                    2. Project Settings → General → Web API Key
-                    
-                    **Step 3: Add to Streamlit Secrets**
-                    Add these to your Streamlit Cloud app secrets:
-                    ```toml
-                    [firebase]
-                    type = "service_account"
-                    project_id = "your-project-id"
-                    private_key_id = "your-private-key-id"
-                    private_key = "-----BEGIN PRIVATE KEY-----\\nYOUR_KEY\\n-----END PRIVATE KEY-----\\n"
-                    client_email = "firebase-adminsdk-xxxxx@your-project.iam.gserviceaccount.com"
-                    client_id = "your-client-id"
-                    auth_uri = "https://accounts.google.com/o/oauth2/auth"
-                    token_uri = "https://oauth2.googleapis.com/token"
-                    auth_provider_x509_cert_url = "https://www.googleapis.com/oauth2/v1/certs"
-                    client_x509_cert_url = "your-client-cert-url"
-                    api_key = "your-web-api-key"
-                    auth_domain = "your-project-id.firebaseapp.com"
-                    storage_bucket = "your-project-id.appspot.com"
-                    messaging_sender_id = "your-sender-id"
-                    app_id = "your-app-id"
-                    ```
-                    """)
                 return False
                 
-            # Get Firebase config from Streamlit secrets
+            firebase_secrets = st.secrets["firebase"]
+            
+            # Check for required fields for Firebase Admin SDK
+            required_admin_fields = ['type', 'project_id', 'private_key', 'client_email']
+            missing_admin_fields = [field for field in required_admin_fields if field not in firebase_secrets or not firebase_secrets[field]]
+            
+            if missing_admin_fields:
+                return False
+                
+            # Get Firebase Admin config from Streamlit secrets
             firebase_config = {
-                "type": st.secrets["firebase"]["type"],
-                "project_id": st.secrets["firebase"]["project_id"],
-                "private_key_id": st.secrets["firebase"]["private_key_id"],
-                "private_key": st.secrets["firebase"]["private_key"].replace('\\n', '\n'),
-                "client_email": st.secrets["firebase"]["client_email"],
-                "client_id": st.secrets["firebase"]["client_id"],
-                "auth_uri": st.secrets["firebase"]["auth_uri"],
-                "token_uri": st.secrets["firebase"]["token_uri"],
-                "auth_provider_x509_cert_url": st.secrets["firebase"]["auth_provider_x509_cert_url"],
-                "client_x509_cert_url": st.secrets["firebase"]["client_x509_cert_url"]
+                "type": firebase_secrets["type"],
+                "project_id": firebase_secrets["project_id"],
+                "private_key_id": firebase_secrets.get("private_key_id", ""),
+                "private_key": firebase_secrets["private_key"].replace('\\n', '\n'),
+                "client_email": firebase_secrets["client_email"],
+                "client_id": firebase_secrets.get("client_id", ""),
+                "auth_uri": firebase_secrets.get("auth_uri", "https://accounts.google.com/o/oauth2/auth"),
+                "token_uri": firebase_secrets.get("token_uri", "https://oauth2.googleapis.com/token"),
+                "auth_provider_x509_cert_url": firebase_secrets.get("auth_provider_x509_cert_url", "https://www.googleapis.com/oauth2/v1/certs"),
+                "client_x509_cert_url": firebase_secrets.get("client_x509_cert_url", "")
             }
             
             # Initialize Firebase Admin
@@ -311,32 +296,40 @@ class FirebaseAuthenticator:
             # Initialize Firestore
             self.db = firestore.client()
             
-            # Initialize Pyrebase for client-side auth
-            pyrebase_config = {
-                "apiKey": st.secrets["firebase"]["api_key"],
-                "authDomain": st.secrets["firebase"]["auth_domain"],
-                "projectId": st.secrets["firebase"]["project_id"],
-                "storageBucket": st.secrets["firebase"]["storage_bucket"],
-                "messagingSenderId": st.secrets["firebase"]["messaging_sender_id"],
-                "appId": st.secrets["firebase"]["app_id"],
-                "databaseURL": ""  # Not using Realtime Database
-            }
+            # Only initialize Pyrebase if we have the required client-side config and pyrebase is available
+            client_side_fields = ['api_key', 'auth_domain', 'storage_bucket', 'messaging_sender_id', 'app_id']
+            has_client_config = all(field in firebase_secrets and firebase_secrets[field] for field in client_side_fields)
             
-            firebase_client = pyrebase.initialize_app(pyrebase_config)
-            self.auth_client = firebase_client.auth()
+            if has_client_config and self.pyrebase_available:
+                try:
+                    pyrebase_config = {
+                        "apiKey": firebase_secrets["api_key"],
+                        "authDomain": firebase_secrets["auth_domain"],
+                        "projectId": firebase_secrets["project_id"],
+                        "storageBucket": firebase_secrets["storage_bucket"],
+                        "messagingSenderId": firebase_secrets["messaging_sender_id"],
+                        "appId": firebase_secrets["app_id"],
+                        "databaseURL": ""  # Not using Realtime Database
+                    }
+                    
+                    firebase_client = pyrebase.initialize_app(pyrebase_config)
+                    self.auth_client = firebase_client.auth()
+                    
+                except Exception as e:
+                    self.auth_client = None
+            else:
+                self.auth_client = None
             
             self.initialized = True
             return True
             
         except Exception as e:
-            st.error(f"Failed to initialize Firebase: {str(e)}")
-            st.info("Using demo mode without authentication.")
             return False
     
     def sign_up(self, email, password, display_name):
         """Create a new user account."""
-        if not self.firebase_available or not self.initialized:
-            return False, "Firebase authentication not available."
+        if not self.firebase_available or not self.initialized or not self.auth_client:
+            return False, "Firebase client authentication not available."
             
         try:
             # Create user with email and password
@@ -348,17 +341,18 @@ class FirebaseAuthenticator:
             # Update profile with display name
             self.auth_client.update_profile(user['idToken'], display_name=display_name)
             
-            # Store additional user info in Firestore
-            user_data = {
-                'uid': user['localId'],
-                'email': email,
-                'display_name': display_name,
-                'created_at': datetime.now(),
-                'role': 'user',
-                'last_login': datetime.now()
-            }
-            
-            self.db.collection('users').document(user['localId']).set(user_data)
+            # Store additional user info in Firestore (if available)
+            if self.db:
+                user_data = {
+                    'uid': user['localId'],
+                    'email': email,
+                    'display_name': display_name,
+                    'created_at': datetime.now(),
+                    'role': 'user',
+                    'last_login': datetime.now()
+                }
+                
+                self.db.collection('users').document(user['localId']).set(user_data)
             
             return True, "Account created successfully! Please check your email for verification."
             
@@ -375,8 +369,8 @@ class FirebaseAuthenticator:
     
     def sign_in(self, email, password):
         """Sign in an existing user."""
-        if not self.firebase_available or not self.initialized:
-            return False, "Firebase authentication not available.", None
+        if not self.firebase_available or not self.initialized or not self.auth_client:
+            return False, "Firebase client authentication not available.", None
             
         try:
             user = self.auth_client.sign_in_with_email_and_password(email, password)
@@ -388,14 +382,23 @@ class FirebaseAuthenticator:
             if not user_info['users'][0].get('emailVerified', False):
                 return False, "Please verify your email before signing in.", None
             
-            # Update last login in Firestore
-            self.db.collection('users').document(user['localId']).update({
-                'last_login': datetime.now()
-            })
+            # Update last login in Firestore (if available)
+            if self.db:
+                try:
+                    self.db.collection('users').document(user['localId']).update({
+                        'last_login': datetime.now()
+                    })
+                except:
+                    pass  # Ignore Firestore errors for login
             
-            # Get user data from Firestore
-            user_doc = self.db.collection('users').document(user['localId']).get()
-            user_data = user_doc.to_dict() if user_doc.exists else {}
+            # Get user data from Firestore (if available)
+            user_data = {}
+            if self.db:
+                try:
+                    user_doc = self.db.collection('users').document(user['localId']).get()
+                    user_data = user_doc.to_dict() if user_doc.exists else {}
+                except:
+                    pass  # Ignore Firestore errors for login
             
             return True, "Sign in successful!", {
                 'uid': user['localId'],
@@ -420,8 +423,8 @@ class FirebaseAuthenticator:
     
     def reset_password(self, email):
         """Send password reset email."""
-        if not self.firebase_available or not self.initialized:
-            return False, "Firebase authentication not available."
+        if not self.firebase_available or not self.initialized or not self.auth_client:
+            return False, "Firebase client authentication not available."
             
         try:
             self.auth_client.send_password_reset_email(email)
@@ -994,8 +997,16 @@ def render_authentication():
     
     firebase_auth = st.session_state.firebase_auth
     
+    # Check if Firebase libraries are available
     if not firebase_auth.firebase_available:
-        st.info("🔧 **Demo Mode**: Firebase authentication is not available. You can use all features without authentication.")
+        st.markdown("""
+        <div class="demo-banner">
+            🔧 <strong>Demo Mode</strong> - Firebase authentication libraries not available. You can use all features without authentication.
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.info("💡 To enable full authentication, install Firebase dependencies: `pip install firebase-admin pyrebase4`")
+        
         if st.button("🚀 Continue to Platform", type="primary"):
             st.session_state.authenticated = True
             st.session_state.demo_mode = True
@@ -1007,9 +1018,50 @@ def render_authentication():
             st.rerun()
         return False
     
-    if not firebase_auth.initialize_firebase():
-        st.info("🔧 **Demo Mode**: Firebase configuration incomplete. You can use all features without authentication.")
-        if st.button("🚀 Continue to Platform", type="primary"):
+    # Try to initialize Firebase
+    firebase_initialized = firebase_auth.initialize_firebase()
+    
+    if not firebase_initialized:
+        st.markdown("""
+        <div class="demo-banner">
+            🔧 <strong>Demo Mode</strong> - Firebase configuration incomplete or missing. You can use all features without authentication.
+        </div>
+        """, unsafe_allow_html=True)
+        
+        with st.expander("📝 How to Configure Firebase (Optional)"):
+            st.markdown("""
+            **Step 1: Create Firebase Project**
+            1. Go to [Firebase Console](https://console.firebase.google.com/)
+            2. Create a new project
+            3. Enable Authentication → Email/Password
+            4. Enable Firestore Database
+            
+            **Step 2: Get Configuration**
+            1. Project Settings → Service Accounts → Generate new private key
+            2. Project Settings → General → Web API Key (for client-side auth)
+            
+            **Step 3: Add to Streamlit Secrets**
+            Add these to your `.streamlit/secrets.toml` or Streamlit Cloud secrets:
+            ```toml
+            [firebase]
+            # Required for server-side (Admin SDK)
+            type = "service_account"
+            project_id = "your-project-id"
+            private_key = "-----BEGIN PRIVATE KEY-----\\nYOUR_KEY\\n-----END PRIVATE KEY-----\\n"
+            client_email = "firebase-adminsdk-xxxxx@your-project.iam.gserviceaccount.com"
+            
+            # Optional for client-side authentication
+            api_key = "your-web-api-key"
+            auth_domain = "your-project-id.firebaseapp.com"
+            storage_bucket = "your-project-id.appspot.com"
+            messaging_sender_id = "your-sender-id"
+            app_id = "your-app-id"
+            ```
+            
+            **Note:** You can use the platform without Firebase authentication in demo mode.
+            """)
+        
+        if st.button("🚀 Continue to Platform (Demo Mode)", type="primary"):
             st.session_state.authenticated = True
             st.session_state.demo_mode = True
             st.session_state.user_info = {
@@ -1024,8 +1076,15 @@ def render_authentication():
     if st.session_state.get('authenticated', False):
         return True
     
+    # Show authentication status
+    if firebase_auth.auth_client:
+        st.success("🔥 Firebase Authentication Available")
+    else:
+        st.info("🔥 Firebase Admin Connected (Server-side only)")
+        st.markdown("*Client-side authentication features may be limited*")
+    
     # Authentication tabs
-    auth_tab1, auth_tab2, auth_tab3 = st.tabs(["🔐 Sign In", "📝 Sign Up", "🔄 Reset Password"])
+    auth_tab1, auth_tab2, auth_tab3, auth_tab4 = st.tabs(["🔐 Sign In", "📝 Sign Up", "🔄 Reset Password", "🚀 Demo Mode"])
     
     with auth_tab1:
         render_sign_in(firebase_auth)
@@ -1035,6 +1094,26 @@ def render_authentication():
     
     with auth_tab3:
         render_password_reset(firebase_auth)
+        
+    with auth_tab4:
+        st.markdown("""
+        <div class="auth-container">
+            <h3 style="text-align: center; margin-bottom: 1rem;">Demo Mode</h3>
+            <p>Try the platform without authentication. All features are available.</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        if st.button("🚀 Enter Demo Mode", type="primary", use_container_width=True):
+            st.session_state.authenticated = True
+            st.session_state.demo_mode = True
+            st.session_state.user_info = {
+                'display_name': 'Demo User',
+                'email': 'demo@example.com',
+                'role': 'demo'
+            }
+            st.success("Welcome to Demo Mode!")
+            time.sleep(1)
+            st.rerun()
     
     return False
 
@@ -1194,7 +1273,7 @@ def initialize_session_state():
     if 'bulk_results' not in st.session_state:
         st.session_state.bulk_results = []
 
-# Helper functions (keeping all the existing functions)
+# Helper functions for bulk upload and file parsing
 def parse_bulk_upload_file(uploaded_file):
     """Parse bulk upload file."""
     try:
