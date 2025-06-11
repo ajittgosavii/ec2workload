@@ -41,7 +41,7 @@ st.set_page_config(
 # Enhanced custom CSS
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    @import url('https://fonts.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
     html, body, [class*="css"] {
         font-family: 'Inter', sans-serif;
@@ -780,15 +780,41 @@ def render_analysis_results(recommendations, key_suffix=""):
 def render_bulk_analysis():
     """Renders the UI for bulk analysis."""
     st.markdown("## 📥 Bulk Workload Analysis")
-    st.warning("""
-        For bulk analysis, please ensure your CSV file has the following columns (case-sensitive):
-        `Workload Name`, `Workload Type`, `PROD_vCPUs`, `PROD_Memory_GiB`, `PROD_Storage_GB`, `PROD_OS`, `PROD_Region`,
-        `UAT_vCPUs`, `UAT_Memory_GiB`, `UAT_Storage_GB`, `UAT_OS`, `UAT_Region`,
-        `DEV_vCPUs`, `DEV_Memory_GiB`, `DEV_Storage_GB`, `DEV_OS`, `DEV_Region`
-        
-        Optional columns: `RI_SP_Option` (e.g., 'On-Demand', '1-Year No Upfront RI/SP', '3-Year No Upfront RI/SP'), 
-        `Annual Growth Rate (%)`, `Projection Years`
+    
+    # Define CSV template
+    csv_columns = [
+        "Workload Name", "Workload Type",
+        "PROD_vCPUs", "PROD_Memory_GiB", "PROD_Storage_GB", "PROD_OS", "PROD_Region",
+        "UAT_vCPUs", "UAT_Memory_GiB", "UAT_Storage_GB", "UAT_OS", "UAT_Region",
+        "DEV_vCPUs", "DEV_Memory_GiB", "DEV_Storage_GB", "DEV_OS", "DEV_Region",
+        "RI_SP_Option", "Annual Growth Rate (%)", "Projection Years"
+    ]
+    
+    sample_data = [
+        ["Sample Workload 1", "Web Application", 4, 8.0, 100, "Linux (Amazon Linux 2)", "US East (N. Virginia)", 
+         2, 4.0, 50, "Linux (Amazon Linux 2)", "US East (N. Virginia)",
+         1, 2.0, 25, "Linux (Amazon Linux 2)", "US East (N. Virginia)",
+         "On-Demand", 10, 5],
+        ["Sample Workload 2", "Database Server", 8, 32.0, 500, "Linux (RHEL)", "US West (Oregon)",
+         4, 16.0, 250, "Linux (RHEL)", "US West (Oregon)",
+         2, 8.0, 100, "Linux (RHEL)", "US West (Oregon)",
+         "1-Year No Upfront RI/SP", 5, 3]
+    ]
+
+    df_template = pd.DataFrame(sample_data, columns=csv_columns)
+    csv_template = df_template.to_csv(index=False).encode('utf-8')
+
+    st.markdown("""
+        To perform a bulk analysis, please download the sample CSV template below.
+        Ensure your CSV file's columns match the template *exactly* (case-sensitive) for proper processing.
     """)
+    st.download_button(
+        label="Download Sample CSV Template",
+        data=csv_template,
+        file_name="bulk_analysis_template.csv",
+        mime="text/csv",
+        key="download_csv_template"
+    )
 
     uploaded_file = st.file_uploader("Upload CSV File", type="csv", key="bulk_upload_file")
 
@@ -1271,7 +1297,7 @@ def render_reports_export():
                             "Monthly OS Cost": "N/A",
                             "Total Monthly Cost": proj_cost_value if isinstance(proj_cost_value, (int, float)) else "N/A",
                             "Annual Growth Rate (%)": inputs.get('growth_rate_annual', 'N/A'),
-                            "Projection Years": inputs.get('growth_years', 'N/A')
+                            "Projection Years": inputs.get('projection_years', 'N/A') # Corrected from proj_details to inputs
                         })
 
         if bulk_detailed_data:
