@@ -25,15 +25,25 @@ from botocore.exceptions import NoCredentialsError, PartialCredentialsError, Cli
 import hashlib
 import hmac
 
-# Firebase imports
+# Firebase imports with better error handling
+FIREBASE_AVAILABLE = False
 try:
     import firebase_admin
     from firebase_admin import credentials, auth, firestore
     import pyrebase
     FIREBASE_AVAILABLE = True
-except ImportError:
+except ImportError as e:
     FIREBASE_AVAILABLE = False
-    st.error("Firebase libraries not installed. Please install: pip install firebase-admin pyrebase4")
+    st.warning(f"""
+    🔒 **Authentication System Not Available**
+    
+    Firebase libraries are not installed. To enable authentication, please install:
+    ```
+    pip install firebase-admin pyrebase4
+    ```
+    
+    **For now, you can use the platform in demo mode without authentication.**
+    """)
 
 # Try to import reportlab for PDF generation
 try:
@@ -96,6 +106,15 @@ st.markdown("""
         margin: 2rem auto;
         max-width: 400px;
         box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+    }
+    
+    .demo-banner {
+        background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+        color: white;
+        padding: 1rem 2rem;
+        border-radius: 8px;
+        margin-bottom: 1rem;
+        text-align: center;
     }
     
     .metric-card {
@@ -162,6 +181,11 @@ st.markdown("""
         color: #92400e;
     }
     
+    .status-demo {
+        background: #ddd6fe;
+        color: #5b21b6;
+    }
+    
     .stButton>button {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white;
@@ -199,32 +223,72 @@ st.markdown("""
         padding: 1rem;
         margin-bottom: 1rem;
     }
+    
+    .setup-instructions {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin: 1rem 0;
+    }
 </style>
 """, unsafe_allow_html=True)
 
 class FirebaseAuthenticator:
-    """Firebase authentication manager."""
+    """Firebase authentication manager with fallback handling."""
     
     def __init__(self):
         self.firebase_app = None
         self.auth_client = None
         self.db = None
         self.initialized = False
+        self.firebase_available = FIREBASE_AVAILABLE
         
     def initialize_firebase(self):
         """Initialize Firebase with Streamlit secrets."""
+        if not self.firebase_available:
+            return False
+            
         if self.initialized:
             return True
             
         try:
-            # Check if Firebase is available
-            if not FIREBASE_AVAILABLE:
-                st.error("Firebase libraries not available. Please install firebase-admin and pyrebase4.")
-                return False
-                
             # Check if secrets are available
             if 'firebase' not in st.secrets:
-                st.error("Firebase configuration not found in secrets. Please configure Firebase secrets.")
+                st.error("Firebase configuration not found in Streamlit secrets. Please configure Firebase secrets in your Streamlit Cloud app.")
+                with st.expander("📝 How to Configure Firebase Secrets"):
+                    st.markdown("""
+                    **Step 1: Create Firebase Project**
+                    1. Go to [Firebase Console](https://console.firebase.google.com/)
+                    2. Create a new project
+                    3. Enable Authentication → Email/Password
+                    4. Enable Firestore Database
+                    
+                    **Step 2: Get Configuration**
+                    1. Project Settings → Service Accounts → Generate new private key
+                    2. Project Settings → General → Web API Key
+                    
+                    **Step 3: Add to Streamlit Secrets**
+                    Add these to your Streamlit Cloud app secrets:
+                    ```toml
+                    [firebase]
+                    type = "service_account"
+                    project_id = "your-project-id"
+                    private_key_id = "your-private-key-id"
+                    private_key = "-----BEGIN PRIVATE KEY-----\\nYOUR_KEY\\n-----END PRIVATE KEY-----\\n"
+                    client_email = "firebase-adminsdk-xxxxx@your-project.iam.gserviceaccount.com"
+                    client_id = "your-client-id"
+                    auth_uri = "https://accounts.google.com/o/oauth2/auth"
+                    token_uri = "https://oauth2.googleapis.com/token"
+                    auth_provider_x509_cert_url = "https://www.googleapis.com/oauth2/v1/certs"
+                    client_x509_cert_url = "your-client-cert-url"
+                    api_key = "your-web-api-key"
+                    auth_domain = "your-project-id.firebaseapp.com"
+                    storage_bucket = "your-project-id.appspot.com"
+                    messaging_sender_id = "your-sender-id"
+                    app_id = "your-app-id"
+                    ```
+                    """)
                 return False
                 
             # Get Firebase config from Streamlit secrets
@@ -270,10 +334,14 @@ class FirebaseAuthenticator:
             
         except Exception as e:
             st.error(f"Failed to initialize Firebase: {str(e)}")
+            st.info("Using demo mode without authentication.")
             return False
     
     def sign_up(self, email, password, display_name):
         """Create a new user account."""
+        if not self.firebase_available or not self.initialized:
+            return False, "Firebase authentication not available."
+            
         try:
             # Create user with email and password
             user = self.auth_client.create_user_with_email_and_password(email, password)
@@ -311,6 +379,9 @@ class FirebaseAuthenticator:
     
     def sign_in(self, email, password):
         """Sign in an existing user."""
+        if not self.firebase_available or not self.initialized:
+            return False, "Firebase authentication not available.", None
+            
         try:
             user = self.auth_client.sign_in_with_email_and_password(email, password)
             
@@ -353,6 +424,9 @@ class FirebaseAuthenticator:
     
     def reset_password(self, email):
         """Send password reset email."""
+        if not self.firebase_available or not self.initialized:
+            return False, "Firebase authentication not available."
+            
         try:
             self.auth_client.send_password_reset_email(email)
             return True, "Password reset email sent. Please check your inbox."
@@ -362,14 +436,6 @@ class FirebaseAuthenticator:
                 return False, "Email not found."
             else:
                 return False, f"Password reset failed: {error_message}"
-    
-    def verify_token(self, id_token):
-        """Verify Firebase ID token."""
-        try:
-            decoded_token = auth.verify_id_token(id_token)
-            return True, decoded_token
-        except Exception as e:
-            return False, None
     
     def sign_out(self):
         """Sign out current user."""
@@ -932,8 +998,30 @@ def render_authentication():
     
     firebase_auth = st.session_state.firebase_auth
     
+    if not firebase_auth.firebase_available:
+        st.info("🔧 **Demo Mode**: Firebase authentication is not available. You can use all features without authentication.")
+        if st.button("🚀 Continue to Platform", type="primary"):
+            st.session_state.authenticated = True
+            st.session_state.demo_mode = True
+            st.session_state.user_info = {
+                'display_name': 'Demo User',
+                'email': 'demo@example.com',
+                'role': 'demo'
+            }
+            st.rerun()
+        return False
+    
     if not firebase_auth.initialize_firebase():
-        st.error("Failed to initialize authentication system. Please check your Firebase configuration.")
+        st.info("🔧 **Demo Mode**: Firebase configuration incomplete. You can use all features without authentication.")
+        if st.button("🚀 Continue to Platform", type="primary"):
+            st.session_state.authenticated = True
+            st.session_state.demo_mode = True
+            st.session_state.user_info = {
+                'display_name': 'Demo User',
+                'email': 'demo@example.com',
+                'role': 'demo'
+            }
+            st.rerun()
         return False
     
     # Check if user is already authenticated
@@ -981,6 +1069,7 @@ def render_sign_in(firebase_auth):
                         st.session_state.authenticated = True
                         st.session_state.user_info = user_data
                         st.session_state.id_token = user_data['id_token']
+                        st.session_state.demo_mode = False
                         st.success(message)
                         time.sleep(1)
                         st.rerun()
@@ -1055,27 +1144,46 @@ def render_user_info():
     """Render user information in sidebar."""
     if st.session_state.get('authenticated', False):
         user_info = st.session_state.get('user_info', {})
+        is_demo = st.session_state.get('demo_mode', False)
         
-        st.markdown(f"""
-        <div class="user-info">
-            <strong>👤 {user_info.get('display_name', 'User')}</strong><br>
-            <small>{user_info.get('email', '')}</small><br>
-            <small>Role: {user_info.get('role', 'user').title()}</small>
-        </div>
-        """, unsafe_allow_html=True)
+        if is_demo:
+            st.markdown(f"""
+            <div class="user-info">
+                <strong>👤 {user_info.get('display_name', 'Demo User')}</strong><br>
+                <small>{user_info.get('email', 'demo@example.com')}</small><br>
+                <span class="status-badge status-demo">Demo Mode</span>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown(f"""
+            <div class="user-info">
+                <strong>👤 {user_info.get('display_name', 'User')}</strong><br>
+                <small>{user_info.get('email', '')}</small><br>
+                <small>Role: {user_info.get('role', 'user').title()}</small>
+            </div>
+            """, unsafe_allow_html=True)
         
         if st.button("🚪 Sign Out", key="sign_out", use_container_width=True):
-            firebase_auth = st.session_state.firebase_auth
-            if firebase_auth.sign_out():
-                st.success("Signed out successfully!")
-                time.sleep(1)
-                st.rerun()
+            if is_demo:
+                # Simple logout for demo mode
+                for key in ['authenticated', 'demo_mode', 'user_info']:
+                    if key in st.session_state:
+                        del st.session_state[key]
+            else:
+                firebase_auth = st.session_state.firebase_auth
+                firebase_auth.sign_out()
+            
+            st.success("Signed out successfully!")
+            time.sleep(1)
+            st.rerun()
 
 # Initialize session state
 def initialize_session_state():
     """Initialize session state."""
     if 'authenticated' not in st.session_state:
         st.session_state.authenticated = False
+    if 'demo_mode' not in st.session_state:
+        st.session_state.demo_mode = False
     if 'user_info' not in st.session_state:
         st.session_state.user_info = {}
     if 'calculator' not in st.session_state:
@@ -1090,7 +1198,7 @@ def initialize_session_state():
     if 'bulk_results' not in st.session_state:
         st.session_state.bulk_results = []
 
-# Helper functions
+# Helper functions (keeping all the existing functions)
 def parse_bulk_upload_file(uploaded_file):
     """Parse bulk upload file."""
     try:
@@ -1675,6 +1783,14 @@ def main():
         if not render_authentication():
             return
     
+    # Show demo mode banner if applicable
+    if st.session_state.get('demo_mode', False):
+        st.markdown("""
+        <div class="demo-banner">
+            🔧 <strong>Demo Mode Active</strong> - Full functionality available without authentication
+        </div>
+        """, unsafe_allow_html=True)
+    
     # Main application
     st.markdown("""
     <div class="main-header">
@@ -1772,7 +1888,7 @@ def main():
     st.markdown("---")
     st.markdown("""
     <div style="text-align: center; color: #6b7280; font-size: 0.875rem; padding: 2rem 0;">
-        <strong>Enterprise AWS Workload Sizing Platform v3.0 with Firebase Authentication</strong><br>
+        <strong>Enterprise AWS Workload Sizing Platform v3.0 with Authentication</strong><br>
         Secure, comprehensive cloud migration planning for enterprise infrastructure
     </div>
     """, unsafe_allow_html=True)
