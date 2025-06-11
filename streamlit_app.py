@@ -1051,62 +1051,54 @@ def render_analysis_results(recommendations, key_suffix=""):
 
     st.markdown("---")
 
-    # Heatmap for instance family costs (example)
-    st.markdown("### Instance Type Cost Heatmap (PROD Region)")
-    selected_region = st.session_state.get('selected_output_region', AWS_REGIONS["US East (N. Virginia)"])
-    selected_os = st.session_state.workload_inputs['PROD_os'] # Use PROD OS as a basis
-
-    instance_details_for_heatmap = st.session_state.calculator.get_instance_details(selected_region)
-    ec2_prices_for_heatmap = st.session_state.calculator.all_ec2_prices.get(selected_region, {})
-
-    if ec2_prices_for_heatmap and instance_details_for_heatmap:
-        heatmap_data = []
-        for instance_type, os_prices in ec2_prices_for_heatmap.items():
-            if selected_os in os_prices and instance_type in instance_details_for_heatmap:
-                price = os_prices[selected_os] * 730 # Monthly On-Demand price
-                vcpus = instance_details_for_heatmap[instance_type]['vCPUs']
-                memory_gb = instance_details_for_heatmap[instance_type]['MemoryGiB']
-                
-                # Group by instance family (e.g., 'm5', 'c5') and then by vCPU/Memory ranges
-                family = instance_type.split('.')[0]
-                heatmap_data.append({
-                    'Instance Type': instance_type,
-                    'Family': family,
-                    'vCPUs': vcpus,
-                    'Memory (GiB)': memory_gb,
-                    'Monthly Cost ($)': price
+    # MODIFIED_CODE_BLOCK: Replaced Heatmap with Current vs. Projected Cost Comparison
+    st.markdown("### Current vs. Projected Cost Comparison (PROD)")
+    prod_rec = recommendations.get('PROD', {})
+    if 'projected_costs' in prod_rec and prod_rec['projected_costs'] and prod_rec.get('total_cost', float('inf')) != float('inf'):
+        
+        # Prepare data for the comparison chart
+        comparison_data = []
+        
+        # Add current cost (Year 0)
+        comparison_data.append({
+            'Year': 'Year 0',
+            'Estimated Monthly Cost': prod_rec['total_cost'],
+            'Type': 'Current'
+        })
+        
+        # Add projected costs
+        for year, details in prod_rec['projected_costs'].items():
+            cost = details.get('estimated_cost')
+            if cost != 'N/A' and isinstance(cost, (int, float)):
+                comparison_data.append({
+                    'Year': year,
+                    'Estimated Monthly Cost': cost,
+                    'Type': 'Projected'
                 })
 
-        df_heatmap = pd.DataFrame(heatmap_data)
-        if not df_heatmap.empty:
-            # Create a pivot table for the heatmap
-            # For simplicity, let's just show family vs. vCPU count as an example
-            # A more sophisticated heatmap might require grouping instances into tiers or using log scales
-            heatmap_pivot = df_heatmap.pivot_table(
-                index='Family', 
-                columns='vCPUs', 
-                values='Monthly Cost ($)', 
-                aggfunc='mean'
-            ).fillna(0) # Fill NaN with 0 for instance types not present
-
-            fig_heatmap = go.Figure(data=go.Heatmap(
-                z=heatmap_pivot.values,
-                x=heatmap_pivot.columns.astype(str),
-                y=heatmap_pivot.index,
-                colorscale='Viridis',
-                colorbar_title='Avg. Monthly Cost ($)'
-            ))
-            fig_heatmap.update_layout(
-                title='Average Monthly Instance Cost by Family and vCPUs',
-                xaxis_title='vCPUs',
-                yaxis_title='Instance Family',
-                height=500
+        if len(comparison_data) > 1: # Only show chart if there's something to compare
+            df_comparison = pd.DataFrame(comparison_data)
+            
+            fig_comparison = px.bar(
+                df_comparison,
+                x='Year',
+                y='Estimated Monthly Cost',
+                color='Type',
+                title='Current vs. Projected Monthly Cost for PROD Environment',
+                labels={'Estimated Monthly Cost': 'Estimated Monthly Cost ($)'},
+                height=450,
+                color_discrete_map={'Current': '#667eea', 'Projected': '#a78bfa'}
             )
-            st.plotly_chart(fig_heatmap, use_container_width=True)
+            fig_comparison.update_layout(
+                xaxis_title='Year',
+                yaxis_title='Estimated Monthly Cost ($)',
+                legend_title='Cost Type'
+            )
+            st.plotly_chart(fig_comparison, use_container_width=True)
         else:
-            st.info(f"No instance pricing data available for heatmap in {PRICING_REGION_NAMES.get(selected_region, selected_region)} with {selected_os}.")
+            st.info("Not enough data to generate a current vs. projected cost comparison chart.")
     else:
-        st.info(f"Cannot generate heatmap: Instance details or prices not fetched for {PRICING_REGION_NAMES.get(selected_region, selected_region)}.")
+        st.info("No projected cost data available for the PROD environment to create a comparison chart.")
 
 
 def render_bulk_analysis():
@@ -1272,11 +1264,10 @@ def create_pdf_report(recommendations, workload_inputs, bulk_results_df=None):
     
     # Custom styles
     styles.add(ParagraphStyle(name='Heading1Centered', alignment=TA_CENTER, fontSize=20, leading=24, fontName='Helvetica-Bold'))
-    styles.add(ParagraphStyle(name='Heading2', fontSize=14, leading=16, fontName='Helvetica-Bold', spaceAfter=10))
-    styles.add(ParagraphStyle(name='Heading3', fontSize=12, leading=14, fontName='Helvetica-Bold', spaceAfter=8))
-    styles.add(ParagraphStyle(name='Normal', fontSize=10, leading=12, fontName='Helvetica'))
-    styles.add(ParagraphStyle(name='Small', fontSize=8, leading=10, fontName='Helvetica'))
-    styles.add(ParagraphStyle(name='Italic', fontSize=10, leading=12, fontName='Helvetica-Oblique'))
+    styles['h2'].fontSize = 14
+    styles['h2'].leading = 16
+    styles['h2'].fontName = 'Inter-SemiBold'
+    styles['h2'].alignment = TA_LEFT # Assuming left alignment is desired for this heading
     
     story = []
 
