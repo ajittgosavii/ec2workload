@@ -726,7 +726,7 @@ def render_workload_configuration():
         with col2:
             st.session_state.workload_inputs['onprem_average_ram_utilization_percent'] = st.number_input("Average RAM Utilization (%)", min_value=0, max_value=100, value=st.session_state.workload_inputs['onprem_average_ram_utilization_percent'], step=1, key="onprem_average_ram_utilization_percent")
         with col3:
-            st.session_state.workload_inputs['onprem_sga_buffer_pool_gb'] = float(st.number_input("SGA/Buffer Pool Size (GB)"), min_value=0.0, max_value=1024.0, value=st.session_state.workload_inputs['onprem_sga_buffer_pool_gb'], step=0.1, format="%.1f", key="onprem_sga_buffer_pool_gb")
+            st.session_state.workload_inputs['onprem_sga_buffer_pool_gb'] =st.number_input("SGA/Buffer Pool Size (GB)", min_value=0.0, max_value=1024.0, value=st.session_state.workload_inputs['onprem_sga_buffer_pool_gb'], step=0.1, format="%.1f", key="onprem_sga_buffer_pool_gb")
         
         st.markdown("##### I/O Performance")
         col1, col2, col3 = st.columns(3)
