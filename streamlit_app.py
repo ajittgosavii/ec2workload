@@ -669,12 +669,18 @@ def render_workload_configuration():
                 st.error(f"Error loading configuration: {e}")
 
 
-def render_analysis_results(recommendations):
-    """Renders the analysis results for a single workload."""
+def render_analysis_results(recommendations, key_suffix=""):
+    """Renders the analysis results for a single workload.
+    
+    Args:
+        recommendations (dict): The dictionary of recommendations.
+        key_suffix (str): A suffix to ensure unique keys for Streamlit elements,
+                          especially when called in loops (e.g., from bulk analysis).
+    """
     st.markdown("## ✨ Analysis Results")
 
-    if not recommendations:
-        st.warning("No recommendations available. Please configure your workload and generate recommendations.")
+    if not recommendations or 'error' in recommendations:
+        st.warning(f"No recommendations available or an error occurred during analysis: {recommendations.get('error', 'Unknown Error')}. Please configure your workload and generate recommendations.")
         return
 
     # Prepare data for display
@@ -724,14 +730,20 @@ def render_analysis_results(recommendations):
         fig_costs = px.pie(df_costs, values='Cost', names='Component', title='PROD Monthly Cost Distribution',
                            hole=0.4, color_discrete_sequence=px.colors.qualitative.Pastel)
         fig_costs.update_traces(textinfo='percent+label', marker=dict(line=dict(color='#000000', width=1)))
-        st.plotly_chart(fig_costs, use_container_width=True)
+        st.plotly_chart(fig_costs, use_container_width=True, key=f"prod_cost_chart_{key_suffix}")
     else:
         st.info("PROD environment recommendations not available for cost breakdown.")
 
 
     # Workload Growth Projection
     st.markdown("### Workload Growth Projections (PROD)")
-    if 'projected_costs' in recommendations.get('PROD', {}) and st.session_state.workload_inputs['growth_years'] > 0:
+    # Ensure st.session_state.workload_inputs is correctly populated for single workload,
+    # or passed from the bulk item's inputs. For simplicity here, assuming single workload context
+    # is generally what drives 'growth_years' and 'growth_rate_annual'
+    current_growth_years = st.session_state.workload_inputs.get('growth_years', 0)
+    current_growth_rate = st.session_state.workload_inputs.get('growth_rate_annual', 0)
+
+    if 'projected_costs' in recommendations.get('PROD', {}) and current_growth_years > 0:
         proj_costs = recommendations['PROD']['projected_costs']
         proj_data = []
         for year_str, details in proj_costs.items():
@@ -751,12 +763,12 @@ def render_analysis_results(recommendations):
                            markers=True, text="Estimated Cost (Monthly)")
         fig_proj.update_traces(texttemplate='%{text:$.2f}', textposition='top center')
         fig_proj.update_layout(hovermode="x unified", xaxis_title="Year", yaxis_title="Estimated Monthly Cost ($)")
-        st.plotly_chart(fig_proj, use_container_width=True)
+        st.plotly_chart(fig_proj, use_container_width=True, key=f"proj_cost_chart_{key_suffix}")
 
         st.markdown(f"""
         <details>
         <summary>Detailed Growth Projection Table</summary>
-        <p>This table shows the projected resource requirements and estimated costs for the PROD environment based on an annual growth rate of <b>{st.session_state.workload_inputs['growth_rate_annual']}%</b> over <b>{st.session_state.workload_inputs['growth_years']}</b> years.</p>
+        <p>This table shows the projected resource requirements and estimated costs for the PROD environment based on an annual growth rate of <b>{current_growth_rate}%</b> over <b>{current_growth_years}</b> years.</p>
         </details>
         """, unsafe_allow_html=True)
         st.dataframe(df_projected, use_container_width=True)
@@ -830,14 +842,14 @@ def render_bulk_analysis():
                         results = st.session_state.calculator.generate_all_recommendations()
                         st.session_state.bulk_results.append({
                             'workload_name': temp_inputs['workload_name'],
-                            'inputs': temp_inputs,
+                            'inputs': temp_inputs, # Store inputs for later use (e.g., report generation, projections)
                             'recommendations': results
                         })
                     except Exception as e:
                         logger.error(f"Error processing workload {temp_inputs['workload_name']}: {e}")
                         st.session_state.bulk_results.append({
                             'workload_name': temp_inputs['workload_name'],
-                            'inputs': temp_inputs,
+                            'inputs': temp_inputs, # Store inputs even if error
                             'recommendations': {'error': str(e)}
                         })
 
@@ -864,21 +876,33 @@ def display_bulk_analysis_results(bulk_results):
     summary_data = []
     for workload_result in bulk_results:
         name = workload_result['workload_name']
-        prod_rec = workload_result['recommendations'].get('PROD', {})
-        total_cost = prod_rec.get('total_cost', float('inf'))
-        instance_type = prod_rec.get('instance_type', 'N/A')
-        
-        if total_cost == float('inf'):
-            cost_str = "N/A"
-        else:
-            cost_str = f"${total_cost:,.2f}"
+        recs = workload_result['recommendations']
 
-        summary_data.append({
-            "Workload Name": name,
-            "PROD Recommended Instance": instance_type,
-            "PROD Monthly Cost": cost_str,
-            "RI/SP Option": workload_result['inputs'].get('ri_sp_option', 'N/A')
-        })
+        if 'error' in recs:
+            summary_data.append({
+                "Workload Name": name,
+                "PROD Recommended Instance": "Error",
+                "PROD Monthly Cost": "Error",
+                "RI/SP Option": workload_result['inputs'].get('ri_sp_option', 'N/A'),
+                "Status": "Failed"
+            })
+        else:
+            prod_rec = recs.get('PROD', {})
+            total_cost = prod_rec.get('total_cost', float('inf'))
+            instance_type = prod_rec.get('instance_type', 'N/A')
+            
+            if total_cost == float('inf'):
+                cost_str = "N/A"
+            else:
+                cost_str = f"${total_cost:,.2f}"
+
+            summary_data.append({
+                "Workload Name": name,
+                "PROD Recommended Instance": instance_type,
+                "PROD Monthly Cost": cost_str,
+                "RI/SP Option": workload_result['inputs'].get('ri_sp_option', 'N/A'),
+                "Status": "Success"
+            })
     
     df_summary = pd.DataFrame(summary_data)
     st.dataframe(df_summary, hide_index=True, use_container_width=True)
@@ -898,21 +922,18 @@ def display_bulk_analysis_results(bulk_results):
         for workload_result in bulk_results:
             name = workload_result['workload_name']
             st.markdown(f"#### Workload: {name}")
+            # Temporarily set session_state.workload_inputs for render_analysis_results
+            # to correctly pick up growth_rate_annual and growth_years from bulk inputs
+            original_single_inputs = st.session_state.workload_inputs.copy()
+            st.session_state.workload_inputs = workload_result['inputs']
+
             if 'error' in workload_result['recommendations']:
                 st.error(f"Error for {name}: {workload_result['recommendations']['error']}")
             else:
-                render_analysis_results(workload_result['recommendations'])
+                render_analysis_results(workload_result['recommendations'], key_suffix=name.replace(' ', '_'))
             st.markdown("---")
-    
-    # Allow selection for individual detailed view (if desired, can be added later)
-    # selected_workload_name = st.selectbox("View detailed results for a specific workload:", 
-    #                                       [res['workload_name'] for res in bulk_results])
-    # if selected_workload_name:
-    #     selected_workload = next((res for res in bulk_results if res['workload_name'] == selected_workload_name), None)
-    #     if selected_workload and 'error' not in selected_workload['recommendations']:
-    #         render_analysis_results(selected_workload['recommendations'])
-    #     elif selected_workload:
-    #         st.error(f"Error for {selected_workload_name}: {selected_workload['recommendations']['error']}")
+            # Restore original single workload inputs
+            st.session_state.workload_inputs = original_single_inputs
 
 
 def generate_pdf_report(analysis_results, workload_inputs, buffer):
@@ -1115,11 +1136,11 @@ def render_reports_export():
         st.markdown("### Single Workload Report")
         if REPORTLAB_AVAILABLE:
             pdf_buffer = BytesIO()
-            generate_pdf_report(st.session_state.analysis_results, st.session_state.workload_inputs, pdf_buffer)
+            generate_pdf_report(st.session_state.analysis_results['recommendations'], st.session_state.analysis_results['inputs'], pdf_buffer)
             st.download_button(
                 label="Download PDF Report",
                 data=pdf_buffer.getvalue(),
-                file_name=f"workload_report_{st.session_state.workload_inputs.get('workload_name', 'single').replace(' ', '_').lower()}.pdf",
+                file_name=f"workload_report_{st.session_state.analysis_results['inputs'].get('workload_name', 'single').replace(' ', '_').lower()}.pdf",
                 mime="application/pdf"
             )
         else:
@@ -1127,10 +1148,14 @@ def render_reports_export():
 
         # Export to CSV
         csv_data = []
-        for env, rec in st.session_state.analysis_results.items():
+        # Use inputs from analysis_results for consistency
+        current_workload_inputs = st.session_state.analysis_results['inputs']
+        current_recommendations = st.session_state.analysis_results['recommendations']
+
+        for env, rec in current_recommendations.items():
             if rec['total_cost'] != float('inf'):
                 row = {
-                    "Workload Name": st.session_state.workload_inputs.get('workload_name', 'Single Workload'),
+                    "Workload Name": current_workload_inputs.get('workload_name', 'Single Workload'),
                     "Environment": env,
                     "Recommended Instance": rec['instance_type'],
                     "vCPUs": rec['vcpus'],
@@ -1147,12 +1172,12 @@ def render_reports_export():
                 csv_data.append(row)
         
         # Add growth projections to CSV if available
-        prod_rec = st.session_state.analysis_results.get('PROD', {})
-        if 'projected_costs' in prod_rec and st.session_state.workload_inputs['growth_years'] > 0:
+        prod_rec = current_recommendations.get('PROD', {})
+        if 'projected_costs' in prod_rec and current_workload_inputs.get('growth_years', 0) > 0:
             for year_str, details in prod_rec['projected_costs'].items():
                 cost_value = details['estimated_cost']
                 csv_data.append({
-                    "Workload Name": st.session_state.workload_inputs.get('workload_name', 'Single Workload'),
+                    "Workload Name": current_workload_inputs.get('workload_name', 'Single Workload'),
                     "Environment": f"PROD - {year_str} Projection",
                     "Recommended Instance": details['recommended_instance'],
                     "vCPUs": details['vcpus'],
@@ -1173,7 +1198,7 @@ def render_reports_export():
             st.download_button(
                 label="Download Single Workload CSV",
                 data=csv_export,
-                file_name=f"workload_details_{st.session_state.workload_inputs.get('workload_name', 'single').replace(' ', '_').lower()}.csv",
+                file_name=f"workload_details_{current_workload_inputs.get('workload_name', 'single').replace(' ', '_').lower()}.csv",
                 mime="text/csv"
             )
 
@@ -1190,9 +1215,16 @@ def render_reports_export():
             if 'error' in recs:
                 bulk_detailed_data.append({
                     "Workload Name": workload_name,
+                    "Environment": "N/A",
                     "Status": "Error",
                     "Error Message": recs['error'],
-                    **{f"Input_{k}": v for k,v in inputs.items()} # Include inputs for error rows
+                    "Recommended Instance": "N/A",
+                    "vCPUs": "N/A", "Memory (GiB)": "N/A", "Storage (GB)": "N/A",
+                    "OS": "N/A", "Region": "N/A", "Pricing Model": "N/A",
+                    "Monthly EC2 Instance Cost": "N/A", "Monthly EBS Storage Cost": "N/A", "Monthly OS Cost": "N/A",
+                    "Total Monthly Cost": "N/A",
+                    "Annual Growth Rate (%)": inputs.get('growth_rate_annual', 'N/A'),
+                    "Projection Years": inputs.get('growth_years', 'N/A')
                 })
                 continue
 
@@ -1201,6 +1233,7 @@ def render_reports_export():
                     "Workload Name": workload_name,
                     "Environment": env,
                     "Status": "Success",
+                    "Error Message": "",
                     "Recommended Instance": rec.get('instance_type', 'N/A'),
                     "vCPUs": rec.get('vcpus', 'N/A'),
                     "Memory (GiB)": rec.get('memory_gb', 'N/A'),
@@ -1225,6 +1258,7 @@ def render_reports_export():
                             "Workload Name": workload_name,
                             "Environment": f"PROD - {year_str} Projection",
                             "Status": "Success",
+                            "Error Message": "",
                             "Recommended Instance": proj_details['recommended_instance'],
                             "vCPUs": proj_details['vcpus'],
                             "Memory (GiB)": proj_details['memory_gb'],
@@ -1286,18 +1320,18 @@ def main():
             total_monthly_cost = 0.0
 
             if st.session_state.bulk_results:
-                total_workloads += len(st.session_state.bulk_results)
                 for res in st.session_state.bulk_results:
-                    if 'PROD' in res['recommendations'] and 'total_cost' in res['recommendations']['PROD'] and res['recommendations']['PROD']['total_cost'] != float('inf'):
-                        total_monthly_cost += res['recommendations']['PROD']['total_cost']
+                    # Check for errors in bulk results before processing
+                    if 'error' not in res['recommendations']:
+                        total_workloads += 1
+                        if 'PROD' in res['recommendations'] and 'total_cost' in res['recommendations']['PROD'] and res['recommendations']['PROD']['total_cost'] != float('inf'):
+                            total_monthly_cost += res['recommendations']['PROD']['total_cost']
             
-            if st.session_state.analysis_results and 'PROD' in st.session_state.analysis_results['recommendations'] and st.session_state.analysis_results['recommendations']['PROD']['total_cost'] != float('inf'):
-                # If both single and bulk results exist, avoid double counting for 'total_workloads' if a single analysis is also active
-                # For simplicity, if a single analysis is active, count it as 1 additional workload if not part of bulk.
-                # A more robust solution might distinguish between 'single' and 'bulk' states explicitly.
-                if not st.session_state.bulk_results: # Only add if no bulk results are active
-                     total_workloads += 1 
-                total_monthly_cost += st.session_state.analysis_results['recommendations']['PROD']['total_cost']
+            # For single analysis, only count if it's not a bulk result (i.e., if bulk_results is empty or None)
+            if st.session_state.analysis_results and not st.session_state.bulk_results:
+                if 'PROD' in st.session_state.analysis_results['recommendations'] and st.session_state.analysis_results['recommendations']['PROD']['total_cost'] != float('inf'):
+                    total_workloads += 1 
+                    total_monthly_cost += st.session_state.analysis_results['recommendations']['PROD']['total_cost']
 
             st.metric("Workloads Analyzed", total_workloads)
             st.metric("Monthly Cost (PROD)", f"${total_monthly_cost:,.2f}")
@@ -1342,15 +1376,13 @@ def main():
                     }
 
                     st.success("✅ Analysis completed successfully!")
-                    # The results will be rendered when the tab refreshes based on st.session_state.analysis_results
-                    # No need to call render_analysis_results here directly after setting session state
                 except Exception as e:
                     st.error(f"❌ Error during analysis: {str(e)}")
 
         # This block will now be the *only* place render_analysis_results is called for single analysis.
         if st.session_state.analysis_results:
             st.markdown("---")
-            render_analysis_results(st.session_state.analysis_results['recommendations'])
+            render_analysis_results(st.session_state.analysis_results['recommendations'], key_suffix="single_workload")
 
     with tab2:
         render_bulk_analysis()
@@ -1364,7 +1396,7 @@ def main():
 
     st.markdown("---")
     st.markdown("""
-    <div style="text-align: center; color: #6b7280; font-size: 0.875rem; padding: 2rem 0;">
+    <div style="text-align: center; color: #6b7280; font-size: 0.875rem; padding: 2rem 0;\">
         <strong>Enterprise AWS Workload Sizing Platform v3.0</strong><br>
         Comprehensive cloud migration planning for enterprise infrastructure
     </div>
