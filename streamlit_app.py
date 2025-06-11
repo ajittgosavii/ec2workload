@@ -989,7 +989,7 @@ def render_analysis_results(results):
         fig_costs = px.bar(df_costs, x='Environment', y=['Instance', 'Storage', 'Network'],
                           title='Cost Breakdown by Environment', barmode='stack')
         fig_costs.update_layout(height=400)
-        st.plotly_chart(fig_costs, use_container_width=True)
+        st.plotly_chart(fig_costs, use_container_width=True, key=f"analysis_costs_chart_{key_suffix}")
         
     with col2:
         opt_data = [{'Environment': env, 'Score': rec['optimization_score']} for env, rec in results.items()]
@@ -1374,7 +1374,7 @@ def main():
         
         if st.session_state.analysis_results:
             st.markdown("---")
-            render_analysis_results(st.session_state.analysis_results['recommendations'])
+            render_analysis_results(st.session_state.analysis_results['recommendations'], key_suffix="main_analysis")
     
     with tab2:
         render_bulk_analysis()
