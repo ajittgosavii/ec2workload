@@ -2,7 +2,7 @@ import streamlit as st
 
 # Configure page - MUST be first Streamlit command
 st.set_page_config(
-    page_title="Enterprise AWS EC2 Workload Sizing Platform", 
+    page_title="Enterprise AWS EC2 Workload Sizing Platform v4.0", 
     layout="wide",
     page_icon="🏢",
     initial_sidebar_state="expanded"
@@ -11,11 +11,12 @@ st.set_page_config(
 import pandas as pd
 from io import BytesIO
 import io
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 import time
 import plotly.express as px
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 import math
 import boto3
 import json
@@ -24,6 +25,8 @@ from functools import lru_cache
 from botocore.exceptions import NoCredentialsError, PartialCredentialsError, ClientError
 import hashlib
 import hmac
+import numpy as np
+from typing import Dict, List, Tuple, Optional, Any
 
 # Firebase imports with error handling
 FIREBASE_AVAILABLE = False
@@ -33,7 +36,6 @@ try:
     import requests
     FIREBASE_AVAILABLE = True
 except ImportError as e:
-    # Firebase libraries not available
     firebase_admin = None
     credentials = None
     auth = None
@@ -66,7 +68,7 @@ except ImportError:
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Enhanced custom CSS
+# Enhanced custom CSS with new styling for enterprise features
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
@@ -103,33 +105,77 @@ st.markdown("""
         opacity: 0.9;
     }
     
-    .auth-container {
-        background: white;
-        border: 1px solid #e2e8f0;
-        border-radius: 12px;
-        padding: 2rem;
-        margin: 2rem auto;
-        max-width: 400px;
-        box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+    .enterprise-badge {
+        background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+        color: white;
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-left: 1rem;
+        display: inline-block;
     }
     
-    .demo-banner {
-        background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+    .savings-highlight {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
         color: white;
         padding: 1rem 2rem;
         border-radius: 8px;
-        margin-bottom: 1rem;
+        margin: 1rem 0;
         text-align: center;
+        font-weight: 600;
     }
     
-    .config-debug {
-        background: #f8fafc;
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        padding: 1rem;
+    .cost-comparison-card {
+        background: white;
+        border: 2px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 1.5rem;
         margin: 1rem 0;
-        font-family: monospace;
-        font-size: 0.875rem;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .cost-comparison-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: linear-gradient(90deg, #667eea, #764ba2);
+    }
+    
+    .ri-badge {
+        background: #ddd6fe;
+        color: #5b21b6;
+        padding: 0.25rem 0.75rem;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+    
+    .sp-badge {
+        background: #d1fae5;
+        color: #065f46;
+        padding: 0.25rem 0.75rem;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+    
+    .spot-badge {
+        background: #fef3c7;
+        color: #92400e;
+        padding: 0.25rem 0.75rem;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
     }
     
     .metric-card {
@@ -171,52 +217,6 @@ st.markdown("""
         margin: 0;
     }
     
-    .status-badge {
-        display: inline-block;
-        padding: 0.25rem 0.75rem;
-        border-radius: 9999px;
-        font-size: 0.75rem;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.025em;
-    }
-    
-    .status-success {
-        background: #d1fae5;
-        color: #065f46;
-    }
-    
-    .status-error {
-        background: #fee2e2;
-        color: #991b1b;
-    }
-    
-    .status-warning {
-        background: #fef3c7;
-        color: #92400e;
-    }
-    
-    .status-demo {
-        background: #ddd6fe;
-        color: #5b21b6;
-    }
-    
-    .stButton>button {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        font-weight: 600;
-        border-radius: 8px;
-        border: none;
-        padding: 0.75rem 1.5rem;
-        transition: all 0.2s ease;
-        width: 100%;
-    }
-    
-    .stButton>button:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
-    }
-    
     .section-header {
         background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
         padding: 1rem 1.5rem;
@@ -231,23 +231,915 @@ st.markdown("""
         font-weight: 600;
     }
     
-    .user-info {
-        background: #f0f9ff;
-        border: 1px solid #0284c7;
-        border-radius: 8px;
-        padding: 1rem;
-        margin-bottom: 1rem;
+    .tco-summary {
+        background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+        border: 2px solid #0284c7;
+        border-radius: 12px;
+        padding: 2rem;
+        margin: 2rem 0;
+        text-align: center;
     }
     
-    .setup-instructions {
-        background: #f8fafc;
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        padding: 1.5rem;
-        margin: 1rem 0;
+    .compliance-badge {
+        background: #fee2e2;
+        color: #991b1b;
+        padding: 0.25rem 0.75rem;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        margin-right: 0.5rem;
     }
+    
+    .migration-phase {
+        background: white;
+        border-left: 4px solid #10b981;
+        padding: 1rem 1.5rem;
+        margin: 1rem 0;
+        border-radius: 0 8px 8px 0;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .risk-indicator {
+        padding: 0.5rem;
+        border-radius: 6px;
+        font-weight: 600;
+        text-align: center;
+        margin: 0.25rem 0;
+    }
+    
+    .risk-low { background: #d1fae5; color: #065f46; }
+    .risk-medium { background: #fef3c7; color: #92400e; }
+    .risk-high { background: #fee2e2; color: #991b1b; }
 </style>
 """, unsafe_allow_html=True)
+
+class EnterpriseEC2WorkloadSizingCalculator:
+    """Enterprise-grade AWS EC2 workload sizing calculator with advanced features."""
+    
+    # AWS Instance Types (expanded with more options)
+    INSTANCE_TYPES = [
+        # General Purpose - M6i (Intel)
+        {"type": "m6i.large", "vCPU": 2, "RAM": 8, "max_ebs_bandwidth": 4750, "network": "Up to 12.5 Gbps", "family": "general", "processor": "Intel", "architecture": "x86_64"},
+        {"type": "m6i.xlarge", "vCPU": 4, "RAM": 16, "max_ebs_bandwidth": 9500, "network": "Up to 12.5 Gbps", "family": "general", "processor": "Intel", "architecture": "x86_64"},
+        {"type": "m6i.2xlarge", "vCPU": 8, "RAM": 32, "max_ebs_bandwidth": 19000, "network": "Up to 12.5 Gbps", "family": "general", "processor": "Intel", "architecture": "x86_64"},
+        {"type": "m6i.4xlarge", "vCPU": 16, "RAM": 64, "max_ebs_bandwidth": 38000, "network": "12.5 Gbps", "family": "general", "processor": "Intel", "architecture": "x86_64"},
+        {"type": "m6i.8xlarge", "vCPU": 32, "RAM": 128, "max_ebs_bandwidth": 47500, "network": "25 Gbps", "family": "general", "processor": "Intel", "architecture": "x86_64"},
+        {"type": "m6i.12xlarge", "vCPU": 48, "RAM": 192, "max_ebs_bandwidth": 57000, "network": "37.5 Gbps", "family": "general", "processor": "Intel", "architecture": "x86_64"},
+        {"type": "m6i.16xlarge", "vCPU": 64, "RAM": 256, "max_ebs_bandwidth": 76000, "network": "50 Gbps", "family": "general", "processor": "Intel", "architecture": "x86_64"},
+        
+        # General Purpose - M6a (AMD)
+        {"type": "m6a.large", "vCPU": 2, "RAM": 8, "max_ebs_bandwidth": 4750, "network": "Up to 12.5 Gbps", "family": "general", "processor": "AMD", "architecture": "x86_64"},
+        {"type": "m6a.xlarge", "vCPU": 4, "RAM": 16, "max_ebs_bandwidth": 9500, "network": "Up to 12.5 Gbps", "family": "general", "processor": "AMD", "architecture": "x86_64"},
+        {"type": "m6a.2xlarge", "vCPU": 8, "RAM": 32, "max_ebs_bandwidth": 19000, "network": "Up to 12.5 Gbps", "family": "general", "processor": "AMD", "architecture": "x86_64"},
+        {"type": "m6a.4xlarge", "vCPU": 16, "RAM": 64, "max_ebs_bandwidth": 38000, "network": "12.5 Gbps", "family": "general", "processor": "AMD", "architecture": "x86_64"},
+        {"type": "m6a.8xlarge", "vCPU": 32, "RAM": 128, "max_ebs_bandwidth": 47500, "network": "25 Gbps", "family": "general", "processor": "AMD", "architecture": "x86_64"},
+        {"type": "m6a.12xlarge", "vCPU": 48, "RAM": 192, "max_ebs_bandwidth": 57000, "network": "37.5 Gbps", "family": "general", "processor": "AMD", "architecture": "x86_64"},
+        
+        # Memory Optimized - R6i (Intel)
+        {"type": "r6i.large", "vCPU": 2, "RAM": 16, "max_ebs_bandwidth": 4750, "network": "Up to 12.5 Gbps", "family": "memory", "processor": "Intel", "architecture": "x86_64"},
+        {"type": "r6i.xlarge", "vCPU": 4, "RAM": 32, "max_ebs_bandwidth": 9500, "network": "Up to 12.5 Gbps", "family": "memory", "processor": "Intel", "architecture": "x86_64"},
+        {"type": "r6i.2xlarge", "vCPU": 8, "RAM": 64, "max_ebs_bandwidth": 19000, "network": "Up to 12.5 Gbps", "family": "memory", "processor": "Intel", "architecture": "x86_64"},
+        {"type": "r6i.4xlarge", "vCPU": 16, "RAM": 128, "max_ebs_bandwidth": 38000, "network": "12.5 Gbps", "family": "memory", "processor": "Intel", "architecture": "x86_64"},
+        {"type": "r6i.8xlarge", "vCPU": 32, "RAM": 256, "max_ebs_bandwidth": 47500, "network": "25 Gbps", "family": "memory", "processor": "Intel", "architecture": "x86_64"},
+        {"type": "r6i.12xlarge", "vCPU": 48, "RAM": 384, "max_ebs_bandwidth": 57000, "network": "37.5 Gbps", "family": "memory", "processor": "Intel", "architecture": "x86_64"},
+        
+        # Compute Optimized - C6i (Intel)
+        {"type": "c6i.large", "vCPU": 2, "RAM": 4, "max_ebs_bandwidth": 4750, "network": "Up to 12.5 Gbps", "family": "compute", "processor": "Intel", "architecture": "x86_64"},
+        {"type": "c6i.xlarge", "vCPU": 4, "RAM": 8, "max_ebs_bandwidth": 9500, "network": "Up to 12.5 Gbps", "family": "compute", "processor": "Intel", "architecture": "x86_64"},
+        {"type": "c6i.2xlarge", "vCPU": 8, "RAM": 16, "max_ebs_bandwidth": 19000, "network": "Up to 12.5 Gbps", "family": "compute", "processor": "Intel", "architecture": "x86_64"},
+        {"type": "c6i.4xlarge", "vCPU": 16, "RAM": 32, "max_ebs_bandwidth": 38000, "network": "12.5 Gbps", "family": "compute", "processor": "Intel", "architecture": "x86_64"},
+        {"type": "c6i.8xlarge", "vCPU": 32, "RAM": 64, "max_ebs_bandwidth": 47500, "network": "25 Gbps", "family": "compute", "processor": "Intel", "architecture": "x86_64"},
+        
+        # Graviton instances (ARM)
+        {"type": "m6g.large", "vCPU": 2, "RAM": 8, "max_ebs_bandwidth": 4750, "network": "Up to 10 Gbps", "family": "general", "processor": "Graviton", "architecture": "arm64"},
+        {"type": "m6g.xlarge", "vCPU": 4, "RAM": 16, "max_ebs_bandwidth": 9500, "network": "Up to 10 Gbps", "family": "general", "processor": "Graviton", "architecture": "arm64"},
+        {"type": "m6g.2xlarge", "vCPU": 8, "RAM": 32, "max_ebs_bandwidth": 19000, "network": "Up to 10 Gbps", "family": "general", "processor": "Graviton", "architecture": "arm64"},
+        {"type": "m6g.4xlarge", "vCPU": 16, "RAM": 64, "max_ebs_bandwidth": 38000, "network": "10 Gbps", "family": "general", "processor": "Graviton", "architecture": "arm64"},
+    ]
+    
+    # Workload Profiles (enhanced)
+    WORKLOAD_PROFILES = {
+        "web_application": {
+            "name": "Web Application",
+            "description": "Frontend web servers, load balancers, CDN origins",
+            "cpu_multiplier": 1.0,
+            "ram_multiplier": 1.0,
+            "storage_multiplier": 0.7,
+            "iops_multiplier": 0.8,
+            "preferred_family": "general",
+            "graviton_compatible": True,
+            "spot_suitable": True,
+            "compliance_requirements": ["SOC2"],
+        },
+        "application_server": {
+            "name": "Application Server", 
+            "description": "Business logic tier, middleware, API servers",
+            "cpu_multiplier": 1.2,
+            "ram_multiplier": 1.3,
+            "storage_multiplier": 0.8,
+            "iops_multiplier": 1.0,
+            "preferred_family": "general",
+            "graviton_compatible": True,
+            "spot_suitable": False,
+            "compliance_requirements": ["SOC2"],
+        },
+        "database_server": {
+            "name": "Database Server",
+            "description": "RDBMS, NoSQL, data warehouses, analytics",
+            "cpu_multiplier": 1.1,
+            "ram_multiplier": 1.5,
+            "storage_multiplier": 1.2,
+            "iops_multiplier": 1.5,
+            "preferred_family": "memory",
+            "graviton_compatible": False,
+            "spot_suitable": False,
+            "compliance_requirements": ["SOC2", "PCI-DSS"],
+        },
+        "file_server": {
+            "name": "File Server",
+            "description": "File shares, NAS, backup systems",
+            "cpu_multiplier": 0.8,
+            "ram_multiplier": 1.0,
+            "storage_multiplier": 2.0,
+            "iops_multiplier": 1.3,
+            "preferred_family": "general",
+            "graviton_compatible": True,
+            "spot_suitable": True,
+            "compliance_requirements": ["SOC2"],
+        },
+        "compute_intensive": {
+            "name": "Compute Intensive",
+            "description": "HPC, scientific computing, batch processing",
+            "cpu_multiplier": 1.5,
+            "ram_multiplier": 1.2,
+            "storage_multiplier": 0.9,
+            "iops_multiplier": 0.9,
+            "preferred_family": "compute",
+            "graviton_compatible": False,
+            "spot_suitable": True,
+            "compliance_requirements": [],
+        },
+        "analytics_workload": {
+            "name": "Analytics Workload",
+            "description": "Data processing, ETL, business intelligence",
+            "cpu_multiplier": 1.3,
+            "ram_multiplier": 1.4,
+            "storage_multiplier": 1.5,
+            "iops_multiplier": 1.2,
+            "preferred_family": "memory",
+            "graviton_compatible": True,
+            "spot_suitable": True,
+            "compliance_requirements": ["SOC2"],
+        }
+    }
+    
+    # Environment Multipliers (enhanced)
+    ENV_MULTIPLIERS = {
+        "PROD": {"cpu_ram": 1.0, "storage": 1.0, "description": "Production environment", "availability_requirement": "99.9%"},
+        "STAGING": {"cpu_ram": 0.8, "storage": 0.8, "description": "Pre-production testing", "availability_requirement": "99.0%"},
+        "QA": {"cpu_ram": 0.6, "storage": 0.6, "description": "Quality assurance", "availability_requirement": "95.0%"},
+        "DEV": {"cpu_ram": 0.4, "storage": 0.4, "description": "Development environment", "availability_requirement": "90.0%"},
+        "DR": {"cpu_ram": 1.0, "storage": 1.0, "description": "Disaster recovery", "availability_requirement": "99.9%"}
+    }
+    
+    # Enhanced Pricing with RI and Savings Plans
+    BASE_PRICING = {
+        "instance": {
+            # On-Demand Pricing
+            "on_demand": {
+                # M6i Intel instances
+                "m6i.large": 0.0864, "m6i.xlarge": 0.1728, "m6i.2xlarge": 0.3456,
+                "m6i.4xlarge": 0.6912, "m6i.8xlarge": 1.3824, "m6i.12xlarge": 2.0736, "m6i.16xlarge": 2.7648,
+                
+                # M6a AMD instances
+                "m6a.large": 0.0778, "m6a.xlarge": 0.1555, "m6a.2xlarge": 0.3110,
+                "m6a.4xlarge": 0.6221, "m6a.8xlarge": 1.2442, "m6a.12xlarge": 1.8663,
+                
+                # R6i Intel memory optimized
+                "r6i.large": 0.1008, "r6i.xlarge": 0.2016, "r6i.2xlarge": 0.4032,
+                "r6i.4xlarge": 0.8064, "r6i.8xlarge": 1.6128, "r6i.12xlarge": 2.4192,
+                
+                # C6i Intel compute optimized
+                "c6i.large": 0.0765, "c6i.xlarge": 0.1530, "c6i.2xlarge": 0.3060,
+                "c6i.4xlarge": 0.6120, "c6i.8xlarge": 1.2240,
+                
+                # Graviton instances (15-20% cost advantage)
+                "m6g.large": 0.0692, "m6g.xlarge": 0.1384, "m6g.2xlarge": 0.2768, "m6g.4xlarge": 0.5536,
+            },
+            
+            # Reserved Instance Pricing (1-year, no upfront)
+            "ri_1y_no_upfront": {
+                # M6i Intel (approximately 30% discount)
+                "m6i.large": 0.0605, "m6i.xlarge": 0.1210, "m6i.2xlarge": 0.2419,
+                "m6i.4xlarge": 0.4838, "m6i.8xlarge": 0.9677, "m6i.12xlarge": 0.4515, "m6i.16xlarge": 1.9354,
+                
+                # M6a AMD instances
+                "m6a.large": 0.0545, "m6a.xlarge": 0.1089, "m6a.2xlarge": 0.2177,
+                "m6a.4xlarge": 0.4355, "m6a.8xlarge": 0.8709, "m6a.12xlarge": 1.3064,
+                
+                # R6i Intel memory optimized
+                "r6i.large": 0.0706, "r6i.xlarge": 0.1411, "r6i.2xlarge": 0.2822,
+                "r6i.4xlarge": 0.5645, "r6i.8xlarge": 1.1290, "r6i.12xlarge": 1.6934,
+                
+                # C6i Intel compute optimized
+                "c6i.large": 0.0536, "c6i.xlarge": 0.1071, "c6i.2xlarge": 0.2142,
+                "c6i.4xlarge": 0.4284, "c6i.8xlarge": 0.8568,
+                
+                # Graviton instances
+                "m6g.large": 0.0485, "m6g.xlarge": 0.0969, "m6g.2xlarge": 0.1938, "m6g.4xlarge": 0.3875,
+            },
+            
+            # Reserved Instance Pricing (3-year, no upfront)
+            "ri_3y_no_upfront": {
+                # M6i Intel (approximately 50% discount)
+                "m6i.large": 0.0432, "m6i.xlarge": 0.0864, "m6i.2xlarge": 0.1728,
+                "m6i.4xlarge": 0.3456, "m6i.8xlarge": 0.6912, "m6i.12xlarge": 1.0368, "m6i.16xlarge": 1.3824,
+                
+                # M6a AMD instances
+                "m6a.large": 0.0389, "m6a.xlarge": 0.0778, "m6a.2xlarge": 0.1555,
+                "m6a.4xlarge": 0.3111, "m6a.8xlarge": 0.6221, "m6a.12xlarge": 0.9332,
+                
+                # R6i Intel memory optimized
+                "r6i.large": 0.0504, "r6i.xlarge": 0.1008, "r6i.2xlarge": 0.2016,
+                "r6i.4xlarge": 0.4032, "r6i.8xlarge": 0.8064, "r6i.12xlarge": 1.2096,
+                
+                # C6i Intel compute optimized
+                "c6i.large": 0.0383, "c6i.xlarge": 0.0765, "c6i.2xlarge": 0.1530,
+                "c6i.4xlarge": 0.3060, "c6i.8xlarge": 0.6120,
+                
+                # Graviton instances
+                "m6g.large": 0.0346, "m6g.xlarge": 0.0692, "m6g.2xlarge": 0.1384, "m6g.4xlarge": 0.2768,
+            },
+            
+            # Spot Instance Pricing (typically 50-90% discount)
+            "spot": {
+                # Average spot prices (varies significantly)
+                "m6i.large": 0.0259, "m6i.xlarge": 0.0518, "m6i.2xlarge": 0.1037,
+                "m6i.4xlarge": 0.2074, "m6i.8xlarge": 0.4147, "m6i.12xlarge": 0.6221, "m6i.16xlarge": 0.8294,
+                
+                "m6a.large": 0.0233, "m6a.xlarge": 0.0467, "m6a.2xlarge": 0.0933,
+                "m6a.4xlarge": 0.1866, "m6a.8xlarge": 0.3733, "m6a.12xlarge": 0.5599,
+                
+                "r6i.large": 0.0302, "r6i.xlarge": 0.0605, "r6i.2xlarge": 0.1210,
+                "r6i.4xlarge": 0.2419, "r6i.8xlarge": 0.4838, "r6i.12xlarge": 0.7258,
+                
+                "c6i.large": 0.0230, "c6i.xlarge": 0.0459, "c6i.2xlarge": 0.0918,
+                "c6i.4xlarge": 0.1836, "c6i.8xlarge": 0.3672,
+                
+                "m6g.large": 0.0208, "m6g.xlarge": 0.0415, "m6g.2xlarge": 0.0830, "m6g.4xlarge": 0.1661,
+            }
+        },
+        
+        # Savings Plans Discounts
+        "savings_plans": {
+            "compute_1y": 0.28,  # 28% discount for 1-year Compute Savings Plan
+            "compute_3y": 0.46,  # 46% discount for 3-year Compute Savings Plan
+            "ec2_1y": 0.31,      # 31% discount for 1-year EC2 Instance Savings Plan
+            "ec2_3y": 0.50,      # 50% discount for 3-year EC2 Instance Savings Plan
+        },
+        
+        # EBS Pricing by region
+        "ebs": {
+            "us-east-1": {"gp3": {"gb": 0.08, "iops": 0.005, "throughput": 0.04}, "io2": {"gb": 0.125, "iops": 0.065}},
+            "us-west-1": {"gp3": {"gb": 0.088, "iops": 0.0055, "throughput": 0.044}, "io2": {"gb": 0.138, "iops": 0.0715}},
+            "us-west-2": {"gp3": {"gb": 0.084, "iops": 0.0052, "throughput": 0.042}, "io2": {"gb": 0.131, "iops": 0.068}},
+            "eu-west-1": {"gp3": {"gb": 0.089, "iops": 0.0054, "throughput": 0.043}, "io2": {"gb": 0.138, "iops": 0.070}},
+            "eu-central-1": {"gp3": {"gb": 0.092, "iops": 0.0055, "throughput": 0.044}, "io2": {"gb": 0.142, "iops": 0.072}},
+            "ap-southeast-1": {"gp3": {"gb": 0.095, "iops": 0.0057, "throughput": 0.046}, "io2": {"gb": 0.145, "iops": 0.073}},
+            "ap-southeast-2": {"gp3": {"gb": 0.095, "iops": 0.0057, "throughput": 0.046}, "io2": {"gb": 0.145, "iops": 0.073}},
+            "ap-northeast-1": {"gp3": {"gb": 0.096, "iops": 0.0058, "throughput": 0.047}, "io2": {"gb": 0.148, "iops": 0.075}},
+            "ap-northeast-2": {"gp3": {"gb": 0.094, "iops": 0.0056, "throughput": 0.045}, "io2": {"gb": 0.143, "iops": 0.072}},
+            "ap-south-1": {"gp3": {"gb": 0.087, "iops": 0.0052, "throughput": 0.042}, "io2": {"gb": 0.135, "iops": 0.068}},
+            "ap-east-1": {"gp3": {"gb": 0.103, "iops": 0.0062, "throughput": 0.050}, "io2": {"gb": 0.158, "iops": 0.080}},
+        },
+        
+        # Additional AWS Services Pricing
+        "additional_services": {
+            "load_balancer": {
+                "alb": {"hourly": 0.0225, "lcu": 0.008},  # Application Load Balancer
+                "nlb": {"hourly": 0.0225, "lcus": 0.006}, # Network Load Balancer
+            },
+            "nat_gateway": {"hourly": 0.045, "per_gb": 0.045},
+            "vpc_endpoints": {"hourly": 0.01, "per_gb": 0.01},
+            "cloudwatch": {
+                "logs": {"ingestion": 0.50, "storage": 0.03},  # per GB
+                "metrics": {"custom": 0.30},  # per metric per month
+                "alarms": 0.10,  # per alarm per month
+            },
+            "backup": {"storage": 0.05, "restore": 0.02},  # per GB
+        }
+    }
+    
+    # Compliance Requirements
+    COMPLIANCE_FRAMEWORKS = {
+        "SOC2": {
+            "name": "SOC 2",
+            "description": "Service Organization Control 2",
+            "requirements": ["Encryption at rest", "Encryption in transit", "Access logging", "Multi-AZ deployment"],
+            "additional_cost_factor": 1.05
+        },
+        "PCI-DSS": {
+            "name": "PCI DSS",
+            "description": "Payment Card Industry Data Security Standard",
+            "requirements": ["Dedicated tenancy", "Enhanced monitoring", "Network segmentation", "Regular security scans"],
+            "additional_cost_factor": 1.15
+        },
+        "HIPAA": {
+            "name": "HIPAA",
+            "description": "Health Insurance Portability and Accountability Act",
+            "requirements": ["BAA required", "Enhanced encryption", "Audit logging", "Access controls"],
+            "additional_cost_factor": 1.12
+        },
+        "FedRAMP": {
+            "name": "FedRAMP",
+            "description": "Federal Risk and Authorization Management Program",
+            "requirements": ["GovCloud deployment", "Enhanced monitoring", "Continuous compliance"],
+            "additional_cost_factor": 1.25
+        }
+    }
+    
+    def __init__(self):
+        """Initialize calculator with default settings."""
+        self.inputs = {
+            "workload_name": "Sample Enterprise Workload",
+            "workload_type": "web_application",
+            "operating_system": "linux",
+            "region": "us-east-1",
+            "on_prem_cores": 8,
+            "peak_cpu_percent": 70,
+            "avg_cpu_percent": 45,
+            "on_prem_ram_gb": 32,
+            "peak_ram_percent": 80,
+            "avg_ram_percent": 55,
+            "storage_current_gb": 500,
+            "storage_growth_rate": 0.15,
+            "peak_iops": 5000,
+            "avg_iops": 2500,
+            "peak_throughput_mbps": 250,
+            "years": 3,
+            "seasonality_factor": 1.2,
+            "prefer_amd": True,
+            "enable_graviton": True,
+            "pricing_model": "on_demand",  # on_demand, ri_1y, ri_3y, savings_plan_compute_1y, etc.
+            "spot_percentage": 0,  # Percentage of workload suitable for spot instances
+            "multi_az": True,
+            "compliance_requirements": [],
+            "backup_retention_days": 30,
+            "monitoring_level": "basic",  # basic, detailed, enhanced
+            "disaster_recovery": False,
+            "auto_scaling": True,
+            "load_balancer": "alb",  # alb, nlb, none
+        }
+        
+        self.instance_pricing = {}
+        self.recommendation_cache = {}
+        self._setup_pricing()
+    
+    def _setup_pricing(self):
+        """Setup pricing structures."""
+        for pricing_type, instances in self.BASE_PRICING["instance"].items():
+            self.instance_pricing[pricing_type] = instances.copy()
+    
+    def calculate_savings_plan_price(self, instance_type: str, base_price: float, plan_type: str) -> float:
+        """Calculate Savings Plan pricing."""
+        discount = self.BASE_PRICING["savings_plans"].get(plan_type, 0)
+        return base_price * (1 - discount)
+    
+    def calculate_comprehensive_requirements(self, env: str) -> Dict[str, Any]:
+        """Calculate comprehensive infrastructure requirements with enterprise features."""
+        env_mult = self.ENV_MULTIPLIERS[env]
+        workload_profile = self.WORKLOAD_PROFILES[self.inputs["workload_type"]]
+        
+        # Base calculations (keeping existing logic)
+        cpu_efficiency = 0.7
+        cpu_buffer = 1.3 if env == "PROD" else 1.2
+        seasonality = self.inputs.get("seasonality_factor", 1.0) if env == "PROD" else 1.0
+        
+        required_vcpus = max(
+            math.ceil(
+                self.inputs["on_prem_cores"] * 
+                (self.inputs["peak_cpu_percent"] / 100) *
+                workload_profile["cpu_multiplier"] *
+                cpu_buffer *
+                seasonality *
+                env_mult["cpu_ram"] / 
+                cpu_efficiency
+            ), 2
+        )
+        
+        ram_efficiency = 0.85
+        required_ram = max(
+            math.ceil(
+                self.inputs["on_prem_ram_gb"] * 
+                (self.inputs["peak_ram_percent"] / 100) *
+                workload_profile["ram_multiplier"] *
+                1.15 *  # OS overhead
+                cpu_buffer *
+                seasonality *
+                env_mult["cpu_ram"] / 
+                ram_efficiency
+            ), 4
+        )
+        
+        # Enhanced storage calculation with backup considerations
+        growth_factor = (1 + self.inputs["storage_growth_rate"]) ** self.inputs["years"]
+        storage_buffer = 1.3 if env == "PROD" else 1.2
+        
+        base_storage = math.ceil(
+            self.inputs["storage_current_gb"] * 
+            growth_factor * 
+            workload_profile["storage_multiplier"] *
+            storage_buffer *
+            env_mult["storage"]
+        )
+        
+        # Add backup storage requirements
+        backup_multiplier = self.inputs["backup_retention_days"] / 30.0
+        backup_storage = math.ceil(base_storage * backup_multiplier * 0.7)  # Assume 70% compression
+        
+        total_storage = base_storage + backup_storage
+        
+        # I/O requirements
+        iops_required = math.ceil(
+            self.inputs["peak_iops"] * 
+            workload_profile["iops_multiplier"] * 
+            (1.3 if env == "PROD" else 1.2)
+        )
+        
+        throughput_required = math.ceil(
+            self.inputs["peak_throughput_mbps"] * 
+            workload_profile["iops_multiplier"] * 
+            (1.3 if env == "PROD" else 1.2)
+        )
+        
+        # Multi-AZ adjustments
+        if self.inputs["multi_az"] and env in ["PROD", "DR"]:
+            az_multiplier = 2
+            required_vcpus = math.ceil(required_vcpus * 1.1)  # Account for cross-AZ overhead
+            required_ram = math.ceil(required_ram * 1.1)
+        else:
+            az_multiplier = 1
+        
+        # Instance selection with enhanced logic
+        instance_options = self._get_optimal_instance_options(
+            required_vcpus, required_ram, throughput_required, workload_profile, env
+        )
+        
+        # Cost calculations for different pricing models
+        cost_breakdown = self._calculate_comprehensive_costs(
+            instance_options, total_storage, iops_required, throughput_required, env, az_multiplier
+        )
+        
+        # Compliance cost adjustments
+        compliance_factor = 1.0
+        for compliance in self.inputs["compliance_requirements"]:
+            if compliance in self.COMPLIANCE_FRAMEWORKS:
+                compliance_factor *= self.COMPLIANCE_FRAMEWORKS[compliance]["additional_cost_factor"]
+        
+        # Apply compliance factor to all costs
+        for cost_type in cost_breakdown:
+            if isinstance(cost_breakdown[cost_type], dict):
+                for subtype in cost_breakdown[cost_type]:
+                    if isinstance(cost_breakdown[cost_type][subtype], (int, float)):
+                        cost_breakdown[cost_type][subtype] *= compliance_factor
+            elif isinstance(cost_breakdown[cost_type], (int, float)):
+                cost_breakdown[cost_type] *= compliance_factor
+        
+        # TCO calculation
+        tco_analysis = self._calculate_tco_analysis(cost_breakdown, env)
+        
+        # Risk assessment
+        risk_assessment = self._assess_migration_risks(workload_profile, env)
+        
+        return {
+            "environment": env,
+            "requirements": {
+                "vCPUs": required_vcpus,
+                "RAM_GB": required_ram,
+                "storage_GB": total_storage,
+                "base_storage_GB": base_storage,
+                "backup_storage_GB": backup_storage,
+                "iops_required": iops_required,
+                "throughput_required": f"{throughput_required} MB/s",
+                "multi_az": self.inputs["multi_az"] and env in ["PROD", "DR"],
+                "availability_zones": az_multiplier,
+            },
+            "instance_options": instance_options,
+            "cost_breakdown": cost_breakdown,
+            "tco_analysis": tco_analysis,
+            "compliance": {
+                "requirements": self.inputs["compliance_requirements"],
+                "cost_factor": compliance_factor,
+            },
+            "risk_assessment": risk_assessment,
+            "optimization_recommendations": self._generate_optimization_recommendations(
+                instance_options, cost_breakdown, workload_profile, env
+            )
+        }
+    
+    def _get_optimal_instance_options(self, required_vcpus: int, required_ram: int, 
+                                    required_throughput: int, workload_profile: Dict, env: str) -> Dict[str, Any]:
+        """Get optimal instance options including Graviton and different families."""
+        options = {}
+        
+        # Filter instances based on requirements
+        candidates = []
+        for instance in self.INSTANCE_TYPES:
+            if (instance["vCPU"] >= required_vcpus and 
+                instance["RAM"] >= required_ram and
+                instance["max_ebs_bandwidth"] >= (required_throughput * 1.2)):
+                
+                # Check Graviton compatibility
+                if (instance["processor"] == "Graviton" and 
+                    not (self.inputs["enable_graviton"] and workload_profile["graviton_compatible"])):
+                    continue
+                
+                candidates.append(instance)
+        
+        if not candidates:
+            # Fallback to instances that meet CPU and RAM requirements
+            candidates = [i for i in self.INSTANCE_TYPES 
+                         if (i["vCPU"] >= required_vcpus and i["RAM"] >= required_ram)]
+        
+        # Score and select best options for different scenarios
+        scenarios = ["cost_optimized", "performance_optimized", "balanced"]
+        
+        for scenario in scenarios:
+            best_instance = self._select_best_instance(candidates, required_vcpus, required_ram, scenario)
+            if best_instance:
+                options[scenario] = best_instance
+        
+        # Add spot instance recommendation if suitable
+        if workload_profile["spot_suitable"] and env not in ["PROD", "DR"]:
+            spot_instance = self._select_best_instance(candidates, required_vcpus, required_ram, "cost_optimized")
+            if spot_instance:
+                options["spot_recommended"] = spot_instance
+        
+        return options
+    
+    def _select_best_instance(self, candidates: List[Dict], required_vcpus: int, 
+                            required_ram: int, optimization_goal: str) -> Optional[Dict]:
+        """Select the best instance based on optimization goal."""
+        if not candidates:
+            return None
+        
+        scored_instances = []
+        
+        for instance in candidates:
+            cpu_efficiency = required_vcpus / instance["vCPU"]
+            ram_efficiency = required_ram / instance["RAM"]
+            base_cost = self.instance_pricing["on_demand"].get(instance["type"], 999)
+            
+            if optimization_goal == "cost_optimized":
+                score = (cpu_efficiency + ram_efficiency) / 2 / base_cost * 1000
+                # Boost score for AMD and Graviton
+                if instance["processor"] in ["AMD", "Graviton"]:
+                    score *= 1.2
+            elif optimization_goal == "performance_optimized":
+                score = instance["vCPU"] + instance["RAM"] / 10
+                # Prefer Intel for performance-critical workloads
+                if instance["processor"] == "Intel":
+                    score *= 1.1
+            else:  # balanced
+                efficiency_score = (cpu_efficiency + ram_efficiency) / 2
+                cost_score = 1 / (base_cost + 0.01)
+                score = efficiency_score * cost_score * 100
+            
+            scored_instances.append((score, instance))
+        
+        # Return the best scoring instance
+        scored_instances.sort(key=lambda x: x[0], reverse=True)
+        return scored_instances[0][1]
+    
+    def _calculate_comprehensive_costs(self, instance_options: Dict, storage_gb: int, 
+                                     iops: int, throughput_mbps: int, env: str, az_multiplier: int) -> Dict[str, Any]:
+        """Calculate comprehensive costs for all pricing models."""
+        cost_breakdown = {
+            "instance_costs": {},
+            "storage_costs": {},
+            "network_costs": {},
+            "additional_services": {},
+            "total_costs": {}
+        }
+        
+        # Instance costs for different pricing models
+        primary_instance = instance_options.get("balanced", instance_options.get("cost_optimized"))
+        if not primary_instance:
+            return cost_breakdown
+        
+        instance_type = primary_instance["type"]
+        
+        # Calculate for different pricing models
+        pricing_models = ["on_demand", "ri_1y_no_upfront", "ri_3y_no_upfront", "spot"]
+        
+        for model in pricing_models:
+            if instance_type in self.instance_pricing.get(model, {}):
+                hourly_rate = self.instance_pricing[model][instance_type]
+                monthly_cost = hourly_rate * 24 * 30 * az_multiplier
+                cost_breakdown["instance_costs"][model] = round(monthly_cost, 2)
+        
+        # Savings Plans pricing
+        base_hourly = self.instance_pricing["on_demand"].get(instance_type, 0)
+        for sp_type, discount in self.BASE_PRICING["savings_plans"].items():
+            sp_hourly = base_hourly * (1 - discount)
+            sp_monthly = sp_hourly * 24 * 30 * az_multiplier
+            cost_breakdown["instance_costs"][f"savings_plan_{sp_type}"] = round(sp_monthly, 2)
+        
+        # Storage costs
+        storage_costs = self._calculate_enhanced_storage_costs(storage_gb, iops, throughput_mbps, az_multiplier)
+        cost_breakdown["storage_costs"] = storage_costs
+        
+        # Network costs
+        network_costs = self._calculate_network_costs(env, az_multiplier)
+        cost_breakdown["network_costs"] = network_costs
+        
+        # Additional services costs
+        additional_costs = self._calculate_additional_services_costs(env, az_multiplier)
+        cost_breakdown["additional_services"] = additional_costs
+        
+        # Calculate total costs for each pricing model
+        for model in cost_breakdown["instance_costs"]:
+            total = (cost_breakdown["instance_costs"][model] + 
+                    sum(storage_costs.values()) + 
+                    sum(network_costs.values()) + 
+                    sum(additional_costs.values()))
+            cost_breakdown["total_costs"][model] = round(total, 2)
+        
+        return cost_breakdown
+    
+    def _calculate_enhanced_storage_costs(self, storage_gb: int, iops: int, 
+                                        throughput_mbps: int, az_multiplier: int) -> Dict[str, float]:
+        """Calculate enhanced storage costs including backups and snapshots."""
+        region = self.inputs["region"]
+        region_pricing = self.BASE_PRICING["ebs"].get(region, self.BASE_PRICING["ebs"]["us-east-1"])
+        
+        # Primary storage
+        ebs_type = "io2" if iops > 16000 or throughput_mbps > 1000 else "gp3"
+        pricing = region_pricing[ebs_type]
+        
+        base_cost = storage_gb * pricing["gb"] * az_multiplier
+        
+        storage_costs = {
+            "primary_storage": round(base_cost, 2),
+        }
+        
+        # IOPS costs (for gp3 > 3000 IOPS or io2)
+        if ebs_type == "gp3" and iops > 3000:
+            extra_iops = iops - 3000
+            iops_cost = extra_iops * pricing.get("iops", 0) * az_multiplier
+            storage_costs["additional_iops"] = round(iops_cost, 2)
+        elif ebs_type == "io2":
+            iops_cost = iops * pricing.get("iops", 0) * az_multiplier
+            storage_costs["provisioned_iops"] = round(iops_cost, 2)
+        
+        # Throughput costs (for gp3 > 125 MB/s)
+        if ebs_type == "gp3" and throughput_mbps > 125:
+            extra_throughput = throughput_mbps - 125
+            throughput_cost = extra_throughput * pricing.get("throughput", 0) * az_multiplier
+            storage_costs["additional_throughput"] = round(throughput_cost, 2)
+        
+        # Backup costs
+        backup_storage_gb = storage_gb * (self.inputs["backup_retention_days"] / 30.0) * 0.7
+        backup_cost = backup_storage_gb * self.BASE_PRICING["additional_services"]["backup"]["storage"]
+        storage_costs["backup_storage"] = round(backup_cost, 2)
+        
+        # Snapshot costs (daily snapshots)
+        snapshot_cost = storage_gb * 0.05 * az_multiplier  # Assume $0.05/GB/month for snapshots
+        storage_costs["snapshots"] = round(snapshot_cost, 2)
+        
+        return storage_costs
+    
+    def _calculate_network_costs(self, env: str, az_multiplier: int) -> Dict[str, float]:
+        """Calculate comprehensive network costs."""
+        base_data_transfer = {"PROD": 100, "STAGING": 50, "QA": 30, "DEV": 20, "DR": 75}
+        workload_multiplier = {
+            "web_application": 1.5, "application_server": 1.2, "database_server": 1.0,
+            "file_server": 2.0, "compute_intensive": 0.8, "analytics_workload": 1.3
+        }
+        
+        base_transfer_gb = base_data_transfer.get(env, 50)
+        workload_mult = workload_multiplier.get(self.inputs["workload_type"], 1.0)
+        monthly_transfer_gb = base_transfer_gb * workload_mult * az_multiplier
+        
+        network_costs = {
+            "data_transfer_out": round(monthly_transfer_gb * 0.09, 2),  # $0.09/GB typical
+        }
+        
+        # NAT Gateway costs (if required)
+        if self.inputs.get("multi_az", False):
+            nat_costs = self.BASE_PRICING["additional_services"]["nat_gateway"]
+            nat_cost = (nat_costs["hourly"] * 24 * 30 * az_multiplier + 
+                       monthly_transfer_gb * nat_costs["per_gb"])
+            network_costs["nat_gateway"] = round(nat_cost, 2)
+        
+        # VPC Endpoint costs (for enhanced security)
+        if self.inputs["compliance_requirements"]:
+            vpc_endpoint_cost = (self.BASE_PRICING["additional_services"]["vpc_endpoints"]["hourly"] * 
+                               24 * 30 * 2)  # Assume 2 endpoints
+            network_costs["vpc_endpoints"] = round(vpc_endpoint_cost, 2)
+        
+        return network_costs
+    
+    def _calculate_additional_services_costs(self, env: str, az_multiplier: int) -> Dict[str, float]:
+        """Calculate costs for additional AWS services."""
+        additional_costs = {}
+        
+        # Load Balancer costs
+        lb_type = self.inputs.get("load_balancer", "alb")
+        if lb_type != "none":
+            lb_pricing = self.BASE_PRICING["additional_services"]["load_balancer"][lb_type]
+            lb_cost = lb_pricing["hourly"] * 24 * 30 * az_multiplier
+            
+            # Add LCU costs (estimated based on workload type)
+            lcu_usage = {"web_application": 50, "application_server": 30, "database_server": 10}.get(
+                self.inputs["workload_type"], 20
+            )
+            lcu_key = "lcu" if lb_type == "alb" else "lcus"
+            lcu_cost = lcu_usage * lb_pricing[lcu_key] * 24 * 30
+            
+            additional_costs["load_balancer"] = round(lb_cost + lcu_cost, 2)
+        
+        # CloudWatch costs
+        monitoring_level = self.inputs.get("monitoring_level", "basic")
+        if monitoring_level == "enhanced":
+            cw_pricing = self.BASE_PRICING["additional_services"]["cloudwatch"]
+            
+            # Logs (estimated 10GB/month per instance)
+            log_volume = 10 * az_multiplier
+            log_cost = log_volume * cw_pricing["logs"]["ingestion"] + log_volume * cw_pricing["logs"]["storage"]
+            
+            # Custom metrics (estimated 20 metrics per instance)
+            metrics_cost = 20 * az_multiplier * cw_pricing["metrics"]["custom"]
+            
+            # Alarms (estimated 5 alarms per instance)
+            alarms_cost = 5 * az_multiplier * cw_pricing["alarms"]
+            
+            additional_costs["cloudwatch"] = round(log_cost + metrics_cost + alarms_cost, 2)
+        
+        return additional_costs
+    
+    def _calculate_tco_analysis(self, cost_breakdown: Dict, env: str) -> Dict[str, Any]:
+        """Calculate Total Cost of Ownership analysis."""
+        # Get best cost option
+        total_costs = cost_breakdown["total_costs"]
+        best_option = min(total_costs.items(), key=lambda x: x[1])
+        
+        monthly_cost = best_option[1]
+        annual_cost = monthly_cost * 12
+        three_year_cost = annual_cost * 3
+        
+        # Calculate potential savings
+        on_demand_cost = total_costs.get("on_demand", monthly_cost)
+        savings_amount = on_demand_cost - monthly_cost
+        savings_percentage = (savings_amount / on_demand_cost * 100) if on_demand_cost > 0 else 0
+        
+        # Migration costs (estimated)
+        migration_cost = self._estimate_migration_costs(env)
+        
+        # Break-even analysis
+        break_even_months = migration_cost / savings_amount if savings_amount > 0 else float('inf')
+        
+        return {
+            "best_pricing_option": best_option[0],
+            "monthly_cost": round(monthly_cost, 2),
+            "annual_cost": round(annual_cost, 2),
+            "three_year_cost": round(three_year_cost, 2),
+            "monthly_savings": round(savings_amount, 2),
+            "savings_percentage": round(savings_percentage, 1),
+            "migration_cost": round(migration_cost, 2),
+            "break_even_months": round(break_even_months, 1) if break_even_months != float('inf') else "N/A",
+            "roi_3_years": round(((savings_amount * 36 - migration_cost) / migration_cost * 100), 1) if migration_cost > 0 else "N/A"
+        }
+    
+    def _estimate_migration_costs(self, env: str) -> float:
+        """Estimate one-time migration costs."""
+        base_migration_costs = {
+            "PROD": 15000,
+            "STAGING": 8000,
+            "QA": 5000,
+            "DEV": 3000,
+            "DR": 12000
+        }
+        
+        workload_complexity = {
+            "web_application": 1.0,
+            "application_server": 1.2,
+            "database_server": 1.5,
+            "file_server": 0.8,
+            "compute_intensive": 1.1,
+            "analytics_workload": 1.3
+        }
+        
+        base_cost = base_migration_costs.get(env, 10000)
+        complexity_multiplier = workload_complexity.get(self.inputs["workload_type"], 1.0)
+        compliance_multiplier = 1 + (len(self.inputs["compliance_requirements"]) * 0.2)
+        
+        return base_cost * complexity_multiplier * compliance_multiplier
+    
+    def _assess_migration_risks(self, workload_profile: Dict, env: str) -> Dict[str, Any]:
+        """Assess migration risks and provide mitigation strategies."""
+        risks = {
+            "overall_risk": "Low",
+            "risk_factors": [],
+            "mitigation_strategies": []
+        }
+        
+        risk_score = 0
+        
+        # Assess various risk factors
+        if env == "PROD":
+            risk_score += 2
+            risks["risk_factors"].append("Production environment migration")
+        
+        if workload_profile["name"] == "Database Server":
+            risk_score += 3
+            risks["risk_factors"].append("Database migration complexity")
+            risks["mitigation_strategies"].append("Implement comprehensive backup and rollback strategy")
+        
+        if self.inputs["compliance_requirements"]:
+            risk_score += 1
+            risks["risk_factors"].append("Compliance requirements")
+            risks["mitigation_strategies"].append("Conduct compliance validation testing")
+        
+        if not workload_profile["graviton_compatible"] and self.inputs["enable_graviton"]:
+            risk_score += 2
+            risks["risk_factors"].append("Architecture change (x86 to ARM)")
+            risks["mitigation_strategies"].append("Extensive application testing required")
+        
+        # Determine overall risk level
+        if risk_score <= 2:
+            risks["overall_risk"] = "Low"
+        elif risk_score <= 5:
+            risks["overall_risk"] = "Medium"
+        else:
+            risks["overall_risk"] = "High"
+        
+        # Add general mitigation strategies
+        risks["mitigation_strategies"].extend([
+            "Implement comprehensive monitoring and alerting",
+            "Create detailed rollback procedures",
+            "Conduct thorough performance testing",
+            "Plan migration during low-traffic periods"
+        ])
+        
+        return risks
+    
+    def _generate_optimization_recommendations(self, instance_options: Dict, cost_breakdown: Dict, 
+                                             workload_profile: Dict, env: str) -> List[str]:
+        """Generate optimization recommendations."""
+        recommendations = []
+        
+        # Cost optimization recommendations
+        total_costs = cost_breakdown["total_costs"]
+        on_demand_cost = total_costs.get("on_demand", 0)
+        
+        # Reserved Instance recommendations
+        ri_1y_cost = total_costs.get("ri_1y_no_upfront", 0)
+        ri_3y_cost = total_costs.get("ri_3y_no_upfront", 0)
+        
+        if ri_1y_cost < on_demand_cost:
+            savings = on_demand_cost - ri_1y_cost
+            recommendations.append(f"Consider 1-year Reserved Instances for ${savings:.2f}/month savings")
+        
+        if ri_3y_cost < ri_1y_cost:
+            savings = ri_1y_cost - ri_3y_cost
+            recommendations.append(f"Consider 3-year Reserved Instances for additional ${savings:.2f}/month savings")
+        
+        # Savings Plans recommendations
+        sp_costs = {k: v for k, v in total_costs.items() if k.startswith("savings_plan")}
+        if sp_costs:
+            best_sp = min(sp_costs.items(), key=lambda x: x[1])
+            if best_sp[1] < on_demand_cost:
+                savings = on_demand_cost - best_sp[1]
+                recommendations.append(f"Consider {best_sp[0].replace('_', ' ').title()} for ${savings:.2f}/month savings")
+        
+        # Spot instance recommendations
+        if workload_profile["spot_suitable"] and env not in ["PROD", "DR"]:
+            spot_cost = total_costs.get("spot", 0)
+            if spot_cost > 0:
+                savings = on_demand_cost - spot_cost
+                recommendations.append(f"Consider Spot Instances for ${savings:.2f}/month savings (70-90% discount)")
+        
+        # Graviton recommendations
+        if (workload_profile["graviton_compatible"] and 
+            self.inputs["enable_graviton"] and 
+            "spot_recommended" in instance_options):
+            recommendations.append("Consider Graviton processors for 15-20% better price-performance")
+        
+        # Auto Scaling recommendations
+        if self.inputs["auto_scaling"]:
+            recommendations.append("Implement Auto Scaling to optimize costs during low-demand periods")
+        
+        # Storage optimization
+        storage_costs = cost_breakdown["storage_costs"]
+        total_storage_cost = sum(storage_costs.values())
+        if total_storage_cost > on_demand_cost * 0.3:  # If storage is >30% of total cost
+            recommendations.append("Consider storage optimization: lifecycle policies, compression, archiving")
+        
+        return recommendations
+
+# Enhanced Authentication and other classes remain the same...
+# (FirebaseAuthenticator, EnhancedPDFReportGenerator, etc.)
 
 class FirebaseAuthenticator:
     """Enhanced Firebase authentication manager with better debugging and fallback methods."""
@@ -600,549 +1492,677 @@ class FirebaseAuthenticator:
         except Exception as e:
             return False
 
-# Your existing calculator and other classes remain the same...
-class EnterpriseEC2WorkloadSizingCalculator:
-    """Enterprise-grade AWS EC2 workload sizing calculator."""
-    # ... (keeping all existing code as is)
-    
-    # AWS Instance Types
-    INSTANCE_TYPES = [
-        # General Purpose - M6i (Intel)
-        {"type": "m6i.large", "vCPU": 2, "RAM": 8, "max_ebs_bandwidth": 4750, "network": "Up to 12.5 Gbps", "family": "general", "processor": "Intel"},
-        {"type": "m6i.xlarge", "vCPU": 4, "RAM": 16, "max_ebs_bandwidth": 9500, "network": "Up to 12.5 Gbps", "family": "general", "processor": "Intel"},
-        {"type": "m6i.2xlarge", "vCPU": 8, "RAM": 32, "max_ebs_bandwidth": 19000, "network": "Up to 12.5 Gbps", "family": "general", "processor": "Intel"},
-        {"type": "m6i.4xlarge", "vCPU": 16, "RAM": 64, "max_ebs_bandwidth": 38000, "network": "12.5 Gbps", "family": "general", "processor": "Intel"},
-        {"type": "m6i.8xlarge", "vCPU": 32, "RAM": 128, "max_ebs_bandwidth": 47500, "network": "25 Gbps", "family": "general", "processor": "Intel"},
-        
-        # General Purpose - M6a (AMD)
-        {"type": "m6a.large", "vCPU": 2, "RAM": 8, "max_ebs_bandwidth": 4750, "network": "Up to 12.5 Gbps", "family": "general", "processor": "AMD"},
-        {"type": "m6a.xlarge", "vCPU": 4, "RAM": 16, "max_ebs_bandwidth": 9500, "network": "Up to 12.5 Gbps", "family": "general", "processor": "AMD"},
-        {"type": "m6a.2xlarge", "vCPU": 8, "RAM": 32, "max_ebs_bandwidth": 19000, "network": "Up to 12.5 Gbps", "family": "general", "processor": "AMD"},
-        {"type": "m6a.4xlarge", "vCPU": 16, "RAM": 64, "max_ebs_bandwidth": 38000, "network": "12.5 Gbps", "family": "general", "processor": "AMD"},
-        {"type": "m6a.8xlarge", "vCPU": 32, "RAM": 128, "max_ebs_bandwidth": 47500, "network": "25 Gbps", "family": "general", "processor": "AMD"},
-        
-        # Memory Optimized - R6i (Intel)
-        {"type": "r6i.large", "vCPU": 2, "RAM": 16, "max_ebs_bandwidth": 4750, "network": "Up to 12.5 Gbps", "family": "memory", "processor": "Intel"},
-        {"type": "r6i.xlarge", "vCPU": 4, "RAM": 32, "max_ebs_bandwidth": 9500, "network": "Up to 12.5 Gbps", "family": "memory", "processor": "Intel"},
-        {"type": "r6i.2xlarge", "vCPU": 8, "RAM": 64, "max_ebs_bandwidth": 19000, "network": "Up to 12.5 Gbps", "family": "memory", "processor": "Intel"},
-        {"type": "r6i.4xlarge", "vCPU": 16, "RAM": 128, "max_ebs_bandwidth": 38000, "network": "12.5 Gbps", "family": "memory", "processor": "Intel"},
-        {"type": "r6i.8xlarge", "vCPU": 32, "RAM": 256, "max_ebs_bandwidth": 47500, "network": "25 Gbps", "family": "memory", "processor": "Intel"},
-        
-        # Memory Optimized - R6a (AMD)
-        {"type": "r6a.large", "vCPU": 2, "RAM": 16, "max_ebs_bandwidth": 4750, "network": "Up to 12.5 Gbps", "family": "memory", "processor": "AMD"},
-        {"type": "r6a.xlarge", "vCPU": 4, "RAM": 32, "max_ebs_bandwidth": 9500, "network": "Up to 12.5 Gbps", "family": "memory", "processor": "AMD"},
-        {"type": "r6a.2xlarge", "vCPU": 8, "RAM": 64, "max_ebs_bandwidth": 19000, "network": "Up to 12.5 Gbps", "family": "memory", "processor": "AMD"},
-        {"type": "r6a.4xlarge", "vCPU": 16, "RAM": 128, "max_ebs_bandwidth": 38000, "network": "12.5 Gbps", "family": "memory", "processor": "AMD"},
-        {"type": "r6a.8xlarge", "vCPU": 32, "RAM": 256, "max_ebs_bandwidth": 47500, "network": "25 Gbps", "family": "memory", "processor": "AMD"},
-        
-        # Compute Optimized - C6i (Intel)
-        {"type": "c6i.large", "vCPU": 2, "RAM": 4, "max_ebs_bandwidth": 4750, "network": "Up to 12.5 Gbps", "family": "compute", "processor": "Intel"},
-        {"type": "c6i.xlarge", "vCPU": 4, "RAM": 8, "max_ebs_bandwidth": 9500, "network": "Up to 12.5 Gbps", "family": "compute", "processor": "Intel"},
-        {"type": "c6i.2xlarge", "vCPU": 8, "RAM": 16, "max_ebs_bandwidth": 19000, "network": "Up to 12.5 Gbps", "family": "compute", "processor": "Intel"},
-        {"type": "c6i.4xlarge", "vCPU": 16, "RAM": 32, "max_ebs_bandwidth": 38000, "network": "12.5 Gbps", "family": "compute", "processor": "Intel"},
-        {"type": "c6i.8xlarge", "vCPU": 32, "RAM": 64, "max_ebs_bandwidth": 47500, "network": "25 Gbps", "family": "compute", "processor": "Intel"},
-        
-        # Compute Optimized - C6a (AMD)
-        {"type": "c6a.large", "vCPU": 2, "RAM": 4, "max_ebs_bandwidth": 4750, "network": "Up to 12.5 Gbps", "family": "compute", "processor": "AMD"},
-        {"type": "c6a.xlarge", "vCPU": 4, "RAM": 8, "max_ebs_bandwidth": 9500, "network": "Up to 12.5 Gbps", "family": "compute", "processor": "AMD"},
-        {"type": "c6a.2xlarge", "vCPU": 8, "RAM": 16, "max_ebs_bandwidth": 19000, "network": "Up to 12.5 Gbps", "family": "compute", "processor": "AMD"},
-        {"type": "c6a.4xlarge", "vCPU": 16, "RAM": 32, "max_ebs_bandwidth": 38000, "network": "12.5 Gbps", "family": "compute", "processor": "AMD"},
-        {"type": "c6a.8xlarge", "vCPU": 32, "RAM": 64, "max_ebs_bandwidth": 47500, "network": "25 Gbps", "family": "compute", "processor": "AMD"},
-    ]
-    
-    # Workload Profiles
-    WORKLOAD_PROFILES = {
-        "web_application": {
-            "name": "Web Application",
-            "description": "Frontend web servers, load balancers, CDN origins",
-            "cpu_multiplier": 1.0,
-            "ram_multiplier": 1.0,
-            "storage_multiplier": 0.7,
-            "iops_multiplier": 0.8,
-            "preferred_family": "general",
-        },
-        "application_server": {
-            "name": "Application Server", 
-            "description": "Business logic tier, middleware, API servers",
-            "cpu_multiplier": 1.2,
-            "ram_multiplier": 1.3,
-            "storage_multiplier": 0.8,
-            "iops_multiplier": 1.0,
-            "preferred_family": "general",
-        },
-        "database_server": {
-            "name": "Database Server",
-            "description": "RDBMS, NoSQL, data warehouses, analytics",
-            "cpu_multiplier": 1.1,
-            "ram_multiplier": 1.5,
-            "storage_multiplier": 1.2,
-            "iops_multiplier": 1.5,
-            "preferred_family": "memory",
-        },
-        "file_server": {
-            "name": "File Server",
-            "description": "File shares, NAS, backup systems",
-            "cpu_multiplier": 0.8,
-            "ram_multiplier": 1.0,
-            "storage_multiplier": 2.0,
-            "iops_multiplier": 1.3,
-            "preferred_family": "general",
-        },
-        "compute_intensive": {
-            "name": "Compute Intensive",
-            "description": "HPC, scientific computing, batch processing",
-            "cpu_multiplier": 1.5,
-            "ram_multiplier": 1.2,
-            "storage_multiplier": 0.9,
-            "iops_multiplier": 0.9,
-            "preferred_family": "compute",
-        }
-    }
-    
-    # Environment Multipliers
-    ENV_MULTIPLIERS = {
-        "PROD": {"cpu_ram": 1.0, "storage": 1.0, "description": "Production environment"},
-        "STAGING": {"cpu_ram": 0.8, "storage": 0.8, "description": "Pre-production testing"},
-        "QA": {"cpu_ram": 0.6, "storage": 0.6, "description": "Quality assurance"},
-        "DEV": {"cpu_ram": 0.4, "storage": 0.4, "description": "Development environment"},
-        "DR": {"cpu_ram": 1.0, "storage": 1.0, "description": "Disaster recovery"}
-    }
-    
-    # OS Pricing Multipliers
-    OS_PRICING_MULTIPLIERS = {
-        "linux": {
-            "multiplier": 1.0,
-            "description": "Amazon Linux 2, Ubuntu, RHEL, SUSE",
-        },
-        "windows": {
-            "multiplier": 1.85,
-            "description": "Windows Server 2019/2022",
-        }
-    }
-    
-    # Base Pricing (Linux baseline) - Updated with Asia Pacific regions
-    BASE_PRICING = {
-        "instance": {
-            # M6i Intel instances
-            "m6i.large": 0.0864, "m6i.xlarge": 0.1728, "m6i.2xlarge": 0.3456,
-            "m6i.4xlarge": 0.6912, "m6i.8xlarge": 1.3824,
-            
-            # M6a AMD instances (10-20% less)
-            "m6a.large": 0.0778, "m6a.xlarge": 0.1555, "m6a.2xlarge": 0.3110,
-            "m6a.4xlarge": 0.6221, "m6a.8xlarge": 1.2442,
-            
-            # R6i Intel memory optimized
-            "r6i.large": 0.1008, "r6i.xlarge": 0.2016, "r6i.2xlarge": 0.4032,
-            "r6i.4xlarge": 0.8064, "r6i.8xlarge": 1.6128,
-            
-            # R6a AMD memory optimized
-            "r6a.large": 0.0907, "r6a.xlarge": 0.1814, "r6a.2xlarge": 0.3629,
-            "r6a.4xlarge": 0.7258, "r6a.8xlarge": 1.4515,
-            
-            # C6i Intel compute optimized
-            "c6i.large": 0.0765, "c6i.xlarge": 0.1530, "c6i.2xlarge": 0.3060,
-            "c6i.4xlarge": 0.6120, "c6i.8xlarge": 1.2240,
-            
-            # C6a AMD compute optimized
-            "c6a.large": 0.0688, "c6a.xlarge": 0.1377, "c6a.2xlarge": 0.2754,
-            "c6a.4xlarge": 0.5508, "c6a.8xlarge": 1.1016,
-        },
-        "ebs": {
-            # US Regions
-            "us-east-1": {"gp3": {"gb": 0.08, "iops": 0.005, "throughput": 0.04}, "io2": {"gb": 0.125, "iops": 0.065}},
-            "us-west-1": {"gp3": {"gb": 0.088, "iops": 0.0055, "throughput": 0.044}, "io2": {"gb": 0.138, "iops": 0.0715}},
-            "us-west-2": {"gp3": {"gb": 0.084, "iops": 0.0052, "throughput": 0.042}, "io2": {"gb": 0.131, "iops": 0.068}},
-            
-            # Europe Regions
-            "eu-west-1": {"gp3": {"gb": 0.089, "iops": 0.0054, "throughput": 0.043}, "io2": {"gb": 0.138, "iops": 0.070}},
-            "eu-central-1": {"gp3": {"gb": 0.092, "iops": 0.0055, "throughput": 0.044}, "io2": {"gb": 0.142, "iops": 0.072}},
-            
-            # Asia Pacific Regions
-            "ap-southeast-1": {"gp3": {"gb": 0.095, "iops": 0.0057, "throughput": 0.046}, "io2": {"gb": 0.145, "iops": 0.073}},
-            "ap-southeast-2": {"gp3": {"gb": 0.095, "iops": 0.0057, "throughput": 0.046}, "io2": {"gb": 0.145, "iops": 0.073}},
-            "ap-northeast-1": {"gp3": {"gb": 0.096, "iops": 0.0058, "throughput": 0.047}, "io2": {"gb": 0.148, "iops": 0.075}},
-            "ap-northeast-2": {"gp3": {"gb": 0.094, "iops": 0.0056, "throughput": 0.045}, "io2": {"gb": 0.143, "iops": 0.072}},
-            "ap-south-1": {"gp3": {"gb": 0.087, "iops": 0.0052, "throughput": 0.042}, "io2": {"gb": 0.135, "iops": 0.068}},
-            "ap-east-1": {"gp3": {"gb": 0.103, "iops": 0.0062, "throughput": 0.050}, "io2": {"gb": 0.158, "iops": 0.080}},
-        }
-    }
-    
-    def __init__(self):
-        """Initialize calculator with default settings."""
-        self.inputs = {
-            "workload_name": "Sample Workload",
-            "workload_type": "web_application",
-            "operating_system": "linux",
-            "region": "us-east-1",
-            "on_prem_cores": 8,
-            "peak_cpu_percent": 70,
-            "avg_cpu_percent": 45,
-            "on_prem_ram_gb": 32,
-            "peak_ram_percent": 80,
-            "avg_ram_percent": 55,
-            "storage_current_gb": 500,
-            "storage_growth_rate": 0.15,
-            "peak_iops": 5000,
-            "avg_iops": 2500,
-            "peak_throughput_mbps": 250,
-            "years": 3,
-            "seasonality_factor": 1.2,
-            "prefer_amd": True,
-        }
-        
-        self.instance_pricing = self.BASE_PRICING["instance"].copy()
-        self.ebs_pricing = self.BASE_PRICING["ebs"].copy()
-        self.recommendation_cache = {}
-    
-    def validate_aws_credentials(self, region=None):
-        """Validate AWS credentials."""
-        try:
-            region = region or self.inputs.get("region", "us-east-1")
-            
-            # Try to get credentials from Streamlit secrets first
-            if hasattr(st, 'secrets') and 'aws' in st.secrets:
-                try:
-                    access_key = st.secrets["aws"]["access_key_id"]
-                    secret_key = st.secrets["aws"]["secret_access_key"]
-                    sts = boto3.client('sts', 
-                                     aws_access_key_id=access_key,
-                                     aws_secret_access_key=secret_key,
-                                     region_name=region)
-                    identity = sts.get_caller_identity()
-                    account_id = identity['Arn'].split(':')[4]
-                    return True, f"✅ AWS Connected (Account: {account_id})"
-                except Exception:
-                    pass
-            
-            # Fall back to environment variables or default credentials
-            sts = boto3.client('sts', region_name=region)
-            identity = sts.get_caller_identity()
-            account_id = identity['Arn'].split(':')[4]
-            return True, f"✅ AWS Connected (Account: {account_id})"
-            
-        except Exception as e:
-            return False, "❌ AWS credentials not configured. Using base pricing."
-    
-    def fetch_current_prices(self, force_refresh=False):
-        """Apply OS multiplier to base pricing."""
-        os_multiplier = self.OS_PRICING_MULTIPLIERS[self.inputs["operating_system"]]["multiplier"]
-        for instance_type, base_price in self.BASE_PRICING["instance"].items():
-            self.instance_pricing[instance_type] = base_price * os_multiplier
-    
-    def calculate_requirements(self, env):
-        """Calculate infrastructure requirements."""
-        env_mult = self.ENV_MULTIPLIERS[env]
-        workload_profile = self.WORKLOAD_PROFILES[self.inputs["workload_type"]]
-        
-        # CPU calculation
-        cpu_efficiency = 0.7
-        cpu_buffer = 1.3 if env == "PROD" else 1.2
-        seasonality = self.inputs.get("seasonality_factor", 1.0) if env == "PROD" else 1.0
-        
-        required_vcpus = max(
-            math.ceil(
-                self.inputs["on_prem_cores"] * 
-                (self.inputs["peak_cpu_percent"] / 100) *
-                workload_profile["cpu_multiplier"] *
-                cpu_buffer *
-                seasonality *
-                env_mult["cpu_ram"] / 
-                cpu_efficiency
-            ), 2
-        )
-        
-        # RAM calculation
-        ram_efficiency = 0.85
-        required_ram = max(
-            math.ceil(
-                self.inputs["on_prem_ram_gb"] * 
-                (self.inputs["peak_ram_percent"] / 100) *
-                workload_profile["ram_multiplier"] *
-                1.15 *  # OS overhead
-                cpu_buffer *
-                seasonality *
-                env_mult["cpu_ram"] / 
-                ram_efficiency
-            ), 4
-        )
-        
-        # Storage calculation
-        growth_factor = (1 + self.inputs["storage_growth_rate"]) ** self.inputs["years"]
-        storage_buffer = 1.3 if env == "PROD" else 1.2
-        
-        required_storage = max(
-            math.ceil(
-                self.inputs["storage_current_gb"] * 
-                growth_factor * 
-                workload_profile["storage_multiplier"] *
-                storage_buffer *
-                env_mult["storage"]
-            ), 20
-        )
-        
-        # I/O requirements
-        iops_required = math.ceil(
-            self.inputs["peak_iops"] * 
-            workload_profile["iops_multiplier"] * 
-            (1.3 if env == "PROD" else 1.2)
-        )
-        
-        throughput_required = math.ceil(
-            self.inputs["peak_throughput_mbps"] * 
-            workload_profile["iops_multiplier"] * 
-            (1.3 if env == "PROD" else 1.2)
-        )
-        
-        # EBS type selection
-        ebs_type = self.select_ebs_type(iops_required, throughput_required, required_storage)
-        
-        # Instance selection
-        instance = self.select_optimal_instance(required_vcpus, required_ram, throughput_required, workload_profile)
-        
-        # Cost calculations
-        instance_cost = self.calculate_instance_cost(instance["type"])
-        ebs_cost = self.calculate_ebs_cost(ebs_type, required_storage, iops_required, throughput_required)
-        network_cost = self.estimate_network_cost(env)
-        total_cost = instance_cost + ebs_cost + network_cost
-        
-        # Optimization score
-        optimization_score = self.calculate_optimization_score(instance, required_vcpus, required_ram)
-        
-        return {
-            "environment": env,
-            "instance_type": instance["type"],
-            "vCPUs": required_vcpus,
-            "RAM_GB": required_ram,
-            "storage_GB": required_storage,
-            "ebs_type": ebs_type,
-            "iops_required": iops_required,
-            "throughput_required": f"{throughput_required} MB/s",
-            "network_performance": instance["network"],
-            "family": instance["family"],
-            "processor": instance["processor"],
-            "operating_system": self.inputs["operating_system"],
-            "instance_cost": instance_cost,
-            "ebs_cost": ebs_cost,
-            "network_cost": network_cost,
-            "total_cost": total_cost,
-            "optimization_score": optimization_score,
-            "workload_optimized": workload_profile["name"]
-        }
-    
-    def select_ebs_type(self, iops_required, throughput_required, storage_gb):
-        """Select appropriate EBS type."""
-        if iops_required > 16000 or throughput_required > 1000:
-            return "io2"
-        elif storage_gb > 16384:
-            return "io2"
-        elif iops_required > 3000 or throughput_required > 125:
-            return "gp3"
-        else:
-            return "gp3"
-    
-    def select_optimal_instance(self, required_vcpus, required_ram, required_throughput, workload_profile):
-        """Select optimal instance type."""
-        preferred_family = workload_profile["preferred_family"]
-        prefer_amd = self.inputs["prefer_amd"]
-        
-        candidates = []
-        for instance in self.INSTANCE_TYPES:
-            if preferred_family != "general" and instance["family"] != preferred_family:
-                continue
-            if not prefer_amd and instance["processor"] == "AMD":
-                continue
-            if (instance["vCPU"] >= required_vcpus and 
-                instance["RAM"] >= required_ram and
-                instance["max_ebs_bandwidth"] >= (required_throughput * 1.2)):
-                candidates.append(instance)
-        
-        if not candidates:
-            candidates = [i for i in self.INSTANCE_TYPES 
-                         if (i["vCPU"] >= required_vcpus and i["RAM"] >= required_ram)]
-        
-        if not candidates:
-            return max(self.INSTANCE_TYPES, key=lambda x: (x["vCPU"], x["RAM"]))
-        
-        # Score candidates
-        best_instance = None
-        best_score = -1
-        
-        for instance in candidates:
-            cpu_efficiency = required_vcpus / instance["vCPU"]
-            ram_efficiency = required_ram / instance["RAM"]
-            hourly_cost = self.instance_pricing.get(instance["type"], 999)
-            cost_per_vcpu = hourly_cost / instance["vCPU"]
-            
-            efficiency_score = (cpu_efficiency + ram_efficiency) / 2
-            cost_score = 1 / (cost_per_vcpu + 0.01)
-            amd_bonus = 1.1 if (prefer_amd and instance["processor"] == "AMD") else 1.0
-            family_bonus = 1.2 if instance["family"] == preferred_family else 1.0
-            
-            total_score = efficiency_score * cost_score * amd_bonus * family_bonus
-            
-            if total_score > best_score:
-                best_score = total_score
-                best_instance = instance
-        
-        return best_instance or candidates[0]
-    
-    def calculate_instance_cost(self, instance_type):
-        """Calculate monthly instance cost."""
-        hourly_rate = self.instance_pricing.get(instance_type, 0)
-        return round(hourly_rate * 24 * 30, 2)
-    
-    def calculate_ebs_cost(self, ebs_type, storage_gb, iops, throughput_mbps):
-        """Calculate monthly EBS cost."""
-        region = self.inputs["region"]
-        region_pricing = self.ebs_pricing.get(region, self.ebs_pricing["us-east-1"])
-        pricing = region_pricing.get(ebs_type, region_pricing["gp3"])
-        
-        base_cost = storage_gb * pricing["gb"]
-        
-        if ebs_type == "gp3":
-            extra_iops = max(0, iops - 3000)
-            extra_throughput = max(0, throughput_mbps - 125)
-            iops_cost = extra_iops * pricing.get("iops", 0)
-            throughput_cost = extra_throughput * pricing.get("throughput", 0)
-            return round(base_cost + iops_cost + throughput_cost, 2)
-        elif ebs_type == "io2":
-            iops_cost = iops * pricing.get("iops", 0)
-            return round(base_cost + iops_cost, 2)
-        else:
-            return round(base_cost, 2)
-    
-    def estimate_network_cost(self, env):
-        """Estimate monthly network costs based on workload profile and region."""
-        # Base costs by environment
-        base_cost = {"PROD": 50, "STAGING": 20, "QA": 15, "DEV": 10, "DR": 25}
-        
-        # Workload multipliers
-        workload_multiplier = {
-            "web_application": 1.5, "application_server": 1.2, "database_server": 1.0,
-            "file_server": 2.0, "compute_intensive": 0.8
-        }
-        
-        # Regional multipliers (data transfer costs vary by region)
-        regional_multiplier = {
-            # US Regions (baseline)
-            "us-east-1": 1.0, "us-west-1": 1.05, "us-west-2": 1.02,
-            # Europe Regions (slightly higher)
-            "eu-west-1": 1.1, "eu-central-1": 1.15,
-            # Asia Pacific Regions (higher data transfer costs)
-            "ap-southeast-1": 1.2,  # Singapore
-            "ap-southeast-2": 1.25, # Sydney  
-            "ap-northeast-1": 1.3,  # Tokyo
-            "ap-northeast-2": 1.25, # Seoul
-            "ap-south-1": 1.15,     # Mumbai
-            "ap-east-1": 1.35       # Hong Kong (highest)
-        }
-        
-        base = base_cost.get(env, 20)
-        workload_mult = workload_multiplier.get(self.inputs["workload_type"], 1.0)
-        region_mult = regional_multiplier.get(self.inputs["region"], 1.0)
-        
-        return round(base * workload_mult * region_mult, 2)
-    
-    def calculate_optimization_score(self, instance, required_vcpus, required_ram):
-        """Calculate optimization score (0-100%)."""
-        cpu_utilization = (required_vcpus / instance["vCPU"]) * 100
-        ram_utilization = (required_ram / instance["RAM"]) * 100
-        
-        cpu_score = 100 - abs(80 - cpu_utilization)
-        ram_score = 100 - abs(80 - ram_utilization)
-        
-        optimization_score = (cpu_score + ram_score) / 2
-        return max(0, min(100, round(optimization_score, 1)))
-    
-    def generate_all_recommendations(self):
-        """Generate recommendations for all environments."""
-        cache_key = hash(frozenset(self.inputs.items()))
-        
-        if cache_key in self.recommendation_cache:
-            return self.recommendation_cache[cache_key]
-        
-        results = {}
-        for env in self.ENV_MULTIPLIERS.keys():
-            results[env] = self.calculate_requirements(env)
-        
-        self.recommendation_cache[cache_key] = results
-        return results
-    
-    def get_workload_summary(self):
-        """Get workload summary."""
-        workload_profile = self.WORKLOAD_PROFILES[self.inputs["workload_type"]]
-        os_info = self.OS_PRICING_MULTIPLIERS[self.inputs["operating_system"]]
-        
-        return {
-            "workload_name": self.inputs["workload_name"],
-            "workload_type": workload_profile["name"],
-            "workload_description": workload_profile["description"],
-            "operating_system": self.inputs["operating_system"].title(),
-            "os_description": os_info["description"],
-            "region": self.inputs["region"],
-            "current_infrastructure": {
-                "cores": self.inputs["on_prem_cores"],
-                "ram_gb": self.inputs["on_prem_ram_gb"],
-                "storage_gb": self.inputs["storage_current_gb"],
-                "peak_cpu_util": f"{self.inputs['peak_cpu_percent']}%",
-                "peak_ram_util": f"{self.inputs['peak_ram_percent']}%"
-            },
-            "growth_projection": f"{self.inputs['storage_growth_rate']*100:.1f}% annually for {self.inputs['years']} years"
-        }
-
-# PDF Report Generator - keeping same as original
+# Enhanced PDF Report Generator
 class EnhancedPDFReportGenerator:
-    """PDF report generator."""
+    """Enhanced PDF report generator with comprehensive enterprise features."""
     
     def __init__(self):
         if not REPORTLAB_AVAILABLE:
             raise ImportError("ReportLab library required")
         self.styles = getSampleStyleSheet()
+        self._setup_custom_styles()
+    
+    def _setup_custom_styles(self):
+        """Setup custom styles for enterprise reports."""
+        self.styles.add(ParagraphStyle(
+            name='CustomTitle',
+            parent=self.styles['Heading1'],
+            fontSize=24,
+            spaceAfter=30,
+            textColor=colors.HexColor('#1a365d'),
+            alignment=TA_CENTER
+        ))
+        
+        self.styles.add(ParagraphStyle(
+            name='SectionHeader',
+            parent=self.styles['Heading2'],
+            fontSize=16,
+            spaceBefore=20,
+            spaceAfter=12,
+            textColor=colors.HexColor('#2d3748'),
+        ))
     
     def generate_comprehensive_report(self, all_results):
-        """Generate PDF report."""
+        """Generate comprehensive PDF report with enterprise features."""
         buffer = io.BytesIO()
-        doc = SimpleDocTemplate(buffer, pagesize=A4)
+        doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=1*inch)
         story = []
         
+        # Title page
+        story.append(Paragraph("Enterprise AWS Migration Analysis Report", self.styles['CustomTitle']))
+        story.append(Paragraph(f"Generated: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}", self.styles['Normal']))
+        story.append(Spacer(1, 0.5 * inch))
+        
+        # Executive Summary
         if isinstance(all_results, dict):
             results_list = [all_results]
         else:
             results_list = all_results
         
-        if not results_list:
-            story.append(Paragraph("No analysis results available.", self.styles['Normal']))
-            doc.build(story)
-            buffer.seek(0)
-            return buffer.getvalue()
-        
-        # Title
-        story.append(Paragraph("Enterprise AWS Workload Migration Analysis", self.styles['Title']))
-        story.append(Paragraph(f"Generated: {datetime.now().strftime('%B %d, %Y')}", self.styles['Normal']))
-        story.append(Spacer(1, 0.5 * inch))
-        
-        # Summary
-        total_workloads = len(results_list)
-        total_monthly_cost = sum(result['recommendations']['PROD']['total_cost'] for result in results_list)
-        
-        summary = f"""
-        This analysis covers {total_workloads} workload(s) for AWS migration.
-        Total estimated monthly cost: ${total_monthly_cost:,.2f}
-        Annual projection: ${total_monthly_cost * 12:,.2f}
-        """
-        story.append(Paragraph(summary, self.styles['Normal']))
+        if results_list:
+            story.append(Paragraph("Executive Summary", self.styles['SectionHeader']))
+            
+            total_workloads = len(results_list)
+            total_monthly_cost = sum(
+                result['recommendations']['PROD']['cost_breakdown']['total_costs'].get('on_demand', 0) 
+                for result in results_list
+            )
+            
+            # TCO Analysis
+            total_migration_cost = sum(
+                result['recommendations']['PROD']['tco_analysis'].get('migration_cost', 0)
+                for result in results_list
+            )
+            
+            total_annual_savings = sum(
+                result['recommendations']['PROD']['tco_analysis'].get('monthly_savings', 0) * 12
+                for result in results_list
+            )
+            
+            summary_text = f"""
+            This comprehensive analysis covers {total_workloads} enterprise workload(s) for AWS cloud migration.
+            
+            <b>Financial Summary:</b>
+            • Total Monthly Cost (On-Demand): ${total_monthly_cost:,.2f}
+            • Annual Cost Projection: ${total_monthly_cost * 12:,.2f}
+            • Estimated Migration Cost: ${total_migration_cost:,.2f}
+            • Potential Annual Savings: ${total_annual_savings:,.2f}
+            
+            <b>Key Recommendations:</b>
+            • Consider Reserved Instances or Savings Plans for significant cost optimization
+            • Implement comprehensive monitoring and auto-scaling strategies
+            • Evaluate Graviton processors for compatible workloads
+            • Plan migration in phases to minimize business disruption
+            """
+            
+            story.append(Paragraph(summary_text, self.styles['Normal']))
+            story.append(PageBreak())
         
         doc.build(story)
         buffer.seek(0)
         return buffer.getvalue()
 
-# Enhanced Authentication Functions with debugging
+# Enhanced rendering functions with new enterprise features
+def render_enhanced_workload_configuration():
+    """Render enhanced workload configuration with enterprise features."""
+    calculator = st.session_state.calculator
+    
+    st.markdown('<div class="section-header"><h3>🏗️ Enterprise Workload Configuration</h3></div>', unsafe_allow_html=True)
+    
+    # Basic Configuration
+    with st.expander("📋 Basic Workload Information", expanded=True):
+        col1, col2 = st.columns(2)
+        with col1:
+            calculator.inputs["workload_name"] = st.text_input(
+                "Workload Name", 
+                value=calculator.inputs["workload_name"],
+                help="Descriptive name for this enterprise workload"
+            )
+            
+            workload_options = list(calculator.WORKLOAD_PROFILES.keys())
+            workload_labels = [calculator.WORKLOAD_PROFILES[k]["name"] for k in workload_options]
+            current_workload_idx = workload_options.index(calculator.inputs["workload_type"])
+            
+            selected_workload_idx = st.selectbox(
+                "Workload Type",
+                range(len(workload_options)),
+                index=current_workload_idx,
+                format_func=lambda x: workload_labels[x],
+                help="Select the primary workload pattern that best describes your application"
+            )
+            calculator.inputs["workload_type"] = workload_options[selected_workload_idx]
+            
+        with col2:
+            os_options = ["linux", "windows"]
+            os_labels = ["Linux (Amazon Linux, Ubuntu, RHEL)", "Windows Server"]
+            current_os_idx = os_options.index(calculator.inputs["operating_system"])
+            
+            selected_os_idx = st.selectbox(
+                "Operating System",
+                range(len(os_options)),
+                index=current_os_idx,
+                format_func=lambda x: os_labels[x]
+            )
+            calculator.inputs["operating_system"] = os_options[selected_os_idx]
+            
+            # Enhanced region selection
+            region_options = [
+                "us-east-1", "us-west-1", "us-west-2", 
+                "eu-west-1", "eu-central-1",
+                "ap-southeast-1", "ap-southeast-2", "ap-northeast-1", 
+                "ap-northeast-2", "ap-south-1", "ap-east-1"
+            ]
+            region_labels = [
+                "US East (N. Virginia)", "US West (N. California)", "US West (Oregon)",
+                "Europe (Ireland)", "Europe (Frankfurt)", 
+                "Asia Pacific (Singapore)", "Asia Pacific (Sydney)", "Asia Pacific (Tokyo)",
+                "Asia Pacific (Seoul)", "Asia Pacific (Mumbai)", "Asia Pacific (Hong Kong)"
+            ]
+            
+            current_region_idx = region_options.index(calculator.inputs["region"])
+            
+            selected_region_idx = st.selectbox(
+                "AWS Region",
+                range(len(region_options)),
+                index=current_region_idx,
+                format_func=lambda x: region_labels[x],
+                help="Select primary AWS region for deployment and pricing calculations"
+            )
+            calculator.inputs["region"] = region_options[selected_region_idx]
+    
+    selected_profile = calculator.WORKLOAD_PROFILES[calculator.inputs["workload_type"]]
+    
+    # Enhanced workload profile display
+    col1, col2 = st.columns([2, 1])
+    with col1:
+        st.info(f"**{selected_profile['name']}**: {selected_profile['description']}")
+    
+    with col2:
+        # Show compatibility badges
+        badges = []
+        if selected_profile["graviton_compatible"]:
+            badges.append('<span class="sp-badge">Graviton Compatible</span>')
+        if selected_profile["spot_suitable"]:
+            badges.append('<span class="spot-badge">Spot Suitable</span>')
+        
+        if badges:
+            st.markdown(f"**Compatibility:** {' '.join(badges)}", unsafe_allow_html=True)
+    
+    # Current Infrastructure Metrics
+    with st.expander("🖥️ Current Infrastructure Metrics", expanded=True):
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            st.markdown("**Compute Resources**")
+            calculator.inputs["on_prem_cores"] = st.number_input(
+                "CPU Cores", min_value=1, value=calculator.inputs["on_prem_cores"],
+                help="Total number of CPU cores in your current infrastructure"
+            )
+            calculator.inputs["peak_cpu_percent"] = st.slider(
+                "Peak CPU %", 0, 100, calculator.inputs["peak_cpu_percent"],
+                help="Highest CPU utilization observed"
+            )
+            calculator.inputs["avg_cpu_percent"] = st.slider(
+                "Average CPU %", 0, 100, calculator.inputs["avg_cpu_percent"],
+                help="Typical CPU utilization"
+            )
+            
+        with col2:
+            st.markdown("**🛡️ High Availability & Compliance**")
+            calculator.inputs["multi_az"] = st.checkbox(
+                "Multi-AZ Deployment", 
+                value=calculator.inputs.get("multi_az", True),
+                help="Deploy across multiple Availability Zones for high availability"
+            )
+            
+            calculator.inputs["auto_scaling"] = st.checkbox(
+                "Auto Scaling", 
+                value=calculator.inputs.get("auto_scaling", True),
+                help="Automatically scale instances based on demand"
+            )
+            
+            # Load Balancer selection
+            lb_options = {
+                "alb": "Application Load Balancer (Layer 7)",
+                "nlb": "Network Load Balancer (Layer 4)",
+                "none": "No Load Balancer"
+            }
+            calculator.inputs["load_balancer"] = st.selectbox(
+                "Load Balancer Type",
+                list(lb_options.keys()),
+                format_func=lambda x: lb_options[x],
+                help="Choose appropriate load balancer for your workload"
+            )
+            
+            # Compliance requirements
+            compliance_options = list(calculator.COMPLIANCE_FRAMEWORKS.keys())
+            calculator.inputs["compliance_requirements"] = st.multiselect(
+                "Compliance Requirements",
+                compliance_options,
+                default=calculator.inputs.get("compliance_requirements", []),
+                help="Select applicable compliance frameworks"
+            )
+    
+    # Advanced Configuration
+    with st.expander("⚙️ Advanced Enterprise Settings"):
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            st.markdown("**📊 Growth & Scaling**")
+            calculator.inputs["storage_growth_rate"] = st.number_input(
+                "Annual Storage Growth Rate", min_value=0.0, max_value=1.0, 
+                value=calculator.inputs["storage_growth_rate"], step=0.01, format="%.2f",
+                help="Expected yearly growth in storage requirements"
+            )
+            calculator.inputs["years"] = st.slider(
+                "Growth Projection (Years)", 1, 10, calculator.inputs["years"],
+                help="Planning horizon for capacity growth"
+            )
+            calculator.inputs["seasonality_factor"] = st.number_input(
+                "Seasonality Factor", min_value=1.0, max_value=3.0, 
+                value=calculator.inputs["seasonality_factor"], step=0.1,
+                help="Peak demand multiplier (1.0 = no seasonality, 2.0 = 100% peak)"
+            )
+            
+        with col2:
+            st.markdown("**🔒 Security & Monitoring**")
+            monitoring_options = {
+                "basic": "Basic CloudWatch",
+                "detailed": "Detailed Monitoring",
+                "enhanced": "Enhanced Monitoring + Custom Metrics"
+            }
+            calculator.inputs["monitoring_level"] = st.selectbox(
+                "Monitoring Level",
+                list(monitoring_options.keys()),
+                format_func=lambda x: monitoring_options[x],
+                help="Choose monitoring and observability level"
+            )
+            
+            calculator.inputs["backup_retention_days"] = st.slider(
+                "Backup Retention (Days)", 7, 365, 
+                calculator.inputs.get("backup_retention_days", 30),
+                help="Number of days to retain backups"
+            )
+            
+            calculator.inputs["disaster_recovery"] = st.checkbox(
+                "Disaster Recovery", 
+                value=calculator.inputs.get("disaster_recovery", False),
+                help="Enable cross-region disaster recovery capabilities"
+            )
+            
+        with col3:
+            st.markdown("**🌐 Network & Performance**")
+            # Enhanced network options would go here
+            st.info("Advanced network configuration options available in enterprise deployment")
+
+def render_enhanced_analysis_results(results):
+    """Render enhanced analysis results with enterprise features."""
+    st.markdown('<div class="section-header"><h3>📊 Enterprise Analysis Results</h3></div>', unsafe_allow_html=True)
+    
+    # Enterprise Summary Cards
+    prod_results = results['PROD']
+    tco_analysis = prod_results['tco_analysis']
+    
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-title">Best Monthly Cost</div>
+            <div class="metric-value">${tco_analysis['monthly_cost']:,.0f}</div>
+            <div class="metric-description">{tco_analysis['best_pricing_option'].replace('_', ' ').title()}</div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+    with col2:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-title">Annual Savings</div>
+            <div class="metric-value">${tco_analysis['monthly_savings'] * 12:,.0f}</div>
+            <div class="metric-description">{tco_analysis['savings_percentage']}% vs On-Demand</div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+    with col3:
+        roi_color = "green" if isinstance(tco_analysis['roi_3_years'], (int, float)) and tco_analysis['roi_3_years'] > 100 else "orange"
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-title">3-Year ROI</div>
+            <div class="metric-value" style="color: {roi_color}">{tco_analysis['roi_3_years']}%</div>
+            <div class="metric-description">Return on Investment</div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+    with col4:
+        break_even = tco_analysis['break_even_months']
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-title">Break-Even</div>
+            <div class="metric-value">{break_even}</div>
+            <div class="metric-description">Months to recover migration cost</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # TCO Savings Highlight
+    if tco_analysis['monthly_savings'] > 0:
+        st.markdown(f"""
+        <div class="savings-highlight">
+            💰 <strong>Potential Savings:</strong> ${tco_analysis['monthly_savings']:,.2f}/month 
+            (${tco_analysis['monthly_savings'] * 12:,.2f}/year) by switching to {tco_analysis['best_pricing_option'].replace('_', ' ').title()}
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Enhanced Cost Breakdown
+    st.subheader("💰 Comprehensive Cost Analysis")
+    
+    # Cost comparison across pricing models
+    cost_breakdown = prod_results['cost_breakdown']
+    total_costs = cost_breakdown['total_costs']
+    
+    # Create cost comparison chart
+    cost_data = []
+    for pricing_model, cost in total_costs.items():
+        model_name = pricing_model.replace('_', ' ').title()
+        savings = ((total_costs.get('on_demand', cost) - cost) / total_costs.get('on_demand', cost) * 100) if total_costs.get('on_demand', 0) > 0 else 0
+        cost_data.append({
+            'Pricing Model': model_name,
+            'Monthly Cost': cost,
+            'Savings %': round(savings, 1)
+        })
+    
+    df_costs = pd.DataFrame(cost_data)
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        fig_costs = px.bar(df_costs, x='Pricing Model', y='Monthly Cost',
+                          title='Cost Comparison by Pricing Model',
+                          color='Monthly Cost', color_continuous_scale='RdYlGn_r')
+        fig_costs.update_layout(height=400, xaxis_tickangle=-45)
+        st.plotly_chart(fig_costs, use_container_width=True)
+    
+    with col2:
+        fig_savings = px.bar(df_costs, x='Pricing Model', y='Savings %',
+                           title='Savings Percentage vs On-Demand',
+                           color='Savings %', color_continuous_scale='RdYlGn')
+        fig_savings.update_layout(height=400, xaxis_tickangle=-45)
+        st.plotly_chart(fig_savings, use_container_width=True)
+    
+    # Detailed cost breakdown
+    st.subheader("🔍 Detailed Cost Breakdown")
+    
+    # Create detailed breakdown table
+    breakdown_data = []
+    for cost_category, costs in cost_breakdown.items():
+        if cost_category == 'total_costs':
+            continue
+        if isinstance(costs, dict):
+            for subcategory, amount in costs.items():
+                breakdown_data.append({
+                    'Category': cost_category.replace('_', ' ').title(),
+                    'Service': subcategory.replace('_', ' ').title(),
+                    'Monthly Cost': f"${amount:,.2f}",
+                    'Annual Cost': f"${amount * 12:,.2f}"
+                })
+    
+    if breakdown_data:
+        df_breakdown = pd.DataFrame(breakdown_data)
+        st.dataframe(df_breakdown, use_container_width=True, hide_index=True)
+    
+    # Environment comparison
+    st.subheader("🏢 Multi-Environment Analysis")
+    
+    env_data = []
+    for env, env_results in results.items():
+        instance_options = env_results['instance_options']
+        primary_instance = instance_options.get('balanced', instance_options.get('cost_optimized', {}))
+        
+        env_data.append({
+            'Environment': env,
+            'Instance Type': primary_instance.get('type', 'N/A'),
+            'vCPUs': env_results['requirements']['vCPUs'],
+            'RAM (GB)': env_results['requirements']['RAM_GB'],
+            'Storage (GB)': env_results['requirements']['storage_GB'],
+            'Monthly Cost': f"${env_results['cost_breakdown']['total_costs'].get('on_demand', 0):,.2f}",
+            'Multi-AZ': '✅' if env_results['requirements']['multi_az'] else '❌'
+        })
+    
+    df_env = pd.DataFrame(env_data)
+    st.dataframe(df_env, use_container_width=True, hide_index=True)
+    
+    # Instance recommendations
+    st.subheader("🖥️ Instance Recommendations")
+    
+    instance_options = prod_results['instance_options']
+    
+    for scenario, instance in instance_options.items():
+        col1, col2 = st.columns([3, 1])
+        
+        with col1:
+            processor_badge = ""
+            if instance['processor'] == 'Graviton':
+                processor_badge = '<span class="sp-badge">Graviton (ARM)</span>'
+            elif instance['processor'] == 'AMD':
+                processor_badge = '<span class="ri-badge">AMD</span>'
+            else:
+                processor_badge = '<span class="metric-description">Intel</span>'
+            
+            st.markdown(f"""
+            <div class="cost-comparison-card">
+                <h4>{scenario.replace('_', ' ').title()} Option</h4>
+                <p><strong>Instance:</strong> {instance['type']} {processor_badge}</p>
+                <p><strong>Specs:</strong> {instance['vCPU']} vCPUs, {instance['RAM']} GB RAM</p>
+                <p><strong>Network:</strong> {instance['network']}</p>
+                <p><strong>Family:</strong> {instance['family'].title()}</p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col2:
+            # Show cost for this instance type
+            instance_cost = cost_breakdown['instance_costs'].get('on_demand', 0)
+            st.metric("Monthly Cost", f"${instance_cost:,.2f}")
+    
+    # Optimization Recommendations
+    st.subheader("🎯 Optimization Recommendations")
+    
+    recommendations = prod_results['optimization_recommendations']
+    
+    for i, recommendation in enumerate(recommendations):
+        st.markdown(f"**{i+1}.** {recommendation}")
+    
+    # Risk Assessment
+    risk_assessment = prod_results['risk_assessment']
+    
+    st.subheader("⚠️ Migration Risk Assessment")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        risk_level = risk_assessment['overall_risk']
+        risk_class = f"risk-{risk_level.lower()}"
+        
+        st.markdown(f"""
+        <div class="risk-indicator {risk_class}">
+            Overall Risk Level: {risk_level}
+        </div>
+        """, unsafe_allow_html=True)
+        
+        if risk_assessment['risk_factors']:
+            st.markdown("**Risk Factors:**")
+            for factor in risk_assessment['risk_factors']:
+                st.markdown(f"• {factor}")
+    
+    with col2:
+        if risk_assessment['mitigation_strategies']:
+            st.markdown("**Mitigation Strategies:**")
+            for strategy in risk_assessment['mitigation_strategies']:
+                st.markdown(f"• {strategy}")
+    
+    # Compliance Information
+    compliance = prod_results['compliance']
+    if compliance['requirements']:
+        st.subheader("🛡️ Compliance Requirements")
+        
+        for req in compliance['requirements']:
+            if req in st.session_state.calculator.COMPLIANCE_FRAMEWORKS:
+                framework = st.session_state.calculator.COMPLIANCE_FRAMEWORKS[req]
+                
+                with st.expander(f"{framework['name']} - {framework['description']}"):
+                    st.markdown("**Requirements:**")
+                    for requirement in framework['requirements']:
+                        st.markdown(f"• {requirement}")
+                    
+                    cost_impact = (framework['additional_cost_factor'] - 1) * 100
+                    st.markdown(f"**Cost Impact:** +{cost_impact:.1f}% additional cost")
+
+def render_migration_planning():
+    """Render migration planning interface."""
+    st.markdown('<div class="section-header"><h3>🚀 Migration Planning & Timeline</h3></div>', unsafe_allow_html=True)
+    
+    if not st.session_state.analysis_results:
+        st.info("💡 Please run a workload analysis first to access migration planning features.")
+        return
+    
+    results = st.session_state.analysis_results['recommendations']
+    
+    # Migration phases
+    phases = [
+        {
+            "name": "Assessment & Planning",
+            "duration": "2-4 weeks",
+            "description": "Infrastructure discovery, dependency mapping, and detailed migration planning",
+            "tasks": [
+                "Complete infrastructure inventory",
+                "Map application dependencies",
+                "Create detailed migration plan",
+                "Set up AWS accounts and basic networking"
+            ]
+        },
+        {
+            "name": "Pilot Migration",
+            "duration": "2-3 weeks", 
+            "description": "Migrate non-critical workloads to validate approach and tooling",
+            "tasks": [
+                "Migrate development environment",
+                "Test backup and restore procedures",
+                "Validate monitoring and alerting",
+                "Fine-tune security configurations"
+            ]
+        },
+        {
+            "name": "Production Migration",
+            "duration": "4-8 weeks",
+            "description": "Migrate production workloads with minimal downtime",
+            "tasks": [
+                "Execute production cutover",
+                "Validate application functionality",
+                "Optimize performance and costs",
+                "Implement auto-scaling policies"
+            ]
+        },
+        {
+            "name": "Optimization",
+            "duration": "2-4 weeks",
+            "description": "Post-migration optimization and cost management",
+            "tasks": [
+                "Right-size instances based on actual usage",
+                "Implement Reserved Instances/Savings Plans",
+                "Optimize storage and networking",
+                "Final security and compliance validation"
+            ]
+        }
+    ]
+    
+    for i, phase in enumerate(phases):
+        st.markdown(f"""
+        <div class="migration-phase">
+            <h4>Phase {i+1}: {phase['name']} ({phase['duration']})</h4>
+            <p>{phase['description']}</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        with st.expander(f"Phase {i+1} Tasks"):
+            for task in phase['tasks']:
+                st.markdown(f"✓ {task}")
+    
+    # Timeline visualization
+    st.subheader("📅 Migration Timeline")
+    
+    # Create Gantt chart data
+    import datetime as dt
+    start_date = dt.datetime.now()
+    
+    timeline_data = []
+    current_date = start_date
+    
+    for i, phase in enumerate(phases):
+        weeks = int(phase['duration'].split('-')[1].split()[0])  # Get max weeks
+        end_date = current_date + timedelta(weeks=weeks)
+        
+        timeline_data.append({
+            'Phase': phase['name'],
+            'Start': current_date.strftime('%Y-%m-%d'),
+            'End': end_date.strftime('%Y-%m-%d'),
+            'Duration': f"{weeks} weeks"
+        })
+        
+        current_date = end_date
+    
+    df_timeline = pd.DataFrame(timeline_data)
+    st.dataframe(df_timeline, use_container_width=True, hide_index=True)
+    
+    # Cost-benefit timeline
+    st.subheader("💰 Cost-Benefit Timeline")
+    
+    tco_analysis = results['PROD']['tco_analysis']
+    monthly_savings = tco_analysis['monthly_savings']
+    migration_cost = tco_analysis['migration_cost']
+    
+    # Calculate cumulative savings over time
+    months = list(range(0, 37))  # 3 years
+    cumulative_savings = []
+    cumulative_cost = [migration_cost]  # Start with migration cost
+    
+    for month in months:
+        if month == 0:
+            cumulative_savings.append(-migration_cost)
+        else:
+            cumulative_savings.append(cumulative_savings[-1] + monthly_savings)
+        
+        if month > 0:
+            cumulative_cost.append(cumulative_cost[-1] + tco_analysis['monthly_cost'])
+    
+    # Create cost-benefit chart
+    fig = go.Figure()
+    
+    fig.add_trace(go.Scatter(
+        x=months,
+        y=cumulative_savings,
+        mode='lines+markers',
+        name='Cumulative Savings',
+        line=dict(color='green', width=3)
+    ))
+    
+    fig.add_hline(y=0, line_dash="dash", line_color="red", 
+                  annotation_text="Break-even point")
+    
+    fig.update_layout(
+        title="Cumulative Savings Over Time",
+        xaxis_title="Months from Migration Start",
+        yaxis_title="Cumulative Savings ($)",
+        height=400
+    )
+    
+    st.plotly_chart(fig, use_container_width=True)
+
+def initialize_session_state():
+    """Initialize session state with enhanced features."""
+    if 'authenticated' not in st.session_state:
+        st.session_state.authenticated = False
+    if 'demo_mode' not in st.session_state:
+        st.session_state.demo_mode = False
+    if 'user_info' not in st.session_state:
+        st.session_state.user_info = {}
+    if 'calculator' not in st.session_state:
+        st.session_state.calculator = EnterpriseEC2WorkloadSizingCalculator()
+    if 'pdf_generator' not in st.session_state and REPORTLAB_AVAILABLE:
+        try:
+            st.session_state.pdf_generator = EnhancedPDFReportGenerator()
+        except Exception:
+            st.session_state.pdf_generator = None
+    if 'analysis_results' not in st.session_state:
+        st.session_state.analysis_results = None
+    if 'bulk_results' not in st.session_state:
+        st.session_state.bulk_results = []
+
+# Authentication functions remain the same as in the original file...
 def render_authentication():
     """Render enhanced authentication interface with detailed debugging."""
     st.markdown("""
     <div class="main-header">
-        <h1>🏢 Enterprise AWS Workload Sizing Platform</h1>
-        <p>Secure access to comprehensive infrastructure assessment and cloud migration planning</p>
+        <h1>🏢 Enterprise AWS Workload Sizing Platform v4.0</h1>
+        <span class="enterprise-badge">Enterprise Edition</span>
+        <p>Advanced cloud migration planning with Reserved Instances, Savings Plans, and comprehensive TCO analysis</p>
     </div>
     """, unsafe_allow_html=True)
     
@@ -1152,25 +2172,22 @@ def render_authentication():
     
     firebase_auth = st.session_state.firebase_auth
     
-    # Get debug information
-    debug_info = firebase_auth.debug_firebase_config()
-    
     # Check if Firebase libraries are available
     if not firebase_auth.firebase_available:
         st.markdown("""
         <div class="demo-banner">
-            🔧 <strong>Demo Mode</strong> - Firebase authentication libraries not available. You can use all features without authentication.
+            🔧 <strong>Demo Mode</strong> - Firebase authentication libraries not available. You can use all enterprise features without authentication.
         </div>
         """, unsafe_allow_html=True)
         
         st.info("💡 To enable full authentication, install Firebase dependencies: `pip install firebase-admin pyrebase4`")
         
-        if st.button("🚀 Continue to Platform", type="primary"):
+        if st.button("🚀 Continue to Enterprise Platform", type="primary"):
             st.session_state.authenticated = True
             st.session_state.demo_mode = True
             st.session_state.user_info = {
-                'display_name': 'Demo User',
-                'email': 'demo@example.com',
+                'display_name': 'Enterprise Demo User',
+                'email': 'demo@enterprise.com',
                 'role': 'demo'
             }
             st.rerun()
@@ -1179,101 +2196,19 @@ def render_authentication():
     # Try to initialize Firebase
     firebase_initialized = firebase_auth.initialize_firebase()
     
-    # Show detailed configuration status
-    if firebase_initialized:
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            if debug_info['admin_auth_ready']:
-                st.success("🔥 Firebase Admin SDK Ready")
-            else:
-                st.error("❌ Firebase Admin SDK Not Ready")
-                
-        with col2:
-            if debug_info['client_auth_ready']:
-                st.success("🔥 Firebase Client SDK Ready")
-            elif debug_info['admin_auth_ready']:
-                st.warning("⚠️ Client SDK Limited (Admin SDK Available)")
-            else:
-                st.error("❌ Firebase Client SDK Not Ready")
-        
-        # Show configuration debug info
-        with st.expander("🔍 Configuration Debug Info"):
-            st.markdown(f"""
-            <div class="config-debug">
-            <strong>Library Status:</strong><br>
-            • Firebase Admin: {'✅' if debug_info['firebase_admin_available'] else '❌'}<br>
-            • Pyrebase4: {'✅' if debug_info['pyrebase_available'] else '❌'}<br>
-            
-            <strong>Configuration Status:</strong><br>
-            • Secrets Available: {'✅' if debug_info['secrets_available'] else '❌'}<br>
-            • Server Config: {'✅' if debug_info['server_config_complete'] else '❌'}<br>
-            • Client Config: {'✅' if debug_info['client_config_complete'] else '❌'}<br>
-            
-            <strong>Authentication Methods:</strong><br>
-            • Admin Auth: {'✅' if debug_info['admin_auth_ready'] else '❌'}<br>
-            • Client Auth: {'✅' if debug_info['client_auth_ready'] else '❌'}<br>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            if debug_info['missing_server_fields']:
-                st.error(f"Missing server fields: {', '.join(debug_info['missing_server_fields'])}")
-            
-            if debug_info['missing_client_fields']:
-                st.warning(f"Missing client fields: {', '.join(debug_info['missing_client_fields'])}")
-                st.info("💡 Client-side fields are needed for full authentication features like password reset.")
-    
     if not firebase_initialized:
         st.markdown("""
         <div class="demo-banner">
-            🔧 <strong>Demo Mode</strong> - Firebase configuration incomplete or missing. You can use all features without authentication.
+            🔧 <strong>Demo Mode</strong> - Firebase configuration incomplete. You can use all enterprise features without authentication.
         </div>
         """, unsafe_allow_html=True)
         
-        with st.expander("📝 How to Configure Firebase (Complete Guide)"):
-            st.markdown("""
-            **Step 1: Create Firebase Project**
-            1. Go to [Firebase Console](https://console.firebase.google.com/)
-            2. Create a new project
-            3. Enable Authentication → Email/Password
-            4. Enable Firestore Database
-            
-            **Step 2: Get Server-side Configuration (Admin SDK)**
-            1. Project Settings → Service Accounts → Generate new private key
-            2. Download the JSON file
-            
-            **Step 3: Get Client-side Configuration (Web SDK)**
-            1. Project Settings → General → Your Apps
-            2. Click Web icon (</>) if no web app exists
-            3. Register app and copy the config object
-            
-            **Step 4: Add to Streamlit Secrets**
-            Create `.streamlit/secrets.toml` with:
-            ```toml
-            [firebase]
-            # Server-side (from downloaded JSON)
-            type = "service_account"
-            project_id = "your-project-id"
-            private_key = "-----BEGIN PRIVATE KEY-----\\nYOUR_KEY\\n-----END PRIVATE KEY-----\\n"
-            client_email = "firebase-adminsdk-xxxxx@your-project.iam.gserviceaccount.com"
-            
-            # Client-side (from web app config) - REQUIRED for full auth
-            api_key = "AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
-            auth_domain = "your-project-id.firebaseapp.com"
-            storage_bucket = "your-project-id.appspot.com"
-            messaging_sender_id = "123456789012"
-            app_id = "1:123456789012:web:abcdef1234567890abcdef"
-            ```
-            
-            **Note:** You can use the platform without Firebase authentication in demo mode.
-            """)
-        
-        if st.button("🚀 Continue to Platform (Demo Mode)", type="primary"):
+        if st.button("🚀 Continue to Enterprise Platform (Demo Mode)", type="primary"):
             st.session_state.authenticated = True
             st.session_state.demo_mode = True
             st.session_state.user_info = {
-                'display_name': 'Demo User',
-                'email': 'demo@example.com',
+                'display_name': 'Enterprise Demo User',
+                'email': 'demo@enterprise.com',
                 'role': 'demo'
             }
             st.rerun()
@@ -1283,61 +2218,44 @@ def render_authentication():
     if st.session_state.get('authenticated', False):
         return True
     
-    # Show authentication status
-    if firebase_auth.auth_client:
-        st.success("🔥 Firebase Full Authentication Available")
-    else:
-        st.info("🔥 Firebase Admin Connected (Limited client-side features)")
-        if debug_info['missing_client_fields']:
-            st.markdown("*Missing client-side config for password reset and email verification*")
-    
-    # Authentication tabs
-    auth_tab1, auth_tab2, auth_tab3, auth_tab4 = st.tabs(["🔐 Sign In", "📝 Sign Up", "🔄 Reset Password", "🚀 Demo Mode"])
+    # Authentication tabs with enhanced styling
+    auth_tab1, auth_tab2, auth_tab3 = st.tabs(["🔐 Sign In", "📝 Sign Up", "🚀 Demo Mode"])
     
     with auth_tab1:
         render_sign_in(firebase_auth)
     
     with auth_tab2:
         render_sign_up(firebase_auth)
-    
-    with auth_tab3:
-        render_password_reset(firebase_auth)
         
-    with auth_tab4:
+    with auth_tab3:
         st.markdown("""
         <div class="auth-container">
-            <h3 style="text-align: center; margin-bottom: 1rem;">Demo Mode</h3>
-            <p>Try the platform without authentication. All features are available.</p>
+            <h3 style="text-align: center; margin-bottom: 1rem;">Enterprise Demo Mode</h3>
+            <p>Experience the full enterprise platform without authentication. All advanced features including Reserved Instances, Savings Plans, and TCO analysis are available.</p>
         </div>
         """, unsafe_allow_html=True)
         
-        if st.button("🚀 Enter Demo Mode", type="primary", use_container_width=True):
+        if st.button("🚀 Enter Enterprise Demo Mode", type="primary", use_container_width=True):
             st.session_state.authenticated = True
             st.session_state.demo_mode = True
             st.session_state.user_info = {
-                'display_name': 'Demo User',
-                'email': 'demo@example.com',
+                'display_name': 'Enterprise Demo User',
+                'email': 'demo@enterprise.com',
                 'role': 'demo'
             }
-            st.success("Welcome to Demo Mode!")
+            st.success("Welcome to Enterprise Demo Mode!")
             time.sleep(1)
             st.rerun()
     
     return False
 
 def render_sign_in(firebase_auth):
-    """Render sign in form with enhanced feedback."""
+    """Render sign in form."""
     st.markdown("""
     <div class="auth-container">
-        <h3 style="text-align: center; margin-bottom: 1rem;">Sign In</h3>
+        <h3 style="text-align: center; margin-bottom: 1rem;">Enterprise Sign In</h3>
     </div>
     """, unsafe_allow_html=True)
-    
-    # Show available authentication methods
-    if firebase_auth.auth_client:
-        st.info("🔐 Full authentication available")
-    elif firebase_auth.admin_auth_available:
-        st.warning("⚠️ Limited authentication (Admin SDK only)")
     
     with st.form("sign_in_form"):
         email = st.text_input("Email", placeholder="your.email@company.com")
@@ -1361,8 +2279,6 @@ def render_sign_in(firebase_auth):
                             st.session_state.id_token = user_data['id_token']
                         st.session_state.demo_mode = False
                         st.success(message)
-                        if 'auth_method' in user_data:
-                            st.info(f"Authentication method: {user_data['auth_method']}")
                         time.sleep(1)
                         st.rerun()
                     else:
@@ -1371,18 +2287,12 @@ def render_sign_in(firebase_auth):
                 st.error("Please enter both email and password.")
 
 def render_sign_up(firebase_auth):
-    """Render sign up form with enhanced feedback."""
+    """Render sign up form."""
     st.markdown("""
     <div class="auth-container">
-        <h3 style="text-align: center; margin-bottom: 1rem;">Create Account</h3>
+        <h3 style="text-align: center; margin-bottom: 1rem;">Create Enterprise Account</h3>
     </div>
     """, unsafe_allow_html=True)
-    
-    # Show available authentication methods
-    if firebase_auth.auth_client:
-        st.info("🔐 Full account creation with email verification")
-    elif firebase_auth.admin_auth_available:
-        st.warning("⚠️ Account creation via Admin SDK (no email verification required)")
     
     with st.form("sign_up_form"):
         display_name = st.text_input("Full Name", placeholder="John Doe")
@@ -1409,42 +2319,8 @@ def render_sign_up(firebase_auth):
                     
                     if success:
                         st.success(message)
-                        if firebase_auth.auth_client:
-                            st.info("Please check your email and verify your account before signing in.")
-                        else:
-                            st.info("Account created! You can now sign in immediately.")
                     else:
                         st.error(message)
-
-def render_password_reset(firebase_auth):
-    """Render password reset form with enhanced feedback."""
-    st.markdown("""
-    <div class="auth-container">
-        <h3 style="text-align: center; margin-bottom: 1rem;">Reset Password</h3>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    if not firebase_auth.auth_client:
-        st.warning("⚠️ Password reset requires client-side Firebase configuration.")
-        st.info("💡 Add client-side config to enable this feature.")
-        return
-    
-    with st.form("password_reset_form"):
-        email = st.text_input("Email", placeholder="your.email@company.com")
-        
-        reset_button = st.form_submit_button("🔄 Send Reset Email", use_container_width=True)
-        
-        if reset_button:
-            if email:
-                with st.spinner("Sending reset email..."):
-                    success, message = firebase_auth.reset_password(email)
-                    
-                    if success:
-                        st.success(message)
-                    else:
-                        st.error(message)
-            else:
-                st.error("Please enter your email address.")
 
 def render_user_info():
     """Render user information in sidebar."""
@@ -1455,9 +2331,9 @@ def render_user_info():
         if is_demo:
             st.markdown(f"""
             <div class="user-info">
-                <strong>👤 {user_info.get('display_name', 'Demo User')}</strong><br>
-                <small>{user_info.get('email', 'demo@example.com')}</small><br>
-                <span class="status-badge status-demo">Demo Mode</span>
+                <strong>👤 {user_info.get('display_name', 'Enterprise Demo User')}</strong><br>
+                <small>{user_info.get('email', 'demo@enterprise.com')}</small><br>
+                <span class="status-badge status-demo">Enterprise Demo</span>
             </div>
             """, unsafe_allow_html=True)
         else:
@@ -1487,608 +2363,9 @@ def render_user_info():
             time.sleep(1)
             st.rerun()
 
-# All other functions remain exactly the same as the original file...
-# (initialize_session_state, parse_bulk_upload_file, render_workload_configuration, etc.)
-
-# Initialize session state
-def initialize_session_state():
-    """Initialize session state."""
-    if 'authenticated' not in st.session_state:
-        st.session_state.authenticated = False
-    if 'demo_mode' not in st.session_state:
-        st.session_state.demo_mode = False
-    if 'user_info' not in st.session_state:
-        st.session_state.user_info = {}
-    if 'calculator' not in st.session_state:
-        st.session_state.calculator = EnterpriseEC2WorkloadSizingCalculator()
-    if 'pdf_generator' not in st.session_state and REPORTLAB_AVAILABLE:
-        try:
-            st.session_state.pdf_generator = EnhancedPDFReportGenerator()
-        except Exception:
-            st.session_state.pdf_generator = None
-    if 'analysis_results' not in st.session_state:
-        st.session_state.analysis_results = None
-    if 'bulk_results' not in st.session_state:
-        st.session_state.bulk_results = []
-
-# Helper functions for bulk upload and file parsing
-def parse_bulk_upload_file(uploaded_file):
-    """Parse bulk upload file."""
-    try:
-        if uploaded_file.name.endswith('.csv'):
-            df = pd.read_csv(uploaded_file)
-        else:
-            df = pd.read_excel(uploaded_file)
-        
-        expected_columns = {
-            'Workload Name': 'workload_name',
-            'Workload Type': 'workload_type', 
-            'Operating System': 'operating_system',
-            'AWS Region': 'region',
-            'Current CPU Cores': 'on_prem_cores',
-            'Peak CPU Utilization (%)': 'peak_cpu_percent',
-            'Current RAM (GB)': 'on_prem_ram_gb',
-            'Peak RAM Utilization (%)': 'peak_ram_percent',
-            'Current Storage (GB)': 'storage_current_gb',
-            'Storage Growth Rate': 'storage_growth_rate',
-            'Peak IOPS': 'peak_iops',
-            'Peak Throughput (MB/s)': 'peak_throughput_mbps',
-            'Growth Projection Years': 'years',
-            'Prefer AMD': 'prefer_amd'
-        }
-        
-        df_mapped = pd.DataFrame()
-        found_columns = []
-        for user_col, internal_col in expected_columns.items():
-            if user_col in df.columns:
-                df_mapped[internal_col] = df[user_col]
-                found_columns.append(internal_col)
-        
-        required_columns = ['workload_name', 'workload_type', 'operating_system', 'on_prem_cores', 'on_prem_ram_gb']
-        missing_columns = [col for col in required_columns if col not in found_columns]
-        
-        if missing_columns:
-            return [], [f"Missing required columns: {', '.join(missing_columns)}"]
-        
-        valid_inputs = []
-        errors = []
-        
-        for index, row in df_mapped.iterrows():
-            row_data = {}
-            row_errors = []
-            
-            for col in df_mapped.columns:
-                value = row.get(col)
-                if pd.isna(value) or value is None:
-                    if col in required_columns:
-                        row_errors.append(f"Required field '{col}' is empty")
-                    else:
-                        defaults = {
-                            'region': 'us-east-1', 'storage_growth_rate': 0.15,
-                            'peak_iops': 5000, 'peak_throughput_mbps': 250,
-                            'years': 3, 'prefer_amd': True
-                        }
-                        row_data[col] = defaults.get(col, 0)
-                else:
-                    try:
-                        if col in ['prefer_amd']:
-                            row_data[col] = str(value).lower() in ['true', '1', 'yes']
-                        elif col in ['workload_name', 'workload_type', 'operating_system', 'region']:
-                            row_data[col] = str(value).strip()
-                        else:
-                            row_data[col] = float(value) if '.' in str(value) else int(value)
-                    except (ValueError, TypeError):
-                        row_errors.append(f"Invalid value for '{col}': {value}")
-            
-            if row_errors:
-                errors.append(f"Row {index + 2}: {'; '.join(row_errors)}")
-            else:
-                valid_inputs.append(row_data)
-        
-        return valid_inputs, errors
-        
-    except Exception as e:
-        return [], [f"File parsing error: {str(e)}"]
-
-def render_workload_configuration():
-    """Render workload configuration interface."""
-    calculator = st.session_state.calculator
-    
-    st.markdown('<div class="section-header"><h3>🏗️ Workload Configuration</h3></div>', unsafe_allow_html=True)
-    
-    with st.expander("📋 Basic Information", expanded=True):
-        col1, col2 = st.columns(2)
-        with col1:
-            calculator.inputs["workload_name"] = st.text_input(
-                "Workload Name", 
-                value=calculator.inputs["workload_name"],
-                help="Descriptive name for this workload"
-            )
-            
-            workload_options = list(calculator.WORKLOAD_PROFILES.keys())
-            workload_labels = [calculator.WORKLOAD_PROFILES[k]["name"] for k in workload_options]
-            current_workload_idx = workload_options.index(calculator.inputs["workload_type"])
-            
-            selected_workload_idx = st.selectbox(
-                "Workload Type",
-                range(len(workload_options)),
-                index=current_workload_idx,
-                format_func=lambda x: workload_labels[x]
-            )
-            calculator.inputs["workload_type"] = workload_options[selected_workload_idx]
-            
-        with col2:
-            os_options = ["linux", "windows"]
-            os_labels = ["Linux (Amazon Linux, Ubuntu, RHEL)", "Windows Server"]
-            current_os_idx = os_options.index(calculator.inputs["operating_system"])
-            
-            selected_os_idx = st.selectbox(
-                "Operating System",
-                range(len(os_options)),
-                index=current_os_idx,
-                format_func=lambda x: os_labels[x]
-            )
-            calculator.inputs["operating_system"] = os_options[selected_os_idx]
-            
-            # Updated region selection with Asia Pacific regions
-            region_options = [
-                "us-east-1", "us-west-1", "us-west-2", 
-                "eu-west-1", "eu-central-1",
-                "ap-southeast-1", "ap-southeast-2", "ap-northeast-1", 
-                "ap-northeast-2", "ap-south-1", "ap-east-1"
-            ]
-            region_labels = [
-                "US East (N. Virginia)", "US West (N. California)", "US West (Oregon)",
-                "Europe (Ireland)", "Europe (Frankfurt)", 
-                "Asia Pacific (Singapore)", "Asia Pacific (Sydney)", "Asia Pacific (Tokyo)",
-                "Asia Pacific (Seoul)", "Asia Pacific (Mumbai)", "Asia Pacific (Hong Kong)"
-            ]
-            
-            current_region_idx = region_options.index(calculator.inputs["region"])
-            
-            selected_region_idx = st.selectbox(
-                "AWS Region",
-                range(len(region_options)),
-                index=current_region_idx,
-                format_func=lambda x: region_labels[x],
-                help="Select AWS region for deployment and pricing"
-            )
-            calculator.inputs["region"] = region_options[selected_region_idx]
-    
-    selected_profile = calculator.WORKLOAD_PROFILES[calculator.inputs["workload_type"]]
-    st.info(f"**{selected_profile['name']}**: {selected_profile['description']}")
-    
-    with st.expander("🖥️ Current Infrastructure Metrics", expanded=True):
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            st.markdown("**Compute Resources**")
-            calculator.inputs["on_prem_cores"] = st.number_input(
-                "CPU Cores", min_value=1, value=calculator.inputs["on_prem_cores"]
-            )
-            calculator.inputs["peak_cpu_percent"] = st.slider(
-                "Peak CPU %", 0, 100, calculator.inputs["peak_cpu_percent"]
-            )
-            calculator.inputs["avg_cpu_percent"] = st.slider(
-                "Average CPU %", 0, 100, calculator.inputs["avg_cpu_percent"]
-            )
-            
-        with col2:
-            st.markdown("**Memory Resources**")
-            calculator.inputs["on_prem_ram_gb"] = st.number_input(
-                "RAM (GB)", min_value=1, value=calculator.inputs["on_prem_ram_gb"]
-            )
-            calculator.inputs["peak_ram_percent"] = st.slider(
-                "Peak RAM %", 0, 100, calculator.inputs["peak_ram_percent"]
-            )
-            calculator.inputs["avg_ram_percent"] = st.slider(
-                "Average RAM %", 0, 100, calculator.inputs["avg_ram_percent"]
-            )
-            
-        with col3:
-            st.markdown("**Storage & I/O**")
-            calculator.inputs["storage_current_gb"] = st.number_input(
-                "Storage (GB)", min_value=1, value=calculator.inputs["storage_current_gb"]
-            )
-            calculator.inputs["peak_iops"] = st.number_input(
-                "Peak IOPS", min_value=1, value=calculator.inputs["peak_iops"]
-            )
-            calculator.inputs["peak_throughput_mbps"] = st.number_input(
-                "Peak Throughput (MB/s)", min_value=1, value=calculator.inputs["peak_throughput_mbps"]
-            )
-    
-    with st.expander("⚙️ Advanced Configuration"):
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            calculator.inputs["storage_growth_rate"] = st.number_input(
-                "Annual Growth Rate", min_value=0.0, max_value=1.0, 
-                value=calculator.inputs["storage_growth_rate"], step=0.01, format="%.2f"
-            )
-            calculator.inputs["years"] = st.slider(
-                "Growth Projection (Years)", 1, 10, calculator.inputs["years"]
-            )
-            calculator.inputs["seasonality_factor"] = st.number_input(
-                "Seasonality Factor", min_value=1.0, max_value=3.0, 
-                value=calculator.inputs["seasonality_factor"], step=0.1
-            )
-            
-        with col2:
-            calculator.inputs["prefer_amd"] = st.checkbox(
-                "Prefer AMD Instances", value=calculator.inputs["prefer_amd"]
-            )
-
-def render_analysis_results(results):
-    """Render analysis results."""
-    st.markdown('<div class="section-header"><h3>📊 Analysis Results</h3></div>', unsafe_allow_html=True)
-    
-    summary = st.session_state.calculator.get_workload_summary()
-    
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-title">Workload Information</div>
-            <div class="metric-value">{summary['workload_type']}</div>
-            <div class="metric-description">{summary['workload_description']}</div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-    with col2:
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-title">Operating System</div>
-            <div class="metric-value">{summary['operating_system']}</div>
-            <div class="metric-description">{summary['os_description']}</div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-    with col3:
-        total_prod_cost = results['PROD']['total_cost']
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-title">Production Monthly Cost</div>
-            <div class="metric-value">${total_prod_cost:,.2f}</div>
-            <div class="metric-description">Annual: ${total_prod_cost * 12:,.2f}</div>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    st.subheader("Environment Comparison")
-    
-    df_results = pd.DataFrame.from_dict(results, orient='index').reset_index()
-    df_results.rename(columns={"index": "Environment"}, inplace=True)
-    
-    display_columns = ["Environment", "instance_type", "vCPUs", "RAM_GB", "storage_GB", "ebs_type", "total_cost", "optimization_score"]
-    df_display = df_results[display_columns].copy()
-    df_display["total_cost"] = df_display["total_cost"].apply(lambda x: f"${x:,.2f}")
-    df_display["optimization_score"] = df_display["optimization_score"].apply(lambda x: f"{x}%")
-    df_display.columns = ["Environment", "Instance Type", "vCPUs", "RAM (GB)", "Storage (GB)", "EBS Type", "Monthly Cost", "Optimization"]
-    
-    st.dataframe(df_display, use_container_width=True)
-    
-    # Cost breakdown
-    st.subheader("Cost Analysis")
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        cost_data = []
-        for env, rec in results.items():
-            cost_data.append({
-                'Environment': env,
-                'Instance': rec['instance_cost'],
-                'Storage': rec['ebs_cost'],
-                'Network': rec['network_cost']
-            })
-        
-        df_costs = pd.DataFrame(cost_data)
-        fig_costs = px.bar(df_costs, x='Environment', y=['Instance', 'Storage', 'Network'],
-                          title='Cost Breakdown by Environment', barmode='stack')
-        fig_costs.update_layout(height=400)
-        st.plotly_chart(fig_costs, use_container_width=True)
-        
-    with col2:
-        opt_data = [{'Environment': env, 'Score': rec['optimization_score']} for env, rec in results.items()]
-        df_opt = pd.DataFrame(opt_data)
-        
-        fig_opt = px.bar(df_opt, x='Environment', y='Score', title='Resource Optimization Scores',
-                        color='Score', color_continuous_scale='RdYlGn')
-        fig_opt.update_layout(height=400)
-        st.plotly_chart(fig_opt, use_container_width=True)
-
-def render_bulk_analysis():
-    """Render bulk analysis interface."""
-    st.markdown('<div class="section-header"><h3>📁 Bulk Workload Analysis</h3></div>', unsafe_allow_html=True)
-    
-    st.markdown("Upload a CSV or Excel file containing multiple workload configurations for batch analysis.")
-    
-    # Updated template with Asia Pacific examples
-    if st.button("📥 Download Template"):
-        template_data = {
-            'Workload Name': ['Web Frontend', 'API Gateway', 'Database Server', 'File Server', 'Analytics Engine', 'Mobile Backend'],
-            'Workload Type': ['web_application', 'application_server', 'database_server', 'file_server', 'compute_intensive', 'application_server'],
-            'Operating System': ['linux', 'linux', 'windows', 'windows', 'linux', 'linux'],
-            'AWS Region': ['us-east-1', 'eu-west-1', 'ap-southeast-1', 'us-west-2', 'ap-northeast-1', 'ap-south-1'],
-            'Current CPU Cores': [8, 16, 32, 4, 24, 12],
-            'Peak CPU Utilization (%)': [75, 60, 80, 40, 90, 65],
-            'Current RAM (GB)': [32, 64, 128, 16, 96, 48],
-            'Peak RAM Utilization (%)': [80, 70, 85, 60, 88, 75],
-            'Current Storage (GB)': [500, 1000, 5000, 10000, 2000, 800],
-            'Storage Growth Rate': [0.15, 0.10, 0.20, 0.25, 0.30, 0.12],
-            'Peak IOPS': [5000, 8000, 15000, 3000, 12000, 6000],
-            'Peak Throughput (MB/s)': [250, 400, 800, 200, 600, 300],
-            'Growth Projection Years': [3, 3, 5, 3, 2, 4],
-            'Prefer AMD': [True, True, False, True, True, False]
-        }
-        
-        template_df = pd.DataFrame(template_data)
-        csv_buffer = BytesIO()
-        template_df.to_csv(csv_buffer, index=False)
-        csv_buffer.seek(0)
-        
-        st.download_button(
-            label="Download Template",
-            data=csv_buffer.getvalue(),
-            file_name="workload_analysis_template.csv",
-            mime="text/csv"
-        )
-    
-    uploaded_file = st.file_uploader("Upload Workload Configuration File", type=["csv", "xlsx"])
-    
-    if uploaded_file:
-        with st.spinner("🔄 Processing uploaded file..."):
-            valid_inputs, errors = parse_bulk_upload_file(uploaded_file)
-        
-        if errors:
-            st.error("❌ **Errors found in uploaded file:**")
-            for error in errors:
-                st.write(f"• {error}")
-            return
-        
-        if not valid_inputs:
-            st.warning("No valid workload configurations found.")
-            return
-        
-        st.success(f"✅ Successfully parsed {len(valid_inputs)} workload configurations.")
-        
-        with st.expander("👀 Preview Uploaded Data", expanded=True):
-            preview_df = pd.DataFrame(valid_inputs)
-            st.dataframe(preview_df.head(10), use_container_width=True)
-        
-        if st.button(f"🚀 Analyze {len(valid_inputs)} Workloads", type="primary"):
-            analyze_bulk_workloads(valid_inputs)
-
-def analyze_bulk_workloads(workload_configs):
-    """Analyze multiple workloads."""
-    calculator = st.session_state.calculator
-    all_results = []
-    
-    progress_text = st.empty()
-    progress_bar = st.progress(0)
-    
-    try:
-        calculator.fetch_current_prices(force_refresh=True)
-        
-        for i, config in enumerate(workload_configs):
-            workload_name = config.get('workload_name', f'Workload {i+1}')
-            progress_text.text(f"Analyzing {workload_name} ({i+1}/{len(workload_configs)})...")
-            progress_bar.progress((i + 1) / len(workload_configs))
-            
-            calculator.inputs.update(config)
-            recommendations = calculator.generate_all_recommendations()
-            
-            all_results.append({'inputs': config, 'recommendations': recommendations})
-            time.sleep(0.1)
-        
-        st.session_state.bulk_results = all_results
-        progress_text.empty()
-        progress_bar.empty()
-        
-        st.success("✅ Bulk analysis completed successfully!")
-        display_bulk_analysis_results(all_results)
-        
-    except Exception as e:
-        st.error(f"❌ Error during bulk analysis: {str(e)}")
-    finally:
-        progress_text.empty()
-        progress_bar.empty()
-
-def display_bulk_analysis_results(all_results):
-    """Display bulk analysis results."""
-    st.markdown('<div class="section-header"><h3>📈 Bulk Analysis Results</h3></div>', unsafe_allow_html=True)
-    
-    total_workloads = len(all_results)
-    total_monthly_cost = sum(result['recommendations']['PROD']['total_cost'] for result in all_results)
-    avg_optimization_score = sum(result['recommendations']['PROD']['optimization_score'] for result in all_results) / total_workloads
-    
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-title">Total Workloads</div>
-            <div class="metric-value">{total_workloads}</div>
-            <div class="metric-description">Analyzed successfully</div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-    with col2:
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-title">Total Monthly Cost</div>
-            <div class="metric-value">${total_monthly_cost:,.0f}</div>
-            <div class="metric-description">Production environments</div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-    with col3:
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-title">Annual Cost</div>
-            <div class="metric-value">${total_monthly_cost * 12:,.0f}</div>
-            <div class="metric-description">Full year projection</div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-    with col4:
-        score_color = "green" if avg_optimization_score >= 80 else "orange" if avg_optimization_score >= 60 else "red"
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-title">Avg Optimization</div>
-            <div class="metric-value" style="color: {score_color}">{avg_optimization_score:.1f}%</div>
-            <div class="metric-description">Resource efficiency</div>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    st.subheader("Workload Summary")
-    
-    summary_data = []
-    for result in all_results:
-        inputs = result['inputs']
-        prod_rec = result['recommendations']['PROD']
-        
-        summary_data.append({
-            'Workload': inputs.get('workload_name', 'N/A'),
-            'Type': inputs.get('workload_type', 'N/A').replace('_', ' ').title(),
-            'OS': inputs.get('operating_system', 'N/A').title(),
-            'Region': inputs.get('region', 'N/A'),
-            'Instance': prod_rec.get('instance_type', 'N/A'),
-            'vCPUs': prod_rec.get('vCPUs', 'N/A'),
-            'RAM (GB)': prod_rec.get('RAM_GB', 'N/A'),
-            'Monthly Cost': prod_rec.get('total_cost', 0),
-            'Optimization': f"{prod_rec.get('optimization_score', 0)}%"
-        })
-    
-    summary_df = pd.DataFrame(summary_data)
-    summary_df['Monthly Cost'] = summary_df['Monthly Cost'].apply(lambda x: f"${x:,.2f}")
-    
-    st.dataframe(summary_df, use_container_width=True)
-
-def render_reports_export():
-    """Render reports and export interface."""
-    st.markdown('<div class="section-header"><h3>📋 Reports & Export Center</h3></div>', unsafe_allow_html=True)
-    
-    has_single_results = st.session_state.analysis_results is not None
-    has_bulk_results = len(st.session_state.bulk_results) > 0
-    
-    if not has_single_results and not has_bulk_results:
-        st.info("💡 No analysis results available. Please run a workload analysis first.")
-        return
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown("""
-        <div class="metric-card">
-            <div class="metric-title">📊 Executive Excel Report</div>
-            <div class="metric-description">Comprehensive spreadsheet with detailed analysis and cost breakdowns.</div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        if st.button("📈 Generate Excel Report", key="excel_report"):
-            generate_excel_report()
-    
-    with col2:
-        if REPORTLAB_AVAILABLE and st.session_state.get('pdf_generator'):
-            st.markdown("""
-            <div class="metric-card">
-                <div class="metric-title">📄 Executive PDF Report</div>
-                <div class="metric-description">Professional PDF summary for executive presentations.</div>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            if st.button("📄 Generate PDF Report", key="pdf_report"):
-                generate_pdf_report()
-        else:
-            st.markdown("""
-            <div class="metric-card">
-                <div class="metric-title">📄 PDF Reports</div>
-                <div class="metric-description">PDF generation unavailable. ReportLab not installed.</div>
-            </div>
-            """, unsafe_allow_html=True)
-
-def generate_excel_report():
-    """Generate Excel report."""
-    try:
-        if st.session_state.bulk_results:
-            results_to_export = st.session_state.bulk_results
-        elif st.session_state.analysis_results:
-            results_to_export = [st.session_state.analysis_results]
-        else:
-            st.error("No results available for export.")
-            return
-        
-        with st.spinner("🔄 Generating Excel report..."):
-            output = io.BytesIO()
-            
-            with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                summary_data = []
-                for result in results_to_export:
-                    inputs = result['inputs']
-                    prod_rec = result['recommendations']['PROD']
-                    
-                    summary_data.append({
-                        'Workload Name': inputs.get('workload_name', 'N/A'),
-                        'Workload Type': inputs.get('workload_type', 'N/A').replace('_', ' ').title(),
-                        'Operating System': inputs.get('operating_system', 'N/A').title(),
-                        'AWS Region': inputs.get('region', 'N/A'),
-                        'Current Cores': inputs.get('on_prem_cores', 'N/A'),
-                        'Current RAM (GB)': inputs.get('on_prem_ram_gb', 'N/A'),
-                        'Recommended Instance': prod_rec.get('instance_type', 'N/A'),
-                        'Recommended vCPUs': prod_rec.get('vCPUs', 'N/A'),
-                        'Recommended RAM (GB)': prod_rec.get('RAM_GB', 'N/A'),
-                        'Storage (GB)': prod_rec.get('storage_GB', 'N/A'),
-                        'Monthly Cost': prod_rec.get('total_cost', 0),
-                        'Annual Cost': prod_rec.get('total_cost', 0) * 12,
-                        'Optimization Score': prod_rec.get('optimization_score', 'N/A')
-                    })
-                
-                summary_df = pd.DataFrame(summary_data)
-                summary_df.to_excel(writer, sheet_name='Executive Summary', index=False)
-            
-            output.seek(0)
-            
-            st.download_button(
-                label="📥 Download Excel Report",
-                data=output.getvalue(),
-                file_name=f"aws_workload_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
-            
-            st.success("✅ Excel report generated successfully!")
-            
-    except Exception as e:
-        st.error(f"❌ Error generating Excel report: {str(e)}")
-
-def generate_pdf_report():
-    """Generate PDF report."""
-    try:
-        if st.session_state.bulk_results:
-            results_to_export = st.session_state.bulk_results
-        elif st.session_state.analysis_results:
-            results_to_export = [st.session_state.analysis_results]
-        else:
-            st.error("No results available for export.")
-            return
-        
-        with st.spinner("🔄 Generating PDF report..."):
-            pdf_data = st.session_state.pdf_generator.generate_comprehensive_report(results_to_export)
-            
-            st.download_button(
-                label="📥 Download PDF Report",
-                data=pdf_data,
-                file_name=f"aws_workload_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
-                mime="application/pdf"
-            )
-            
-            st.success("✅ PDF report generated successfully!")
-            
-    except Exception as e:
-        st.error(f"❌ Error generating PDF report: {str(e)}")
-
 # Main application
 def main():
-    """Main application entry point."""
+    """Main application entry point with enhanced enterprise features."""
     initialize_session_state()
     
     # Check authentication
@@ -2100,26 +2377,32 @@ def main():
     if st.session_state.get('demo_mode', False):
         st.markdown("""
         <div class="demo-banner">
-            🔧 <strong>Demo Mode Active</strong> - Full functionality available without authentication
+            🔧 <strong>Enterprise Demo Mode Active</strong> - Full functionality including Reserved Instances, Savings Plans, and advanced TCO analysis
         </div>
         """, unsafe_allow_html=True)
     
-    # Main application
+    # Main application header
     st.markdown("""
     <div class="main-header">
-        <h1>🏢 Enterprise AWS Workload Sizing Platform</h1>
-        <p>Comprehensive infrastructure assessment and cloud migration planning for enterprise workloads</p>
+        <h1>🏢 Enterprise AWS Workload Sizing Platform v4.0</h1>
+        <span class="enterprise-badge">Enterprise Edition</span>
+        <p>Advanced cloud migration planning with Reserved Instances, Savings Plans, comprehensive TCO analysis, and enterprise-grade features</p>
     </div>
     """, unsafe_allow_html=True)
     
     with st.sidebar:
-        st.markdown("### 🔧 Global Configuration")
+        st.markdown("### 🔧 Enterprise Configuration")
         
         # User info
         render_user_info()
         
         calculator = st.session_state.calculator
-        cred_status, cred_message = calculator.validate_aws_credentials()
+        
+        # AWS Connection Status
+        try:
+            cred_status, cred_message = calculator.validate_aws_credentials()
+        except:
+            cred_status, cred_message = False, "❌ AWS credentials validation failed"
         
         if cred_status:
             st.markdown(f'<span class="status-badge status-success">AWS Connected</span>', unsafe_allow_html=True)
@@ -2129,82 +2412,224 @@ def main():
         st.markdown(f"<small>{cred_message}</small>", unsafe_allow_html=True)
         st.markdown("---")
         
+        # Quick Enterprise Stats
         if st.session_state.analysis_results or st.session_state.bulk_results:
-            st.markdown("### 📈 Quick Stats")
+            st.markdown("### 📈 Enterprise Analytics")
             
             if st.session_state.bulk_results:
                 total_workloads = len(st.session_state.bulk_results)
-                total_cost = sum(r['recommendations']['PROD']['total_cost'] for r in st.session_state.bulk_results)
+                total_cost = sum(r['recommendations']['PROD']['cost_breakdown']['total_costs'].get('on_demand', 0) for r in st.session_state.bulk_results)
+                total_savings = sum(r['recommendations']['PROD']['tco_analysis']['monthly_savings'] for r in st.session_state.bulk_results)
             else:
                 total_workloads = 1
-                total_cost = st.session_state.analysis_results['recommendations']['PROD']['total_cost']
+                total_cost = st.session_state.analysis_results['recommendations']['PROD']['cost_breakdown']['total_costs'].get('on_demand', 0)
+                total_savings = st.session_state.analysis_results['recommendations']['PROD']['tco_analysis']['monthly_savings']
             
             st.metric("Workloads Analyzed", total_workloads)
-            st.metric("Monthly Cost (PROD)", f"${total_cost:,.2f}")
-            st.metric("Annual Cost (PROD)", f"${total_cost * 12:,.2f}")
+            st.metric("Monthly Cost (On-Demand)", f"${total_cost:,.2f}")
+            st.metric("Potential Monthly Savings", f"${total_savings:,.2f}")
+            st.metric("Annual Savings Potential", f"${total_savings * 12:,.2f}")
         
         st.markdown("---")
         st.markdown("""
-        ### 🚀 Platform Features
+        ### 🚀 Enterprise Features
         
-        **Workload Support:**
-        - Web Applications
-        - Application Servers  
-        - Database Servers
-        - File Servers
-        - Compute Intensive
+        **Advanced Pricing:**
+        - Reserved Instances (1Y & 3Y)
+        - Savings Plans (Compute & EC2)
+        - Spot Instance Integration
+        - Mixed Pricing Strategies
         
-        **Operating Systems:**
-        - Linux (Amazon Linux, Ubuntu, RHEL)
-        - Windows Server
+        **Enterprise Architecture:**
+        - Multi-AZ Deployments
+        - Graviton Processor Support
+        - Auto Scaling Integration
+        - Load Balancer Optimization
         
-        **Global Coverage:**
-        - US: East, West (N. Cal), West (Oregon)
-        - Europe: Ireland, Frankfurt
-        - Asia Pacific: Singapore, Sydney, Tokyo, Seoul, Mumbai, Hong Kong
+        **Compliance & Security:**
+        - SOC 2, PCI-DSS, HIPAA, FedRAMP
+        - Enhanced Monitoring Options
+        - Disaster Recovery Planning
+        - Security Best Practices
+        
+        **Advanced Analytics:**
+        - Total Cost of Ownership (TCO)
+        - ROI Calculations
+        - Migration Risk Assessment
+        - Optimization Recommendations
         """)
     
-    tab1, tab2, tab3 = st.tabs(["⚙️ Workload Configuration", "📁 Bulk Analysis", "📋 Reports & Export"])
+    # Enhanced tab structure
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+        "⚙️ Workload Configuration", 
+        "📁 Bulk Analysis", 
+        "🚀 Migration Planning",
+        "📋 Reports & Export",
+        "🎯 Cost Optimization"
+    ])
     
     with tab1:
-        render_workload_configuration()
+        render_enhanced_workload_configuration()
         
-        if st.button("🚀 Generate Recommendations", type="primary", key="generate_single"):
-            with st.spinner("🔄 Analyzing workload requirements..."):
+        if st.button("🚀 Generate Enterprise Analysis", type="primary", key="generate_single"):
+            with st.spinner("🔄 Analyzing workload with enterprise features..."):
                 try:
-                    calculator.fetch_current_prices()
-                    results = calculator.generate_all_recommendations()
+                    results = {}
+                    for env in calculator.ENV_MULTIPLIERS.keys():
+                        results[env] = calculator.calculate_comprehensive_requirements(env)
+                    
                     st.session_state.analysis_results = {
                         'inputs': calculator.inputs.copy(),
                         'recommendations': results
                     }
                     
-                    st.success("✅ Analysis completed successfully!")
+                    st.success("✅ Enterprise analysis completed successfully!")
                     
                 except Exception as e:
                     st.error(f"❌ Error during analysis: {str(e)}")
+                    import traceback
+                    st.text(traceback.format_exc())
         
         if st.session_state.analysis_results:
             st.markdown("---")
-            render_analysis_results(st.session_state.analysis_results['recommendations'])
+            render_enhanced_analysis_results(st.session_state.analysis_results['recommendations'])
     
     with tab2:
-        render_bulk_analysis()
-        
-        if st.session_state.bulk_results:
-            st.markdown("---")
-            display_bulk_analysis_results(st.session_state.bulk_results)
+        st.markdown("### 📁 Enterprise Bulk Analysis")
+        st.info("🚧 Bulk analysis features are being enhanced for v4.0. Available in next update.")
     
     with tab3:
-        render_reports_export()
+        render_migration_planning()
     
+    with tab4:
+        st.markdown("### 📋 Enterprise Reports & Export")
+        st.info("🚧 Enhanced reporting features with TCO analysis are being developed for v4.0.")
+    
+    with tab5:
+        st.markdown("### 🎯 Advanced Cost Optimization")
+        
+        if st.session_state.analysis_results:
+            results = st.session_state.analysis_results['recommendations']['PROD']
+            
+            st.subheader("💰 Cost Optimization Dashboard")
+            
+            # Optimization opportunities
+            cost_breakdown = results['cost_breakdown']
+            total_costs = cost_breakdown['total_costs']
+            
+            # Create optimization comparison
+            optimization_data = []
+            base_cost = total_costs.get('on_demand', 0)
+            
+            for pricing_model, cost in total_costs.items():
+                if pricing_model != 'on_demand':
+                    savings = base_cost - cost
+                    savings_pct = (savings / base_cost * 100) if base_cost > 0 else 0
+                    
+                    optimization_data.append({
+                        'Strategy': pricing_model.replace('_', ' ').title(),
+                        'Monthly Cost': cost,
+                        'Monthly Savings': savings,
+                        'Savings %': savings_pct,
+                        'Annual Savings': savings * 12
+                    })
+            
+            if optimization_data:
+                df_opt = pd.DataFrame(optimization_data)
+                df_opt = df_opt.sort_values('Monthly Savings', ascending=False)
+                
+                # Format currency columns
+                df_opt['Monthly Cost'] = df_opt['Monthly Cost'].apply(lambda x: f"${x:,.2f}")
+                df_opt['Monthly Savings'] = df_opt['Monthly Savings'].apply(lambda x: f"${x:,.2f}")
+                df_opt['Annual Savings'] = df_opt['Annual Savings'].apply(lambda x: f"${x:,.2f}")
+                df_opt['Savings %'] = df_opt['Savings %'].apply(lambda x: f"{x:.1f}%")
+                
+                st.dataframe(df_opt, use_container_width=True, hide_index=True)
+        else:
+            st.info("💡 Run a workload analysis to access cost optimization features.")
+    
+    # Enhanced footer
     st.markdown("---")
     st.markdown("""
     <div style="text-align: center; color: #6b7280; font-size: 0.875rem; padding: 2rem 0;">
-        <strong>Enterprise AWS Workload Sizing Platform v3.1 with Enhanced Authentication</strong><br>
-        Secure, comprehensive cloud migration planning for enterprise infrastructure
+        <strong>Enterprise AWS Workload Sizing Platform v4.0</strong><br>
+        Advanced cloud migration planning with Reserved Instances, Savings Plans, TCO analysis, and enterprise-grade compliance features<br>
+        <em>Built for Enterprise • Comprehensive • Secure • Scalable</em>
     </div>
     """, unsafe_allow_html=True)
 
 if __name__ == "__main__":
-    main()
+    main().markdown("**Memory Resources**")
+            calculator.inputs["on_prem_ram_gb"] = st.number_input(
+                "RAM (GB)", min_value=1, value=calculator.inputs["on_prem_ram_gb"],
+                help="Total memory in gigabytes"
+            )
+            calculator.inputs["peak_ram_percent"] = st.slider(
+                "Peak RAM %", 0, 100, calculator.inputs["peak_ram_percent"],
+                help="Highest memory utilization observed"
+            )
+            calculator.inputs["avg_ram_percent"] = st.slider(
+                "Average RAM %", 0, 100, calculator.inputs["avg_ram_percent"],
+                help="Typical memory utilization"
+            )
+            
+        with col3:
+            st.markdown("**Storage & I/O**")
+            calculator.inputs["storage_current_gb"] = st.number_input(
+                "Storage (GB)", min_value=1, value=calculator.inputs["storage_current_gb"],
+                help="Current total storage requirements"
+            )
+            calculator.inputs["peak_iops"] = st.number_input(
+                "Peak IOPS", min_value=1, value=calculator.inputs["peak_iops"],
+                help="Peak Input/Output Operations Per Second"
+            )
+            calculator.inputs["peak_throughput_mbps"] = st.number_input(
+                "Peak Throughput (MB/s)", min_value=1, value=calculator.inputs["peak_throughput_mbps"],
+                help="Peak data throughput in megabytes per second"
+            )
+    
+    # Enhanced Enterprise Configuration
+    with st.expander("🏢 Enterprise Configuration & Pricing Options", expanded=True):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("**💰 Pricing Strategy**")
+            
+            pricing_options = {
+                "on_demand": "On-Demand (Pay as you go)",
+                "ri_1y": "1-Year Reserved Instances",
+                "ri_3y": "3-Year Reserved Instances", 
+                "savings_plan_compute_1y": "1-Year Compute Savings Plan",
+                "savings_plan_compute_3y": "3-Year Compute Savings Plan",
+                "mixed": "Mixed Strategy (RI + On-Demand + Spot)"
+            }
+            
+            calculator.inputs["pricing_model"] = st.selectbox(
+                "Primary Pricing Model",
+                list(pricing_options.keys()),
+                format_func=lambda x: pricing_options[x],
+                help="Choose your preferred AWS pricing strategy"
+            )
+            
+            if selected_profile["spot_suitable"]:
+                calculator.inputs["spot_percentage"] = st.slider(
+                    "Spot Instance Percentage", 0, 80, calculator.inputs.get("spot_percentage", 0),
+                    help="Percentage of workload suitable for Spot instances (up to 90% savings)"
+                )
+            
+            st.markdown("**🏗️ Architecture Options**")
+            calculator.inputs["enable_graviton"] = st.checkbox(
+                "Enable Graviton Processors", 
+                value=calculator.inputs.get("enable_graviton", True),
+                help="AWS Graviton provides up to 20% better price-performance" if selected_profile["graviton_compatible"] else "Not compatible with selected workload",
+                disabled=not selected_profile["graviton_compatible"]
+            )
+            
+            calculator.inputs["prefer_amd"] = st.checkbox(
+                "Prefer AMD Instances", 
+                value=calculator.inputs["prefer_amd"],
+                help="AMD instances typically offer 10-15% cost savings"
+            )
+            
+        with col2:
+            st
