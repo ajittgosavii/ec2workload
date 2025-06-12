@@ -2631,11 +2631,12 @@ def main():
         st.info("🚧 Bulk analysis features are being enhanced for v4.0. Available in next update.")
     
     with tab3:
-        render_migration_planning()
+        render_migration_planning() 
     
+       # Replace ONLY the tab4 section in your main() function with this correctly indented version:
+
     with tab4:
-       st.markdown("### 📋 Enterprise Reports & Export")
-        
+        st.markdown("### 📋 Enterprise Reports & Export")        
         if not st.session_state.analysis_results and not st.session_state.bulk_results:
             st.info("💡 Please run a workload analysis first to generate reports.")
         else:
