@@ -2074,15 +2074,9 @@ class EnhancedPDFReportGenerator:
         doc.build(story)
         buffer.seek(0)
         return buffer.getvalue()
-
-def render_enhanced_workload_configuration():
-    # FIND the render_enhanced_workload_configuration() function (around line 1200-1400)
-# REPLACE the existing analysis button section (near the end of the function) with this:
-
 def render_enhanced_workload_configuration():
     """Render enhanced workload configuration with enterprise features."""
     calculator = st.session_state.calculator
-    
     st.markdown('<div class="section-header"><h3>🏗️ Enterprise Workload Configuration</h3></div>', unsafe_allow_html=True)
     
     # Basic Configuration
