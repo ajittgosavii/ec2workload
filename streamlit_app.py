@@ -2634,9 +2634,159 @@ def main():
         render_migration_planning()
     
     with tab4:
-        st.markdown("### 📋 Enterprise Reports & Export")
-        st.info("🚧 Enhanced reporting features with TCO analysis are being developed for v4.0.")
-    
+       st.markdown("### 📋 Enterprise Reports & Export")
+        
+        if not st.session_state.analysis_results and not st.session_state.bulk_results:
+            st.info("💡 Please run a workload analysis first to generate reports.")
+        else:
+            # Check if ReportLab is available
+            if not REPORTLAB_AVAILABLE:
+                st.error("📄 PDF generation requires ReportLab library. Install with: `pip install reportlab`")
+                st.info("You can still export data as CSV and Excel formats.")
+            
+            # Report options
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.markdown("#### 📊 Available Reports")
+                
+                report_options = []
+                if st.session_state.analysis_results:
+                    report_options.extend([
+                        "Executive Summary",
+                        "Detailed Cost Analysis", 
+                        "Technical Specifications",
+                        "Migration Plan",
+                        "Risk Assessment"
+                    ])
+                
+                if st.session_state.bulk_results:
+                    report_options.extend([
+                        "Portfolio Overview",
+                        "Bulk Cost Analysis"
+                    ])
+                
+                selected_reports = st.multiselect(
+                    "Select Report Sections",
+                    report_options,
+                    default=report_options[:3] if len(report_options) >= 3 else report_options
+                )
+            
+            with col2:
+                st.markdown("#### 🎨 Report Options")
+                
+                include_charts = st.checkbox("Include Charts and Graphs", value=True)
+                include_raw_data = st.checkbox("Include Raw Data Tables", value=False)
+                company_name = st.text_input("Company Name", value="Enterprise Corporation")
+                report_title = st.text_input("Report Title", value="AWS Migration Analysis")
+            
+            st.markdown("---")
+            
+            # Export buttons
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                if REPORTLAB_AVAILABLE and st.button("📄 Generate PDF Report", type="primary"):
+                    with st.spinner("🔄 Generating comprehensive PDF report..."):
+                        try:
+                            pdf_data = generate_comprehensive_pdf_report(
+                                st.session_state.analysis_results or st.session_state.bulk_results,
+                                selected_reports,
+                                company_name,
+                                report_title,
+                                include_charts,
+                                include_raw_data
+                            )
+                            
+                            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                            filename = f"AWS_Migration_Report_{timestamp}.pdf"
+                            
+                            st.download_button(
+                                label="⬇️ Download PDF Report",
+                                data=pdf_data,
+                                file_name=filename,
+                                mime="application/pdf",
+                                key="download_pdf"
+                            )
+                            
+                            st.success("✅ PDF report generated successfully!")
+                            
+                        except Exception as e:
+                            st.error(f"❌ Error generating PDF: {str(e)}")
+                            import traceback
+                            st.text(traceback.format_exc())
+            
+            with col2:
+                if st.button("📊 Export to Excel"):
+                    with st.spinner("🔄 Generating Excel report..."):
+                        try:
+                            excel_data = generate_excel_report(
+                                st.session_state.analysis_results or st.session_state.bulk_results
+                            )
+                            
+                            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                            filename = f"AWS_Migration_Data_{timestamp}.xlsx"
+                            
+                            st.download_button(
+                                label="⬇️ Download Excel File",
+                                data=excel_data,
+                                file_name=filename,
+                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                key="download_excel"
+                            )
+                            
+                            st.success("✅ Excel file generated successfully!")
+                            
+                        except Exception as e:
+                            st.error(f"❌ Error generating Excel: {str(e)}")
+            
+            with col3:
+                if st.button("📄 Export to CSV"):
+                    with st.spinner("🔄 Generating CSV export..."):
+                        try:
+                            csv_data = generate_csv_report(
+                                st.session_state.analysis_results or st.session_state.bulk_results
+                            )
+                            
+                            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                            filename = f"AWS_Migration_Summary_{timestamp}.csv"
+                            
+                            st.download_button(
+                                label="⬇️ Download CSV File",
+                                data=csv_data,
+                                file_name=filename,
+                                mime="text/csv",
+                                key="download_csv"
+                            )
+                            
+                            st.success("✅ CSV file generated successfully!")
+                            
+                        except Exception as e:
+                            st.error(f"❌ Error generating CSV: {str(e)}")
+            
+            # Preview section
+            if st.session_state.analysis_results:
+                st.markdown("---")
+                st.markdown("### 👀 Report Preview")
+                
+                with st.expander("Executive Summary Preview"):
+                    results = st.session_state.analysis_results['recommendations']['PROD']
+                    tco_analysis = results['tco_analysis']
+                    
+                    st.markdown(f"""
+                    **Workload:** {st.session_state.analysis_results['inputs']['workload_name']}
+                    
+                    **Financial Summary:**
+                    - Best Monthly Cost: ${tco_analysis['monthly_cost']:,.2f} ({tco_analysis['best_pricing_option'].replace('_', ' ').title()})
+                    - Annual Savings vs On-Demand: ${tco_analysis['monthly_savings'] * 12:,.2f}
+                    - 3-Year ROI: {tco_analysis['roi_3_years']}%
+                    - Break-even: {tco_analysis['break_even_months']} months
+                    
+                    **Recommendations:**
+                    """)
+                    
+                    for i, rec in enumerate(results['optimization_recommendations'][:3], 1):
+                        st.markdown(f"{i}. {rec}")
     with tab5:
         st.markdown("### 🎯 Advanced Cost Optimization")
         
