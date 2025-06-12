@@ -270,6 +270,58 @@ st.markdown("""
     .risk-low { background: #d1fae5; color: #065f46; }
     .risk-medium { background: #fef3c7; color: #92400e; }
     .risk-high { background: #fee2e2; color: #991b1b; }
+    
+    .demo-banner {
+        background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+        color: white;
+        padding: 1rem 2rem;
+        border-radius: 8px;
+        margin: 1rem 0;
+        text-align: center;
+        font-weight: 600;
+    }
+    
+    .auth-container {
+        max-width: 400px;
+        margin: 2rem auto;
+        padding: 2rem;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+    }
+    
+    .user-info {
+        background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+        padding: 1rem;
+        border-radius: 8px;
+        margin-bottom: 1rem;
+        border-left: 4px solid #667eea;
+    }
+    
+    .status-badge {
+        padding: 0.25rem 0.75rem;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        margin-top: 0.5rem;
+        display: inline-block;
+    }
+    
+    .status-success {
+        background: #d1fae5;
+        color: #065f46;
+    }
+    
+    .status-error {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+    
+    .status-demo {
+        background: #fbbf24;
+        color: white;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -600,17 +652,29 @@ class EnterpriseEC2WorkloadSizingCalculator:
         for pricing_type, instances in self.BASE_PRICING["instance"].items():
             self.instance_pricing[pricing_type] = instances.copy()
     
-    def calculate_savings_plan_price(self, instance_type: str, base_price: float, plan_type: str) -> float:
-        """Calculate Savings Plan pricing."""
-        discount = self.BASE_PRICING["savings_plans"].get(plan_type, 0)
-        return base_price * (1 - discount)
+    def validate_aws_credentials(self):
+        """Validate AWS credentials."""
+        try:
+            session = boto3.Session()
+            credentials = session.get_credentials()
+            if credentials is None:
+                return False, "❌ No AWS credentials found"
+            
+            # Test credentials by making a simple call
+            ec2 = session.client('ec2', region_name='us-east-1')
+            ec2.describe_regions()
+            return True, "✅ AWS credentials valid"
+        except (NoCredentialsError, PartialCredentialsError):
+            return False, "❌ AWS credentials not configured"
+        except Exception as e:
+            return False, f"❌ AWS connection error: {str(e)}"
     
     def calculate_comprehensive_requirements(self, env: str) -> Dict[str, Any]:
         """Calculate comprehensive infrastructure requirements with enterprise features."""
         env_mult = self.ENV_MULTIPLIERS[env]
         workload_profile = self.WORKLOAD_PROFILES[self.inputs["workload_type"]]
         
-        # Base calculations (keeping existing logic)
+        # Base calculations
         cpu_efficiency = 0.7
         cpu_buffer = 1.3 if env == "PROD" else 1.2
         seasonality = self.inputs.get("seasonality_factor", 1.0) if env == "PROD" else 1.0
@@ -641,7 +705,7 @@ class EnterpriseEC2WorkloadSizingCalculator:
             ), 4
         )
         
-        # Enhanced storage calculation with backup considerations
+        # Enhanced storage calculation
         growth_factor = (1 + self.inputs["storage_growth_rate"]) ** self.inputs["years"]
         storage_buffer = 1.3 if env == "PROD" else 1.2
         
@@ -680,12 +744,12 @@ class EnterpriseEC2WorkloadSizingCalculator:
         else:
             az_multiplier = 1
         
-        # Instance selection with enhanced logic
+        # Instance selection
         instance_options = self._get_optimal_instance_options(
             required_vcpus, required_ram, throughput_required, workload_profile, env
         )
         
-        # Cost calculations for different pricing models
+        # Cost calculations
         cost_breakdown = self._calculate_comprehensive_costs(
             instance_options, total_storage, iops_required, throughput_required, env, az_multiplier
         )
@@ -1138,9 +1202,6 @@ class EnterpriseEC2WorkloadSizingCalculator:
         
         return recommendations
 
-# Enhanced Authentication and other classes remain the same...
-# (FirebaseAuthenticator, EnhancedPDFReportGenerator, etc.)
-
 class FirebaseAuthenticator:
     """Enhanced Firebase authentication manager with better debugging and fallback methods."""
     
@@ -1582,7 +1643,6 @@ class EnhancedPDFReportGenerator:
         buffer.seek(0)
         return buffer.getvalue()
 
-# Enhanced rendering functions with new enterprise features
 def render_enhanced_workload_configuration():
     """Render enhanced workload configuration with enterprise features."""
     calculator = st.session_state.calculator
@@ -1685,6 +1745,79 @@ def render_enhanced_workload_configuration():
             calculator.inputs["avg_cpu_percent"] = st.slider(
                 "Average CPU %", 0, 100, calculator.inputs["avg_cpu_percent"],
                 help="Typical CPU utilization"
+            )
+            
+        with col2:
+            st.markdown("**Memory Resources**")
+            calculator.inputs["on_prem_ram_gb"] = st.number_input(
+                "RAM (GB)", min_value=1, value=calculator.inputs["on_prem_ram_gb"],
+                help="Total memory in gigabytes"
+            )
+            calculator.inputs["peak_ram_percent"] = st.slider(
+                "Peak RAM %", 0, 100, calculator.inputs["peak_ram_percent"],
+                help="Highest memory utilization observed"
+            )
+            calculator.inputs["avg_ram_percent"] = st.slider(
+                "Average RAM %", 0, 100, calculator.inputs["avg_ram_percent"],
+                help="Typical memory utilization"
+            )
+            
+        with col3:
+            st.markdown("**Storage & I/O**")
+            calculator.inputs["storage_current_gb"] = st.number_input(
+                "Storage (GB)", min_value=1, value=calculator.inputs["storage_current_gb"],
+                help="Current total storage requirements"
+            )
+            calculator.inputs["peak_iops"] = st.number_input(
+                "Peak IOPS", min_value=1, value=calculator.inputs["peak_iops"],
+                help="Peak Input/Output Operations Per Second"
+            )
+            calculator.inputs["peak_throughput_mbps"] = st.number_input(
+                "Peak Throughput (MB/s)", min_value=1, value=calculator.inputs["peak_throughput_mbps"],
+                help="Peak data throughput in megabytes per second"
+            )
+    
+    # Enhanced Enterprise Configuration
+    with st.expander("🏢 Enterprise Configuration & Pricing Options", expanded=True):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("**💰 Pricing Strategy**")
+            
+            pricing_options = {
+                "on_demand": "On-Demand (Pay as you go)",
+                "ri_1y": "1-Year Reserved Instances",
+                "ri_3y": "3-Year Reserved Instances", 
+                "savings_plan_compute_1y": "1-Year Compute Savings Plan",
+                "savings_plan_compute_3y": "3-Year Compute Savings Plan",
+                "mixed": "Mixed Strategy (RI + On-Demand + Spot)"
+            }
+            
+            calculator.inputs["pricing_model"] = st.selectbox(
+                "Primary Pricing Model",
+                list(pricing_options.keys()),
+                format_func=lambda x: pricing_options[x],
+                help="Choose your preferred AWS pricing strategy"
+            )
+            
+            if selected_profile["spot_suitable"]:
+                calculator.inputs["spot_percentage"] = st.slider(
+                    "Spot Instance Percentage", 0, 80, calculator.inputs.get("spot_percentage", 0),
+                    help="Percentage of workload suitable for Spot instances (up to 90% savings)"
+                )
+            
+            st.markdown("**🏗️ Architecture Options**")
+            calculator.inputs["enable_graviton"] = st.checkbox(
+                "Enable Graviton Processors", 
+                value=calculator.inputs.get("enable_graviton", True),
+                help="AWS Graviton provides up to 20% better price-performance" if selected_profile["graviton_compatible"] else "Not compatible with selected workload",
+                disabled=not selected_profile["graviton_compatible"]
+            )
+            
+            calculator.inputs["prefer_amd"] = st.checkbox(
+                "Prefer AMD Instances", 
+                value=calculator.inputs["prefer_amd"],
+                help="AMD instances typically offer 10-15% cost savings"
             )
             
         with col2:
@@ -2155,7 +2288,6 @@ def initialize_session_state():
     if 'bulk_results' not in st.session_state:
         st.session_state.bulk_results = []
 
-# Authentication functions remain the same as in the original file...
 def render_authentication():
     """Render enhanced authentication interface with detailed debugging."""
     st.markdown("""
@@ -2559,77 +2691,4 @@ def main():
     """, unsafe_allow_html=True)
 
 if __name__ == "__main__":
-    main().markdown("**Memory Resources**")
-            calculator.inputs["on_prem_ram_gb"] = st.number_input(
-                "RAM (GB)", min_value=1, value=calculator.inputs["on_prem_ram_gb"],
-                help="Total memory in gigabytes"
-            )
-            calculator.inputs["peak_ram_percent"] = st.slider(
-                "Peak RAM %", 0, 100, calculator.inputs["peak_ram_percent"],
-                help="Highest memory utilization observed"
-            )
-            calculator.inputs["avg_ram_percent"] = st.slider(
-                "Average RAM %", 0, 100, calculator.inputs["avg_ram_percent"],
-                help="Typical memory utilization"
-            )
-            
-        with col3:
-            st.markdown("**Storage & I/O**")
-            calculator.inputs["storage_current_gb"] = st.number_input(
-                "Storage (GB)", min_value=1, value=calculator.inputs["storage_current_gb"],
-                help="Current total storage requirements"
-            )
-            calculator.inputs["peak_iops"] = st.number_input(
-                "Peak IOPS", min_value=1, value=calculator.inputs["peak_iops"],
-                help="Peak Input/Output Operations Per Second"
-            )
-            calculator.inputs["peak_throughput_mbps"] = st.number_input(
-                "Peak Throughput (MB/s)", min_value=1, value=calculator.inputs["peak_throughput_mbps"],
-                help="Peak data throughput in megabytes per second"
-            )
-    
-    # Enhanced Enterprise Configuration
-    with st.expander("🏢 Enterprise Configuration & Pricing Options", expanded=True):
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.markdown("**💰 Pricing Strategy**")
-            
-            pricing_options = {
-                "on_demand": "On-Demand (Pay as you go)",
-                "ri_1y": "1-Year Reserved Instances",
-                "ri_3y": "3-Year Reserved Instances", 
-                "savings_plan_compute_1y": "1-Year Compute Savings Plan",
-                "savings_plan_compute_3y": "3-Year Compute Savings Plan",
-                "mixed": "Mixed Strategy (RI + On-Demand + Spot)"
-            }
-            
-            calculator.inputs["pricing_model"] = st.selectbox(
-                "Primary Pricing Model",
-                list(pricing_options.keys()),
-                format_func=lambda x: pricing_options[x],
-                help="Choose your preferred AWS pricing strategy"
-            )
-            
-            if selected_profile["spot_suitable"]:
-                calculator.inputs["spot_percentage"] = st.slider(
-                    "Spot Instance Percentage", 0, 80, calculator.inputs.get("spot_percentage", 0),
-                    help="Percentage of workload suitable for Spot instances (up to 90% savings)"
-                )
-            
-            st.markdown("**🏗️ Architecture Options**")
-            calculator.inputs["enable_graviton"] = st.checkbox(
-                "Enable Graviton Processors", 
-                value=calculator.inputs.get("enable_graviton", True),
-                help="AWS Graviton provides up to 20% better price-performance" if selected_profile["graviton_compatible"] else "Not compatible with selected workload",
-                disabled=not selected_profile["graviton_compatible"]
-            )
-            
-            calculator.inputs["prefer_amd"] = st.checkbox(
-                "Prefer AMD Instances", 
-                value=calculator.inputs["prefer_amd"],
-                help="AMD instances typically offer 10-15% cost savings"
-            )
-            
-        with col2:
-            st
+    main()
