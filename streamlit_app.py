@@ -2689,6 +2689,325 @@ def main():
         <em>Built for Enterprise • Comprehensive • Secure • Scalable</em>
     </div>
     """, unsafe_allow_html=True)
+# Add these functions to your streamlit_app.py file before the main() function
+
+def generate_comprehensive_pdf_report(results_data, selected_sections, company_name, report_title, include_charts, include_raw_data):
+    """Generate comprehensive PDF report with all selected sections."""
+    
+    if not REPORTLAB_AVAILABLE:
+        raise ImportError("ReportLab is required for PDF generation")
+    
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=1*inch, leftMargin=1*inch, rightMargin=1*inch)
+    story = []
+    
+    # Styles
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        name='CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=24,
+        spaceAfter=30,
+        textColor=colors.HexColor('#1a365d'),
+        alignment=TA_CENTER
+    )
+    
+    section_style = ParagraphStyle(
+        name='SectionHeader',
+        parent=styles['Heading2'],
+        fontSize=16,
+        spaceBefore=20,
+        spaceAfter=12,
+        textColor=colors.HexColor('#2d3748'),
+    )
+    
+    # Title page
+    story.append(Paragraph(report_title, title_style))
+    story.append(Paragraph(company_name, styles['Normal']))
+    story.append(Paragraph(f"Generated: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}", styles['Normal']))
+    story.append(Spacer(1, 0.5 * inch))
+    
+    # Handle both single and bulk results
+    if isinstance(results_data, dict) and 'recommendations' in results_data:
+        # Single workload result
+        results_list = [results_data]
+    elif isinstance(results_data, list):
+        # Bulk results
+        results_list = results_data
+    else:
+        # Fallback
+        results_list = [results_data]
+    
+    # Executive Summary
+    if "Executive Summary" in selected_sections:
+        story.append(Paragraph("Executive Summary", section_style))
+        
+        total_workloads = len(results_list)
+        total_monthly_cost = sum(
+            result['recommendations']['PROD']['cost_breakdown']['total_costs'].get('on_demand', 0) 
+            for result in results_list
+        )
+        
+        total_migration_cost = sum(
+            result['recommendations']['PROD']['tco_analysis'].get('migration_cost', 0)
+            for result in results_list
+        )
+        
+        total_annual_savings = sum(
+            result['recommendations']['PROD']['tco_analysis'].get('monthly_savings', 0) * 12
+            for result in results_list
+        )
+        
+        summary_text = f"""
+        This comprehensive analysis covers {total_workloads} enterprise workload(s) for AWS cloud migration.
+        <br/><br/>
+        <b>Financial Summary:</b><br/>
+        • Total Monthly Cost (On-Demand): ${total_monthly_cost:,.2f}<br/>
+        • Annual Cost Projection: ${total_monthly_cost * 12:,.2f}<br/>
+        • Estimated Migration Cost: ${total_migration_cost:,.2f}<br/>
+        • Potential Annual Savings: ${total_annual_savings:,.2f}<br/>
+        <br/>
+        <b>Key Recommendations:</b><br/>
+        • Consider Reserved Instances or Savings Plans for significant cost optimization<br/>
+        • Implement comprehensive monitoring and auto-scaling strategies<br/>
+        • Evaluate Graviton processors for compatible workloads<br/>
+        • Plan migration in phases to minimize business disruption
+        """
+        
+        story.append(Paragraph(summary_text, styles['Normal']))
+        story.append(PageBreak())
+    
+    # Detailed sections for each workload
+    for idx, result in enumerate(results_list):
+        workload_name = result.get('inputs', {}).get('workload_name', f'Workload {idx + 1}')
+        prod_results = result['recommendations']['PROD']
+        
+        story.append(Paragraph(f"Workload Analysis: {workload_name}", section_style))
+        
+        if "Technical Specifications" in selected_sections:
+            story.append(Paragraph("Technical Specifications", styles['Heading3']))
+            
+            requirements = prod_results['requirements']
+            instance_options = prod_results['instance_options']
+            primary_instance = instance_options.get('balanced', instance_options.get('cost_optimized', {}))
+            
+            tech_text = f"""
+            <b>Resource Requirements:</b><br/>
+            • vCPUs: {requirements['vCPUs']}<br/>
+            • RAM: {requirements['RAM_GB']} GB<br/>
+            • Storage: {requirements['storage_GB']} GB<br/>
+            • IOPS: {requirements['iops_required']}<br/>
+            • Multi-AZ: {'Yes' if requirements['multi_az'] else 'No'}<br/>
+            <br/>
+            <b>Recommended Instance:</b><br/>
+            • Type: {primary_instance.get('type', 'N/A')}<br/>
+            • Processor: {primary_instance.get('processor', 'N/A')}<br/>
+            • Family: {primary_instance.get('family', 'N/A').title()}<br/>
+            • Architecture: {primary_instance.get('architecture', 'N/A')}
+            """
+            story.append(Paragraph(tech_text, styles['Normal']))
+            story.append(Spacer(1, 12))
+        
+        if "Detailed Cost Analysis" in selected_sections:
+            story.append(Paragraph("Cost Analysis", styles['Heading3']))
+            
+            cost_breakdown = prod_results['cost_breakdown']
+            total_costs = cost_breakdown['total_costs']
+            tco_analysis = prod_results['tco_analysis']
+            
+            # Create cost table
+            cost_data = [['Pricing Model', 'Monthly Cost', 'Savings vs On-Demand']]
+            on_demand_cost = total_costs.get('on_demand', 0)
+            
+            for pricing_model, cost in total_costs.items():
+                savings = ((on_demand_cost - cost) / on_demand_cost * 100) if on_demand_cost > 0 else 0
+                cost_data.append([
+                    pricing_model.replace('_', ' ').title(),
+                    f"${cost:,.2f}",
+                    f"{savings:.1f}%"
+                ])
+            
+            cost_table = Table(cost_data)
+            cost_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black)
+            ]))
+            
+            story.append(cost_table)
+            story.append(Spacer(1, 12))
+            
+            # TCO Summary
+            tco_text = f"""
+            <b>Total Cost of Ownership (3 Years):</b><br/>
+            • Best Option: {tco_analysis['best_pricing_option'].replace('_', ' ').title()}<br/>
+            • Monthly Cost: ${tco_analysis['monthly_cost']:,.2f}<br/>
+            • Annual Savings: ${tco_analysis['monthly_savings'] * 12:,.2f}<br/>
+            • 3-Year ROI: {tco_analysis['roi_3_years']}%<br/>
+            • Break-even: {tco_analysis['break_even_months']} months
+            """
+            story.append(Paragraph(tco_text, styles['Normal']))
+        
+        if "Risk Assessment" in selected_sections:
+            story.append(Paragraph("Risk Assessment", styles['Heading3']))
+            
+            risk_assessment = prod_results['risk_assessment']
+            
+            risk_text = f"""
+            <b>Overall Risk Level: {risk_assessment['overall_risk']}</b><br/>
+            <br/>
+            <b>Risk Factors:</b><br/>
+            """
+            
+            for factor in risk_assessment['risk_factors']:
+                risk_text += f"• {factor}<br/>"
+            
+            risk_text += "<br/><b>Mitigation Strategies:</b><br/>"
+            
+            for strategy in risk_assessment['mitigation_strategies'][:5]:  # Limit to top 5
+                risk_text += f"• {strategy}<br/>"
+            
+            story.append(Paragraph(risk_text, styles['Normal']))
+        
+        if "Migration Plan" in selected_sections:
+            story.append(Paragraph("Migration Plan", styles['Heading3']))
+            
+            migration_text = """
+            <b>Recommended Migration Phases:</b><br/>
+            <br/>
+            <b>Phase 1: Assessment & Planning (2-4 weeks)</b><br/>
+            • Complete infrastructure inventory<br/>
+            • Map application dependencies<br/>
+            • Create detailed migration plan<br/>
+            • Set up AWS accounts and basic networking<br/>
+            <br/>
+            <b>Phase 2: Pilot Migration (2-3 weeks)</b><br/>
+            • Migrate development environment<br/>
+            • Test backup and restore procedures<br/>
+            • Validate monitoring and alerting<br/>
+            • Fine-tune security configurations<br/>
+            <br/>
+            <b>Phase 3: Production Migration (4-8 weeks)</b><br/>
+            • Execute production cutover<br/>
+            • Validate application functionality<br/>
+            • Optimize performance and costs<br/>
+            • Implement auto-scaling policies<br/>
+            <br/>
+            <b>Phase 4: Optimization (2-4 weeks)</b><br/>
+            • Right-size instances based on actual usage<br/>
+            • Implement Reserved Instances/Savings Plans<br/>
+            • Optimize storage and networking<br/>
+            • Final security and compliance validation
+            """
+            story.append(Paragraph(migration_text, styles['Normal']))
+        
+        if idx < len(results_list) - 1:  # Add page break between workloads
+            story.append(PageBreak())
+    
+    # Build PDF
+    doc.build(story)
+    buffer.seek(0)
+    return buffer.getvalue()
+
+
+def generate_excel_report(results_data):
+    """Generate Excel report with multiple sheets."""
+    output = BytesIO()
+    
+    # Handle both single and bulk results
+    if isinstance(results_data, dict) and 'recommendations' in results_data:
+        results_list = [results_data]
+    elif isinstance(results_data, list):
+        results_list = results_data
+    else:
+        results_list = [results_data]
+    
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        # Summary sheet
+        summary_data = []
+        for result in results_list:
+            workload_name = result.get('inputs', {}).get('workload_name', 'Unknown')
+            prod_results = result['recommendations']['PROD']
+            tco_analysis = prod_results['tco_analysis']
+            requirements = prod_results['requirements']
+            
+            summary_data.append({
+                'Workload': workload_name,
+                'vCPUs': requirements['vCPUs'],
+                'RAM (GB)': requirements['RAM_GB'], 
+                'Storage (GB)': requirements['storage_GB'],
+                'Best Pricing': tco_analysis['best_pricing_option'],
+                'Monthly Cost': tco_analysis['monthly_cost'],
+                'Monthly Savings': tco_analysis['monthly_savings'],
+                'Annual Savings': tco_analysis['monthly_savings'] * 12,
+                'ROI (3Y)': tco_analysis['roi_3_years'],
+                'Break-even (months)': tco_analysis['break_even_months']
+            })
+        
+        summary_df = pd.DataFrame(summary_data)
+        summary_df.to_excel(writer, sheet_name='Executive Summary', index=False)
+        
+        # Detailed cost breakdown for each workload
+        for idx, result in enumerate(results_list):
+            workload_name = result.get('inputs', {}).get('workload_name', f'Workload_{idx+1}')
+            prod_results = result['recommendations']['PROD']
+            
+            # Cost breakdown sheet
+            cost_data = []
+            total_costs = prod_results['cost_breakdown']['total_costs']
+            
+            for pricing_model, cost in total_costs.items():
+                cost_data.append({
+                    'Pricing Model': pricing_model.replace('_', ' ').title(),
+                    'Monthly Cost': cost,
+                    'Annual Cost': cost * 12
+                })
+            
+            cost_df = pd.DataFrame(cost_data)
+            sheet_name = f"{workload_name[:20]}_Costs"  # Limit sheet name length
+            cost_df.to_excel(writer, sheet_name=sheet_name, index=False)
+    
+    output.seek(0)
+    return output.getvalue()
+
+
+def generate_csv_report(results_data):
+    """Generate CSV summary report."""
+    # Handle both single and bulk results
+    if isinstance(results_data, dict) and 'recommendations' in results_data:
+        results_list = [results_data]
+    elif isinstance(results_data, list):
+        results_list = results_data
+    else:
+        results_list = [results_data]
+    
+    summary_data = []
+    for result in results_list:
+        workload_name = result.get('inputs', {}).get('workload_name', 'Unknown')
+        prod_results = result['recommendations']['PROD']
+        tco_analysis = prod_results['tco_analysis']
+        requirements = prod_results['requirements']
+        
+        summary_data.append({
+            'Workload': workload_name,
+            'vCPUs': requirements['vCPUs'],
+            'RAM_GB': requirements['RAM_GB'],
+            'Storage_GB': requirements['storage_GB'],
+            'Best_Pricing_Model': tco_analysis['best_pricing_option'],
+            'Monthly_Cost': tco_analysis['monthly_cost'],
+            'Monthly_Savings': tco_analysis['monthly_savings'],
+            'Annual_Savings': tco_analysis['monthly_savings'] * 12,
+            'ROI_3_Years': tco_analysis['roi_3_years'],
+            'Break_Even_Months': tco_analysis['break_even_months']
+        })
+    
+    df = pd.DataFrame(summary_data)
+    return df.to_csv(index=False)
 
 if __name__ == "__main__":
     main()
