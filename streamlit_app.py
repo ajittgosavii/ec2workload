@@ -334,11 +334,678 @@ class ClaudeAIMigrationAnalyzer:
             'success_factors': ['Strong project leadership']
         }
 
+class AWSCostCalculator:
+    """AWS service cost calculator with detailed pricing breakdown."""
+    
+    def __init__(self):
+        # AWS pricing data (us-east-1 region, monthly costs)
+        self.pricing = {
+            'compute': {
+                'ec2_instances': {
+                    'm6i.large': {'on_demand': 63.07, 'ri_1y': 44.17, 'ri_3y': 31.54, 'spot': 18.92},
+                    'm6i.xlarge': {'on_demand': 126.14, 'ri_1y': 88.33, 'ri_3y': 63.07, 'spot': 37.84},
+                    'm6i.2xlarge': {'on_demand': 252.29, 'ri_1y': 176.66, 'ri_3y': 126.14, 'spot': 75.69},
+                    'm6i.4xlarge': {'on_demand': 504.58, 'ri_1y': 353.33, 'ri_3y': 252.29, 'spot': 151.37},
+                    'r6i.large': {'on_demand': 73.58, 'ri_1y': 51.54, 'ri_3y': 36.79, 'spot': 22.07},
+                    'r6i.xlarge': {'on_demand': 147.17, 'ri_1y': 103.07, 'ri_3y': 73.58, 'spot': 44.15}
+                },
+                'auto_scaling': 0,  # No additional cost
+                'placement_groups': 0,  # No additional cost
+                'elastic_ip': 3.65  # Per month when not associated
+            },
+            'network': {
+                'vpc': 0,  # No cost for VPC itself
+                'nat_gateway': 32.85,  # Per NAT Gateway per month
+                'alb': 16.43,  # Application Load Balancer per month
+                'nlb': 16.43,  # Network Load Balancer per month
+                'cloudfront': {
+                    'per_gb': 0.085,  # First 10TB per month
+                    'requests_per_10k': 0.0075
+                },
+                'route53': {
+                    'hosted_zone': 0.50,  # Per hosted zone per month
+                    'queries_per_million': 0.40
+                },
+                'data_transfer': {
+                    'out_to_internet_first_1gb': 0,
+                    'out_to_internet_up_to_10tb': 0.09,  # Per GB
+                    'out_to_cloudfront': 0,
+                    'between_azs': 0.01  # Per GB
+                },
+                'vpn_gateway': 36.50,  # Per VPN connection per month
+                'direct_connect': {
+                    '1gbps': 30,  # Per month
+                    '10gbps': 300  # Per month
+                }
+            },
+            'storage': {
+                'ebs': {
+                    'gp3': 0.08,  # Per GB per month
+                    'io2': 0.125,  # Per GB per month
+                    'io2_iops': 0.065,  # Per provisioned IOPS per month
+                    'snapshots': 0.05  # Per GB per month
+                },
+                's3': {
+                    'standard': 0.023,  # Per GB per month
+                    'standard_ia': 0.0125,  # Per GB per month
+                    'glacier': 0.004,  # Per GB per month
+                    'deep_archive': 0.00099  # Per GB per month
+                },
+                'efs': 0.30,  # Per GB per month
+                'fsx': 0.145  # Per GB per month (Lustre)
+            },
+            'database': {
+                'rds_mysql': {
+                    'db.t4g.micro': 7.59,
+                    'db.t4g.small': 15.18,
+                    'db.t4g.medium': 30.37,
+                    'db.r6g.large': 131.40,
+                    'db.r6g.xlarge': 262.80,
+                    'db.r6g.2xlarge': 525.60
+                },
+                'aurora_mysql': {
+                    'db.r6g.large': 105.12,
+                    'db.r6g.xlarge': 210.24,
+                    'db.r6g.2xlarge': 420.48
+                },
+                'storage': {
+                    'rds_gp2': 0.115,  # Per GB per month
+                    'rds_io1': 0.125,  # Per GB per month
+                    'aurora_storage': 0.10,  # Per GB per month
+                    'aurora_io': 0.20  # Per million requests
+                },
+                'backup_storage': 0.095,  # Per GB per month
+                'rds_proxy': 0.015  # Per vCPU per hour
+            },
+            'security': {
+                'secrets_manager': 0.40,  # Per secret per month
+                'kms': 1.00,  # Per key per month
+                'acm': 0,  # Free for AWS services
+                'config': 0.003,  # Per configuration item per month
+                'cloudtrail': 2.00,  # Per trail per month
+                'guardduty': 4.62,  # Per million events
+                'inspector': 0.30,  # Per agent assessment
+                'security_hub': 0.0030,  # Per finding per month
+                'waf': 1.00,  # Per web ACL per month
+                'shield_advanced': 3000  # Per month
+            },
+            'monitoring': {
+                'cloudwatch': {
+                    'metrics': 0.30,  # Per metric per month
+                    'dashboards': 3.00,  # Per dashboard per month
+                    'alarms': 0.10,  # Per alarm per month
+                    'logs_ingestion': 0.50,  # Per GB ingested
+                    'logs_storage': 0.03  # Per GB per month
+                },
+                'xray': 5.00,  # Per million traces
+                'application_insights': 0.0012,  # Per resource per hour
+                'synthetics': 0.0012,  # Per canary run
+                'cost_explorer': 0,  # Free
+                'budgets': 0.02  # Per budget per day
+            }
+        }
+    
+    def calculate_service_costs(self, env: str, tech_recs: Dict, requirements: Dict) -> Dict[str, Any]:
+        """Calculate detailed costs for all AWS services."""
+        
+        costs = {
+            'compute': self._calculate_compute_costs(env, tech_recs['compute'], requirements),
+            'network': self._calculate_network_costs(env, tech_recs['network'], requirements),
+            'storage': self._calculate_storage_costs(env, tech_recs['storage'], requirements),
+            'database': self._calculate_database_costs(env, tech_recs['database'], requirements),
+            'security': self._calculate_security_costs(env, tech_recs['security'], requirements),
+            'monitoring': self._calculate_monitoring_costs(env, tech_recs['monitoring'], requirements)
+        }
+        
+        # Calculate totals
+        total_monthly = sum(category['total'] for category in costs.values())
+        total_annual = total_monthly * 12
+        
+        costs['summary'] = {
+            'total_monthly': total_monthly,
+            'total_annual': total_annual,
+            'largest_cost_category': max(costs.keys(), key=lambda k: costs[k]['total'] if k != 'summary' else 0)
+        }
+        
+        return costs
+    
+    def _calculate_compute_costs(self, env: str, compute_recs: Dict, requirements: Dict) -> Dict[str, Any]:
+        """Calculate compute-related costs."""
+        
+        instance_type = compute_recs['primary_instance']['type']
+        instance_count = self._get_instance_count(env)
+        
+        # EC2 instance costs
+        instance_pricing = self.pricing['compute']['ec2_instances'].get(instance_type, self.pricing['compute']['ec2_instances']['m6i.large'])
+        
+        # Determine pricing model
+        pricing_model = 'on_demand'
+        if env in ['PROD', 'PREPROD']:
+            pricing_model = 'ri_1y'
+        
+        monthly_instance_cost = instance_pricing[pricing_model] * instance_count
+        
+        # Auto Scaling (no additional cost, but affects instance count)
+        scaling_info = compute_recs.get('scaling', {})
+        max_instances = scaling_info.get('max_instances', instance_count)
+        
+        # Elastic IP costs (if needed)
+        eip_cost = self.pricing['compute']['elastic_ip'] * instance_count if env in ['PROD', 'PREPROD'] else 0
+        
+        total_compute = monthly_instance_cost + eip_cost
+        
+        return {
+            'ec2_instances': {
+                'cost': monthly_instance_cost,
+                'details': f"{instance_count}x {instance_type} ({pricing_model})",
+                'breakdown': {
+                    'instance_type': instance_type,
+                    'instance_count': instance_count,
+                    'pricing_model': pricing_model,
+                    'unit_cost': instance_pricing[pricing_model],
+                    'max_instances_scaling': max_instances
+                }
+            },
+            'elastic_ip': {
+                'cost': eip_cost,
+                'details': f"{instance_count} Elastic IPs" if eip_cost > 0 else "No Elastic IPs"
+            },
+            'auto_scaling': {
+                'cost': 0,
+                'details': "No additional cost - scales existing instances"
+            },
+            'total': total_compute,
+            'optimization_notes': self._get_compute_optimization_notes(env, instance_type, pricing_model)
+        }
+    
+    def _calculate_network_costs(self, env: str, network_recs: Dict, requirements: Dict) -> Dict[str, Any]:
+        """Calculate network-related costs."""
+        
+        # Load Balancer costs
+        lb_cost = 0
+        lb_type = network_recs.get('load_balancer', '')
+        if 'ALB' in lb_type:
+            lb_cost = self.pricing['network']['alb']
+        elif 'NLB' in lb_type:
+            lb_cost = self.pricing['network']['nlb']
+        
+        # NAT Gateway costs
+        nat_cost = 0
+        if network_recs.get('nat_gateway') == 'Required':
+            nat_count = 2 if env in ['PROD', 'PREPROD'] else 1  # Multi-AZ for production
+            nat_cost = self.pricing['network']['nat_gateway'] * nat_count
+        
+        # CloudFront costs (estimated)
+        cdn_cost = 0
+        if network_recs.get('cdn') == 'CloudFront':
+            estimated_gb_month = self._estimate_cdn_usage(env)
+            cdn_cost = estimated_gb_month * self.pricing['network']['cloudfront']['per_gb']
+        
+        # Route 53 costs
+        dns_cost = self.pricing['network']['route53']['hosted_zone']
+        if 'health checks' in network_recs.get('dns', ''):
+            dns_cost += 0.50 * 2  # 2 health checks
+        
+        # Data transfer costs (estimated)
+        data_transfer_cost = self._estimate_data_transfer_costs(env)
+        
+        # VPN costs
+        vpn_cost = 0
+        if 'VPN' in network_recs.get('vpn', ''):
+            vpn_cost = self.pricing['network']['vpn_gateway']
+        
+        total_network = lb_cost + nat_cost + cdn_cost + dns_cost + data_transfer_cost + vpn_cost
+        
+        return {
+            'load_balancer': {
+                'cost': lb_cost,
+                'details': f"{lb_type}" if lb_cost > 0 else "No load balancer"
+            },
+            'nat_gateway': {
+                'cost': nat_cost,
+                'details': f"{int(nat_cost / self.pricing['network']['nat_gateway'])} NAT Gateways" if nat_cost > 0 else "No NAT Gateway"
+            },
+            'cloudfront_cdn': {
+                'cost': cdn_cost,
+                'details': f"~{self._estimate_cdn_usage(env)} GB/month" if cdn_cost > 0 else "No CDN"
+            },
+            'route53_dns': {
+                'cost': dns_cost,
+                'details': "Hosted zone + health checks" if dns_cost > 1 else "Basic hosted zone"
+            },
+            'data_transfer': {
+                'cost': data_transfer_cost,
+                'details': f"Estimated data transfer costs"
+            },
+            'vpn_gateway': {
+                'cost': vpn_cost,
+                'details': "Site-to-site VPN" if vpn_cost > 0 else "No VPN"
+            },
+            'total': total_network,
+            'optimization_notes': self._get_network_optimization_notes(env)
+        }
+    
+    def _calculate_storage_costs(self, env: str, storage_recs: Dict, requirements: Dict) -> Dict[str, Any]:
+        """Calculate storage-related costs."""
+        
+        # Primary EBS storage
+        storage_gb = requirements.get('storage_GB', 100)
+        
+        # EBS volume costs
+        primary_storage_type = storage_recs.get('primary_storage', 'gp3')
+        if 'gp3' in primary_storage_type:
+            ebs_cost = storage_gb * self.pricing['storage']['ebs']['gp3']
+        elif 'io2' in primary_storage_type:
+            ebs_cost = storage_gb * self.pricing['storage']['ebs']['io2']
+            # Add IOPS costs for io2
+            iops = self._extract_iops_from_recommendation(storage_recs.get('iops_recommendation', ''))
+            if iops > 3000:  # Free IOPS up to 3000 for io2
+                additional_iops = iops - 3000
+                ebs_cost += additional_iops * self.pricing['storage']['ebs']['io2_iops']
+        else:
+            ebs_cost = storage_gb * self.pricing['storage']['ebs']['gp3']
+        
+        # Snapshot costs (for backup)
+        snapshot_frequency = self._get_snapshot_frequency(storage_recs.get('backup_strategy', ''))
+        snapshot_retention_gb = storage_gb * snapshot_frequency * 0.3  # Assume 30% change rate
+        snapshot_cost = snapshot_retention_gb * self.pricing['storage']['ebs']['snapshots']
+        
+        # S3 costs for long-term backup/archival
+        s3_cost = 0
+        if env in ['PROD', 'PREPROD']:
+            # Estimate S3 usage for long-term backups
+            s3_storage_gb = storage_gb * 2  # 2x for long-term retention
+            s3_cost = s3_storage_gb * self.pricing['storage']['s3']['standard_ia']
+        
+        total_storage = ebs_cost + snapshot_cost + s3_cost
+        
+        return {
+            'ebs_primary': {
+                'cost': ebs_cost,
+                'details': f"{storage_gb} GB {primary_storage_type}",
+                'breakdown': {
+                    'volume_cost': storage_gb * (self.pricing['storage']['ebs']['io2'] if 'io2' in primary_storage_type else self.pricing['storage']['ebs']['gp3']),
+                    'iops_cost': ebs_cost - (storage_gb * (self.pricing['storage']['ebs']['io2'] if 'io2' in primary_storage_type else self.pricing['storage']['ebs']['gp3']))
+                }
+            },
+            'ebs_snapshots': {
+                'cost': snapshot_cost,
+                'details': f"~{snapshot_retention_gb:.0f} GB snapshot storage"
+            },
+            's3_backup': {
+                'cost': s3_cost,
+                'details': f"~{s3_storage_gb if s3_cost > 0 else 0} GB S3 IA storage" if s3_cost > 0 else "No S3 backup"
+            },
+            'total': total_storage,
+            'optimization_notes': self._get_storage_optimization_notes(env, storage_recs)
+        }
+    
+    def _calculate_database_costs(self, env: str, db_recs: Dict, requirements: Dict) -> Dict[str, Any]:
+        """Calculate database-related costs."""
+        
+        # RDS instance costs
+        instance_class = db_recs.get('instance_class', 'db.r6g.large')
+        engine = db_recs.get('engine', 'RDS MySQL')
+        
+        # Determine pricing based on engine
+        if 'Aurora' in engine:
+            db_instance_cost = self.pricing['database']['aurora_mysql'].get(instance_class, self.pricing['database']['aurora_mysql']['db.r6g.large'])
+        else:
+            db_instance_cost = self.pricing['database']['rds_mysql'].get(instance_class, self.pricing['database']['rds_mysql']['db.r6g.large'])
+        
+        # Multi-AZ costs (double the instance cost)
+        if db_recs.get('multi_az'):
+            db_instance_cost *= 2
+        
+        # Storage costs
+        db_storage_gb = max(requirements.get('storage_GB', 100), 20)  # Minimum 20GB for RDS
+        
+        if 'Aurora' in engine:
+            # Aurora storage pricing
+            storage_cost = db_storage_gb * self.pricing['database']['storage']['aurora_storage']
+            # Add IO costs (estimated)
+            io_cost = 1000000 * self.pricing['database']['storage']['aurora_io']  # 1M IOs estimate
+            storage_cost += io_cost
+        else:
+            # RDS storage pricing
+            storage_cost = db_storage_gb * self.pricing['database']['storage']['rds_gp2']
+        
+        # Backup storage costs
+        backup_retention = self._extract_backup_days(db_recs.get('backup_retention', '7 days'))
+        backup_storage_gb = db_storage_gb * (backup_retention / 30) * 0.2  # Estimate backup size
+        backup_cost = backup_storage_gb * self.pricing['database']['backup_storage']
+        
+        # Read replica costs
+        read_replica_cost = 0
+        read_replicas = self._extract_read_replica_count(db_recs.get('read_replicas', 'No read replicas'))
+        if read_replicas > 0:
+            read_replica_cost = db_instance_cost * read_replicas * 0.8  # 80% of primary cost
+        
+        # RDS Proxy costs (if used)
+        proxy_cost = 0
+        if 'RDS Proxy' in db_recs.get('connection_pooling', ''):
+            vcpus = requirements.get('vCPUs', 2)
+            proxy_cost = vcpus * self.pricing['database']['rds_proxy'] * 730  # Per hour pricing
+        
+        total_database = db_instance_cost + storage_cost + backup_cost + read_replica_cost + proxy_cost
+        
+        return {
+            'db_instance': {
+                'cost': db_instance_cost,
+                'details': f"{instance_class} ({engine}) {'Multi-AZ' if db_recs.get('multi_az') else 'Single-AZ'}"
+            },
+            'db_storage': {
+                'cost': storage_cost,
+                'details': f"{db_storage_gb} GB {'Aurora' if 'Aurora' in engine else 'RDS'} storage"
+            },
+            'backup_storage': {
+                'cost': backup_cost,
+                'details': f"~{backup_storage_gb:.0f} GB backup retention ({backup_retention} days)"
+            },
+            'read_replicas': {
+                'cost': read_replica_cost,
+                'details': f"{read_replicas} read replicas" if read_replicas > 0 else "No read replicas"
+            },
+            'rds_proxy': {
+                'cost': proxy_cost,
+                'details': f"RDS Proxy for {vcpus} vCPUs" if proxy_cost > 0 else "No RDS Proxy"
+            },
+            'total': total_database,
+            'optimization_notes': self._get_database_optimization_notes(env, db_recs)
+        }
+    
+    def _calculate_security_costs(self, env: str, security_recs: Dict, requirements: Dict) -> Dict[str, Any]:
+        """Calculate security-related costs."""
+        
+        # Secrets Manager
+        secrets_count = self._estimate_secrets_count(env)
+        secrets_cost = secrets_count * self.pricing['security']['secrets_manager']
+        
+        # KMS keys
+        kms_keys = self._estimate_kms_keys(env, security_recs)
+        kms_cost = kms_keys * self.pricing['security']['kms']
+        
+        # Config
+        config_items = self._estimate_config_items(env)
+        config_cost = config_items * self.pricing['security']['config']
+        
+        # CloudTrail
+        cloudtrail_cost = self.pricing['security']['cloudtrail']
+        
+        # GuardDuty (production environments)
+        guardduty_cost = 0
+        if env in ['PROD', 'PREPROD']:
+            guardduty_cost = self.pricing['security']['guardduty']
+        
+        # Security Hub
+        security_hub_cost = 0
+        if env in ['PROD', 'PREPROD']:
+            findings_per_month = 1000  # Estimate
+            security_hub_cost = findings_per_month * self.pricing['security']['security_hub']
+        
+        # WAF (if web application)
+        waf_cost = 0
+        if env in ['PROD', 'PREPROD']:
+            waf_cost = self.pricing['security']['waf']
+        
+        total_security = secrets_cost + kms_cost + config_cost + cloudtrail_cost + guardduty_cost + security_hub_cost + waf_cost
+        
+        return {
+            'secrets_manager': {
+                'cost': secrets_cost,
+                'details': f"{secrets_count} secrets"
+            },
+            'kms': {
+                'cost': kms_cost,
+                'details': f"{kms_keys} customer managed keys"
+            },
+            'config': {
+                'cost': config_cost,
+                'details': f"~{config_items} configuration items"
+            },
+            'cloudtrail': {
+                'cost': cloudtrail_cost,
+                'details': "Management events trail"
+            },
+            'guardduty': {
+                'cost': guardduty_cost,
+                'details': "Threat detection" if guardduty_cost > 0 else "Not enabled"
+            },
+            'security_hub': {
+                'cost': security_hub_cost,
+                'details': f"~{1000 if security_hub_cost > 0 else 0} findings/month" if security_hub_cost > 0 else "Not enabled"
+            },
+            'waf': {
+                'cost': waf_cost,
+                'details': "Web Application Firewall" if waf_cost > 0 else "Not enabled"
+            },
+            'total': total_security,
+            'optimization_notes': self._get_security_optimization_notes(env)
+        }
+    
+    def _calculate_monitoring_costs(self, env: str, monitoring_recs: Dict, requirements: Dict) -> Dict[str, Any]:
+        """Calculate monitoring-related costs."""
+        
+        # CloudWatch metrics
+        custom_metrics = self._estimate_custom_metrics(env)
+        metrics_cost = custom_metrics * self.pricing['monitoring']['cloudwatch']['metrics']
+        
+        # CloudWatch dashboards
+        dashboards = self._estimate_dashboards(env)
+        dashboard_cost = dashboards * self.pricing['monitoring']['cloudwatch']['dashboards']
+        
+        # CloudWatch alarms
+        alarms = self._estimate_alarms(env)
+        alarm_cost = alarms * self.pricing['monitoring']['cloudwatch']['alarms']
+        
+        # CloudWatch logs
+        log_ingestion_gb = self._estimate_log_volume(env)
+        log_cost = log_ingestion_gb * self.pricing['monitoring']['cloudwatch']['logs_ingestion']
+        log_storage_cost = log_ingestion_gb * self.pricing['monitoring']['cloudwatch']['logs_storage']
+        
+        # X-Ray (if enabled)
+        xray_cost = 0
+        if monitoring_recs.get('apm') == 'X-Ray':
+            trace_volume = 1  # 1 million traces estimate
+            xray_cost = trace_volume * self.pricing['monitoring']['xray']
+        
+        # Synthetics (if enabled)
+        synthetics_cost = 0
+        if monitoring_recs.get('synthetic_monitoring') == 'Required':
+            canary_runs = 30 * 24 * 12  # 12 runs per hour, 24/7
+            synthetics_cost = canary_runs * self.pricing['monitoring']['synthetics']
+        
+        total_monitoring = metrics_cost + dashboard_cost + alarm_cost + log_cost + log_storage_cost + xray_cost + synthetics_cost
+        
+        return {
+            'cloudwatch_metrics': {
+                'cost': metrics_cost,
+                'details': f"{custom_metrics} custom metrics"
+            },
+            'cloudwatch_dashboards': {
+                'cost': dashboard_cost,
+                'details': f"{dashboards} dashboards"
+            },
+            'cloudwatch_alarms': {
+                'cost': alarm_cost,
+                'details': f"{alarms} alarms"
+            },
+            'cloudwatch_logs': {
+                'cost': log_cost + log_storage_cost,
+                'details': f"~{log_ingestion_gb} GB/month ingestion + storage",
+                'breakdown': {
+                    'ingestion': log_cost,
+                    'storage': log_storage_cost
+                }
+            },
+            'xray': {
+                'cost': xray_cost,
+                'details': "Application tracing" if xray_cost > 0 else "Not enabled"
+            },
+            'synthetics': {
+                'cost': synthetics_cost,
+                'details': f"~{canary_runs if synthetics_cost > 0 else 0} canary runs/month" if synthetics_cost > 0 else "Not enabled"
+            },
+            'total': total_monitoring,
+            'optimization_notes': self._get_monitoring_optimization_notes(env)
+        }
+    
+    # Helper methods for cost calculations
+    def _get_instance_count(self, env: str) -> int:
+        """Get instance count based on environment."""
+        counts = {'DEV': 1, 'QA': 1, 'UAT': 2, 'PREPROD': 2, 'PROD': 3}
+        return counts.get(env, 2)
+    
+    def _estimate_cdn_usage(self, env: str) -> float:
+        """Estimate CDN data transfer in GB."""
+        usage = {'DEV': 0, 'QA': 0, 'UAT': 50, 'PREPROD': 100, 'PROD': 500}
+        return usage.get(env, 100)
+    
+    def _estimate_data_transfer_costs(self, env: str) -> float:
+        """Estimate data transfer costs."""
+        # Simplified estimation
+        transfer_gb = {'DEV': 10, 'QA': 20, 'UAT': 50, 'PREPROD': 100, 'PROD': 500}
+        gb = transfer_gb.get(env, 50)
+        return gb * self.pricing['network']['data_transfer']['out_to_internet_up_to_10tb']
+    
+    def _extract_iops_from_recommendation(self, iops_rec: str) -> int:
+        """Extract IOPS number from recommendation string."""
+        import re
+        match = re.search(r'(\d+)', iops_rec)
+        return int(match.group(1)) if match else 3000
+    
+    def _get_snapshot_frequency(self, backup_strategy: str) -> float:
+        """Get snapshot frequency multiplier."""
+        if 'Daily' in backup_strategy:
+            return 30
+        elif 'Twice daily' in backup_strategy:
+            return 60
+        elif 'Continuous' in backup_strategy:
+            return 365
+        return 30
+    
+    def _extract_backup_days(self, retention: str) -> int:
+        """Extract backup retention days."""
+        import re
+        match = re.search(r'(\d+)', retention)
+        return int(match.group(1)) if match else 7
+    
+    def _extract_read_replica_count(self, replica_config: str) -> int:
+        """Extract read replica count."""
+        if 'No read replicas' in replica_config:
+            return 0
+        elif '1 read replica' in replica_config:
+            return 1
+        elif '1-2 read replicas' in replica_config:
+            return 2
+        elif '2-3 read replicas' in replica_config:
+            return 3
+        elif '3+ read replicas' in replica_config:
+            return 3
+        return 0
+    
+    def _estimate_secrets_count(self, env: str) -> int:
+        """Estimate number of secrets."""
+        counts = {'DEV': 3, 'QA': 5, 'UAT': 8, 'PREPROD': 12, 'PROD': 15}
+        return counts.get(env, 8)
+    
+    def _estimate_kms_keys(self, env: str, security_recs: Dict) -> int:
+        """Estimate KMS keys needed."""
+        base_keys = {'DEV': 1, 'QA': 2, 'UAT': 3, 'PREPROD': 4, 'PROD': 5}
+        return base_keys.get(env, 3)
+    
+    def _estimate_config_items(self, env: str) -> int:
+        """Estimate AWS Config items."""
+        counts = {'DEV': 10, 'QA': 20, 'UAT': 50, 'PREPROD': 100, 'PROD': 200}
+        return counts.get(env, 50)
+    
+    def _estimate_custom_metrics(self, env: str) -> int:
+        """Estimate custom CloudWatch metrics."""
+        counts = {'DEV': 5, 'QA': 10, 'UAT': 25, 'PREPROD': 50, 'PROD': 100}
+        return counts.get(env, 25)
+    
+    def _estimate_dashboards(self, env: str) -> int:
+        """Estimate CloudWatch dashboards."""
+        counts = {'DEV': 1, 'QA': 1, 'UAT': 2, 'PREPROD': 3, 'PROD': 5}
+        return counts.get(env, 2)
+    
+    def _estimate_alarms(self, env: str) -> int:
+        """Estimate CloudWatch alarms."""
+        counts = {'DEV': 5, 'QA': 10, 'UAT': 20, 'PREPROD': 40, 'PROD': 80}
+        return counts.get(env, 20)
+    
+    def _estimate_log_volume(self, env: str) -> float:
+        """Estimate log volume in GB per month."""
+        volumes = {'DEV': 1, 'QA': 2, 'UAT': 5, 'PREPROD': 15, 'PROD': 50}
+        return volumes.get(env, 10)
+    
+    # Optimization notes methods
+    def _get_compute_optimization_notes(self, env: str, instance_type: str, pricing_model: str) -> List[str]:
+        """Get compute optimization recommendations."""
+        notes = []
+        if pricing_model == 'on_demand' and env in ['PROD', 'PREPROD']:
+            notes.append("💡 Consider Reserved Instances for 20-40% cost savings")
+        if 'large' in instance_type and env == 'DEV':
+            notes.append("💡 Consider smaller instances for development environment")
+        notes.append("💡 Monitor CPU utilization to right-size instances")
+        return notes
+    
+    def _get_network_optimization_notes(self, env: str) -> List[str]:
+        """Get network optimization recommendations."""
+        notes = [
+            "💡 Use CloudFront to reduce data transfer costs",
+            "💡 Implement VPC endpoints to avoid NAT Gateway costs for AWS services"
+        ]
+        if env in ['DEV', 'QA']:
+            notes.append("💡 Single NAT Gateway sufficient for non-production")
+        return notes
+    
+    def _get_storage_optimization_notes(self, env: str, storage_recs: Dict) -> List[str]:
+        """Get storage optimization recommendations."""
+        notes = [
+            "💡 Use gp3 volumes for better price-performance ratio",
+            "💡 Implement lifecycle policies for S3 backup storage"
+        ]
+        if env in ['PROD', 'PREPROD']:
+            notes.append("💡 Consider EBS snapshots cross-region replication")
+        return notes
+    
+    def _get_database_optimization_notes(self, env: str, db_recs: Dict) -> List[str]:
+        """Get database optimization recommendations."""
+        notes = [
+            "💡 Use Aurora for better price-performance at scale",
+            "💡 Monitor database utilization for right-sizing"
+        ]
+        if env not in ['PROD']:
+            notes.append("💡 Single-AZ deployment sufficient for non-production")
+        return notes
+    
+    def _get_security_optimization_notes(self, env: str) -> List[str]:
+        """Get security optimization recommendations."""
+        notes = [
+            "💡 Use AWS managed keys where possible to reduce costs",
+            "💡 Implement proper log retention policies"
+        ]
+        if env in ['DEV', 'QA']:
+            notes.append("💡 Reduce security tooling for development environments")
+        return notes
+    
+    def _get_monitoring_optimization_notes(self, env: str) -> List[str]:
+        """Get monitoring optimization recommendations."""
+        notes = [
+            "💡 Use metric filters to reduce custom metric costs",
+            "💡 Implement log retention policies to control storage costs"
+        ]
+        if env in ['DEV', 'QA']:
+            notes.append("💡 Reduce monitoring frequency for development environments")
+        return notes
+
 class EnhancedEnvironmentAnalyzer:
     """Enhanced environment analyzer with detailed complexity explanations."""
     
     def __init__(self):
         self.environments = ['DEV', 'QA', 'UAT', 'PREPROD', 'PROD']
+        self.cost_calculator = AWSCostCalculator()
         
     def get_detailed_complexity_explanation(self, env: str, env_results: Dict) -> Dict[str, Any]:
         """Get detailed explanation of environment complexity."""
@@ -1598,16 +2265,69 @@ def render_enhanced_results():
         total_costs = cost_breakdown.get('total_costs', {})
         
         if total_costs:
-            cost_data = []
-            for pricing_model, cost in total_costs.items():
-                cost_data.append({
-                    'Pricing Model': pricing_model.replace('_', ' ').title(),
-                    'Monthly Cost': f"${cost:,.2f}",
-                    'Annual Cost': f"${cost*12:,.2f}"
-                })
+            col1, col2 = st.columns(2)
             
-            df_costs = pd.DataFrame(cost_data)
-            st.dataframe(df_costs, use_container_width=True, hide_index=True)
+            with col1:
+                st.markdown("**Instance Pricing Comparison**")
+                cost_data = []
+                for pricing_model, cost in total_costs.items():
+                    cost_data.append({
+                        'Pricing Model': pricing_model.replace('_', ' ').title(),
+                        'Monthly Cost': f"${cost:,.2f}",
+                        'Annual Cost': f"${cost*12:,.2f}"
+                    })
+                
+                df_costs = pd.DataFrame(cost_data)
+                st.dataframe(df_costs, use_container_width=True, hide_index=True)
+            
+            with col2:
+                st.markdown("**AWS Service Cost Breakdown (PROD)**")
+                
+                # Calculate detailed service costs if available
+                try:
+                    analyzer = EnhancedEnvironmentAnalyzer()
+                    tech_recs = analyzer.get_technical_recommendations('PROD', prod_results)
+                    cost_calculator = AWSCostCalculator()
+                    service_costs = cost_calculator.calculate_service_costs('PROD', tech_recs, prod_results.get('requirements', {}))
+                    
+                    service_cost_data = []
+                    categories = ['compute', 'network', 'storage', 'database', 'security', 'monitoring']
+                    for cat in categories:
+                        if cat in service_costs:
+                            service_cost_data.append({
+                                'Service Category': cat.title(),
+                                'Monthly Cost': f"${service_costs[cat]['total']:.2f}"
+                            })
+                    
+                    if service_cost_data:
+                        df_service_costs = pd.DataFrame(service_cost_data)
+                        st.dataframe(df_service_costs, use_container_width=True, hide_index=True)
+                        
+                        # Show total from service breakdown
+                        total_services = sum(service_costs[cat]['total'] for cat in categories if cat in service_costs)
+                        st.markdown(f"**Total Monthly AWS Services Cost: ${total_services:.2f}**")
+                    else:
+                        # Fallback to basic cost display
+                        basic_cost_data = [
+                            {'Cost Component': 'Instance Costs', 'Monthly Cost': f"${cost_breakdown.get('instance_costs', {}).get('on_demand', 0):.2f}"},
+                            {'Cost Component': 'Storage Costs', 'Monthly Cost': f"${cost_breakdown.get('storage_costs', {}).get('primary_storage', 0):.2f}"},
+                            {'Cost Component': 'Network Costs', 'Monthly Cost': f"${cost_breakdown.get('network_costs', {}).get('data_transfer', 0):.2f}"}
+                        ]
+                        
+                        df_basic_costs = pd.DataFrame(basic_cost_data)
+                        st.dataframe(df_basic_costs, use_container_width=True, hide_index=True)
+                
+                except Exception as e:
+                    logger.error(f"Error calculating detailed service costs: {e}")
+                    # Fallback to basic cost display
+                    basic_cost_data = [
+                        {'Cost Component': 'Instance Costs', 'Monthly Cost': f"${cost_breakdown.get('instance_costs', {}).get('on_demand', 0):.2f}"},
+                        {'Cost Component': 'Storage Costs', 'Monthly Cost': f"${cost_breakdown.get('storage_costs', {}).get('primary_storage', 0):.2f}"},
+                        {'Cost Component': 'Network Costs', 'Monthly Cost': f"${cost_breakdown.get('network_costs', {}).get('data_transfer', 0):.2f}"}
+                    ]
+                    
+                    df_basic_costs = pd.DataFrame(basic_cost_data)
+                    st.dataframe(df_basic_costs, use_container_width=True, hide_index=True)
         
     except Exception as e:
         st.error(f"❌ Error displaying results: {str(e)}")
@@ -1704,7 +2424,7 @@ def render_enhanced_environment_heatmap_tab():
     st.dataframe(df_detailed, use_container_width=True, hide_index=True)
 
 def render_technical_recommendations_tab():
-    """Render comprehensive technical recommendations tab."""
+    """Render comprehensive technical recommendations tab with cost details."""
     
     st.markdown("### 🔧 Comprehensive Technical Recommendations by Environment")
     
@@ -1714,12 +2434,13 @@ def render_technical_recommendations_tab():
     
     results = st.session_state.enhanced_results
     analyzer = EnhancedEnvironmentAnalyzer()
+    cost_calculator = AWSCostCalculator()
     
     # Environment selector
     selected_env = st.selectbox(
         "Select Environment for Detailed Technical Recommendations:",
         ['PROD', 'PREPROD', 'UAT', 'QA', 'DEV'],
-        help="Choose an environment to see comprehensive technical specifications"
+        help="Choose an environment to see comprehensive technical specifications and costs"
     )
     
     env_results = results['recommendations'].get(selected_env, {})
@@ -1728,22 +2449,74 @@ def render_technical_recommendations_tab():
         st.warning(f"No analysis results available for {selected_env} environment.")
         return
     
-    # Get technical recommendations
+    # Get technical recommendations and costs
     tech_recs = analyzer.get_technical_recommendations(selected_env, env_results)
+    requirements = env_results.get('requirements', {})
+    service_costs = cost_calculator.calculate_service_costs(selected_env, tech_recs, requirements)
     
-    st.markdown(f"## {selected_env} Environment - Technical Specifications")
+    st.markdown(f"## {selected_env} Environment - Technical Specifications & Costs")
     
-    # Create tabs for different technical areas
+    # Cost summary at the top
+    st.markdown("### 💰 Cost Summary")
+    
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        total_monthly = service_costs['summary']['total_monthly']
+        st.metric("Total Monthly Cost", f"${total_monthly:,.2f}")
+    
+    with col2:
+        total_annual = service_costs['summary']['total_annual']
+        st.metric("Total Annual Cost", f"${total_annual:,.2f}")
+    
+    with col3:
+        largest_category = service_costs['summary']['largest_cost_category']
+        largest_cost = service_costs[largest_category]['total']
+        st.metric("Largest Cost Driver", f"{largest_category.title()}: ${largest_cost:.2f}")
+    
+    with col4:
+        # Calculate cost per vCPU
+        vcpus = requirements.get('vCPUs', 2)
+        cost_per_vcpu = total_monthly / vcpus if vcpus > 0 else 0
+        st.metric("Cost per vCPU/month", f"${cost_per_vcpu:.2f}")
+    
+    # Cost breakdown chart
+    st.markdown("#### Cost Breakdown by Service Category")
+    
+    categories = ['compute', 'network', 'storage', 'database', 'security', 'monitoring']
+    costs = [service_costs[cat]['total'] for cat in categories]
+    
+    fig_pie = go.Figure(data=[go.Pie(
+        labels=[cat.title() for cat in categories],
+        values=costs,
+        hole=.3,
+        textinfo='label+percent',
+        textposition='auto'
+    )])
+    
+    fig_pie.update_layout(
+        title="Monthly Cost Distribution",
+        height=400,
+        showlegend=True
+    )
+    
+    st.plotly_chart(fig_pie, use_container_width=True)
+    
+    # Create tabs for different technical areas with costs
     tech_tabs = st.tabs([
-        "💻 Compute", "🌐 Network", "💾 Storage", 
-        "🗄️ Database", "🔒 Security", "📊 Monitoring"
+        "💻 Compute & Costs", "🌐 Network & Costs", "💾 Storage & Costs", 
+        "🗄️ Database & Costs", "🔒 Security & Costs", "📊 Monitoring & Costs"
     ])
     
-    # Compute tab
+    # Compute tab with costs
     with tech_tabs[0]:
-        st.markdown("#### Compute Configuration")
+        st.markdown("#### 💻 Compute Configuration & Costs")
         
         compute_recs = tech_recs['compute']
+        compute_costs = service_costs['compute']
+        
+        # Cost overview
+        st.markdown(f"**Monthly Compute Cost: ${compute_costs['total']:.2f}**")
         
         col1, col2 = st.columns(2)
         
@@ -1762,20 +2535,21 @@ def render_technical_recommendations_tab():
             st.dataframe(df_instance, use_container_width=True, hide_index=True)
         
         with col2:
-            st.markdown("**Alternative Instance Options**")
+            st.markdown("**Compute Cost Breakdown**")
             
-            alternatives = compute_recs['alternative_instances']
-            if alternatives:
-                alt_data = []
-                for alt in alternatives:
-                    alt_data.append({
-                        'Instance Type': alt['type'],
-                        'Rationale': alt['rationale']
+            cost_breakdown_data = []
+            for service, details in compute_costs.items():
+                if service != 'total' and service != 'optimization_notes':
+                    cost_breakdown_data.append({
+                        'Service': service.replace('_', ' ').title(),
+                        'Monthly Cost': f"${details['cost']:.2f}",
+                        'Details': details['details']
                     })
-                
-                df_alternatives = pd.DataFrame(alt_data)
-                st.dataframe(df_alternatives, use_container_width=True, hide_index=True)
+            
+            df_compute_costs = pd.DataFrame(cost_breakdown_data)
+            st.dataframe(df_compute_costs, use_container_width=True, hide_index=True)
         
+        # Deployment configuration
         st.markdown("**Deployment Configuration**")
         
         deployment_data = [
@@ -1786,71 +2560,390 @@ def render_technical_recommendations_tab():
         
         df_deployment = pd.DataFrame(deployment_data)
         st.dataframe(df_deployment, use_container_width=True, hide_index=True)
+        
+        # Cost optimization notes
+        st.markdown("**💡 Cost Optimization Recommendations**")
+        for note in compute_costs.get('optimization_notes', []):
+            st.markdown(note)
     
-    # Network tab
+    # Network tab with costs
     with tech_tabs[1]:
-        st.markdown("#### Network Configuration")
+        st.markdown("#### 🌐 Network Configuration & Costs")
         
         network_recs = tech_recs['network']
+        network_costs = service_costs['network']
         
-        network_data = []
-        for key, value in network_recs.items():
-            network_data.append({'Component': key.replace('_', ' ').title(), 'Configuration': value})
+        # Cost overview
+        st.markdown(f"**Monthly Network Cost: ${network_costs['total']:.2f}**")
         
-        df_network = pd.DataFrame(network_data)
-        st.dataframe(df_network, use_container_width=True, hide_index=True)
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("**Core Network Components**")
+            
+            core_network_data = [
+                {'Component': 'VPC Design', 'Configuration': network_recs['vpc_design']},
+                {'Component': 'Subnets', 'Configuration': network_recs['subnets']},
+                {'Component': 'Security Groups', 'Configuration': network_recs['security_groups']},
+                {'Component': 'Load Balancer', 'Configuration': network_recs['load_balancer']}
+            ]
+            
+            df_core_network = pd.DataFrame(core_network_data)
+            st.dataframe(df_core_network, use_container_width=True, hide_index=True)
+        
+        with col2:
+            st.markdown("**Network Cost Breakdown**")
+            
+            network_cost_data = []
+            for service, details in network_costs.items():
+                if service != 'total' and service != 'optimization_notes':
+                    network_cost_data.append({
+                        'Service': service.replace('_', ' ').title(),
+                        'Monthly Cost': f"${details['cost']:.2f}",
+                        'Details': details['details']
+                    })
+            
+            df_network_costs = pd.DataFrame(network_cost_data)
+            st.dataframe(df_network_costs, use_container_width=True, hide_index=True)
+        
+        # Advanced network services
+        st.markdown("**Advanced Network Services**")
+        
+        advanced_network_data = [
+            {'Service': 'CDN', 'Configuration': network_recs['cdn']},
+            {'Service': 'DNS', 'Configuration': network_recs['dns']},
+            {'Service': 'NAT Gateway', 'Configuration': network_recs['nat_gateway']},
+            {'Service': 'VPN', 'Configuration': network_recs['vpn']}
+        ]
+        
+        df_advanced_network = pd.DataFrame(advanced_network_data)
+        st.dataframe(df_advanced_network, use_container_width=True, hide_index=True)
+        
+        # Cost optimization notes
+        st.markdown("**💡 Network Cost Optimization**")
+        for note in network_costs.get('optimization_notes', []):
+            st.markdown(note)
     
-    # Storage tab
+    # Storage tab with costs
     with tech_tabs[2]:
-        st.markdown("#### Storage Configuration")
+        st.markdown("#### 💾 Storage Configuration & Costs")
         
         storage_recs = tech_recs['storage']
+        storage_costs = service_costs['storage']
         
-        storage_data = []
-        for key, value in storage_recs.items():
-            storage_data.append({'Setting': key.replace('_', ' ').title(), 'Configuration': value})
+        # Cost overview
+        st.markdown(f"**Monthly Storage Cost: ${storage_costs['total']:.2f}**")
         
-        df_storage = pd.DataFrame(storage_data)
-        st.dataframe(df_storage, use_container_width=True, hide_index=True)
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("**Primary Storage Configuration**")
+            
+            storage_config_data = [
+                {'Setting': 'Storage Type', 'Value': storage_recs['primary_storage']},
+                {'Setting': 'Recommended Size', 'Value': storage_recs['recommended_size']},
+                {'Setting': 'IOPS', 'Value': storage_recs['iops_recommendation']},
+                {'Setting': 'Throughput', 'Value': storage_recs['throughput_recommendation']}
+            ]
+            
+            df_storage_config = pd.DataFrame(storage_config_data)
+            st.dataframe(df_storage_config, use_container_width=True, hide_index=True)
+        
+        with col2:
+            st.markdown("**Storage Cost Breakdown**")
+            
+            storage_cost_data = []
+            for service, details in storage_costs.items():
+                if service != 'total' and service != 'optimization_notes':
+                    storage_cost_data.append({
+                        'Storage Type': service.replace('_', ' ').title(),
+                        'Monthly Cost': f"${details['cost']:.2f}",
+                        'Details': details['details']
+                    })
+            
+            df_storage_costs = pd.DataFrame(storage_cost_data)
+            st.dataframe(df_storage_costs, use_container_width=True, hide_index=True)
+        
+        # Data protection
+        st.markdown("**Data Protection & Management**")
+        
+        protection_data = [
+            {'Feature': 'Backup Strategy', 'Configuration': storage_recs['backup_strategy']},
+            {'Feature': 'Encryption', 'Configuration': storage_recs['encryption']},
+            {'Feature': 'Performance', 'Configuration': storage_recs['performance']},
+            {'Feature': 'Lifecycle Policy', 'Configuration': storage_recs['lifecycle_policy']}
+        ]
+        
+        df_protection = pd.DataFrame(protection_data)
+        st.dataframe(df_protection, use_container_width=True, hide_index=True)
+        
+        # Cost optimization notes
+        st.markdown("**💡 Storage Cost Optimization**")
+        for note in storage_costs.get('optimization_notes', []):
+            st.markdown(note)
     
-    # Database tab
+    # Database tab with costs
     with tech_tabs[3]:
-        st.markdown("#### Database Configuration")
+        st.markdown("#### 🗄️ Database Configuration & Costs")
         
         db_recs = tech_recs['database']
+        db_costs = service_costs['database']
         
-        db_data = []
-        for key, value in db_recs.items():
-            db_data.append({'Setting': key.replace('_', ' ').title(), 'Configuration': value})
+        # Cost overview
+        st.markdown(f"**Monthly Database Cost: ${db_costs['total']:.2f}**")
         
-        df_db = pd.DataFrame(db_data)
-        st.dataframe(df_db, use_container_width=True, hide_index=True)
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("**Database Engine & Instance**")
+            
+            db_config_data = [
+                {'Setting': 'Database Engine', 'Value': db_recs['engine']},
+                {'Setting': 'Instance Class', 'Value': db_recs['instance_class']},
+                {'Setting': 'Multi-AZ', 'Value': 'Yes' if db_recs['multi_az'] else 'No'},
+                {'Setting': 'Backup Retention', 'Value': db_recs['backup_retention']}
+            ]
+            
+            df_db_config = pd.DataFrame(db_config_data)
+            st.dataframe(df_db_config, use_container_width=True, hide_index=True)
+        
+        with col2:
+            st.markdown("**Database Cost Breakdown**")
+            
+            db_cost_data = []
+            for service, details in db_costs.items():
+                if service != 'total' and service != 'optimization_notes':
+                    db_cost_data.append({
+                        'Database Component': service.replace('_', ' ').title(),
+                        'Monthly Cost': f"${details['cost']:.2f}",
+                        'Details': details['details']
+                    })
+            
+            df_db_costs = pd.DataFrame(db_cost_data)
+            st.dataframe(df_db_costs, use_container_width=True, hide_index=True)
+        
+        # Advanced database features
+        st.markdown("**Advanced Database Features**")
+        
+        db_advanced_data = [
+            {'Feature': 'Read Replicas', 'Configuration': db_recs['read_replicas']},
+            {'Feature': 'Connection Pooling', 'Configuration': db_recs['connection_pooling']},
+            {'Feature': 'Maintenance Window', 'Configuration': db_recs['maintenance_window']},
+            {'Feature': 'Monitoring', 'Configuration': db_recs['monitoring']}
+        ]
+        
+        df_db_advanced = pd.DataFrame(db_advanced_data)
+        st.dataframe(df_db_advanced, use_container_width=True, hide_index=True)
+        
+        # Cost optimization notes
+        st.markdown("**💡 Database Cost Optimization**")
+        for note in db_costs.get('optimization_notes', []):
+            st.markdown(note)
     
-    # Security tab
+    # Security tab with costs
     with tech_tabs[4]:
-        st.markdown("#### Security Configuration")
+        st.markdown("#### 🔒 Security Configuration & Costs")
         
         security_recs = tech_recs['security']
+        security_costs = service_costs['security']
         
-        security_data = []
-        for key, value in security_recs.items():
-            security_data.append({'Security Area': key.replace('_', ' ').title(), 'Configuration': value})
+        # Cost overview
+        st.markdown(f"**Monthly Security Cost: ${security_costs['total']:.2f}**")
         
-        df_security = pd.DataFrame(security_data)
-        st.dataframe(df_security, use_container_width=True, hide_index=True)
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("**Security Services Configuration**")
+            
+            security_data = []
+            for key, value in security_recs.items():
+                security_data.append({'Security Area': key.replace('_', ' ').title(), 'Configuration': value})
+            
+            df_security = pd.DataFrame(security_data)
+            st.dataframe(df_security, use_container_width=True, hide_index=True)
+        
+        with col2:
+            st.markdown("**Security Cost Breakdown**")
+            
+            security_cost_data = []
+            for service, details in security_costs.items():
+                if service != 'total' and service != 'optimization_notes':
+                    security_cost_data.append({
+                        'Security Service': service.replace('_', ' ').title(),
+                        'Monthly Cost': f"${details['cost']:.2f}",
+                        'Details': details['details']
+                    })
+            
+            df_security_costs = pd.DataFrame(security_cost_data)
+            st.dataframe(df_security_costs, use_container_width=True, hide_index=True)
+        
+        # Security best practices
+        st.markdown("**Security Best Practices for this Environment:**")
+        
+        security_practices = [
+            "🔐 Implement least privilege access principles",
+            "🔍 Enable comprehensive audit logging",
+            "🛡️ Use AWS Config for compliance monitoring",
+            "🚨 Set up GuardDuty for threat detection",
+            "📊 Regular security assessments and penetration testing"
+        ]
+        
+        for practice in security_practices:
+            st.markdown(practice)
+        
+        # Cost optimization notes
+        st.markdown("**💡 Security Cost Optimization**")
+        for note in security_costs.get('optimization_notes', []):
+            st.markdown(note)
     
-    # Monitoring tab
+    # Monitoring tab with costs
     with tech_tabs[5]:
-        st.markdown("#### Monitoring Configuration")
+        st.markdown("#### 📊 Monitoring Configuration & Costs")
         
         monitoring_recs = tech_recs['monitoring']
+        monitoring_costs = service_costs['monitoring']
         
-        monitoring_data = []
-        for key, value in monitoring_recs.items():
-            monitoring_data.append({'Component': key.replace('_', ' ').title(), 'Configuration': value})
+        # Cost overview
+        st.markdown(f"**Monthly Monitoring Cost: ${monitoring_costs['total']:.2f}**")
         
-        df_monitoring = pd.DataFrame(monitoring_data)
-        st.dataframe(df_monitoring, use_container_width=True, hide_index=True)
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("**Core Monitoring Setup**")
+            
+            monitoring_core_data = [
+                {'Component': 'CloudWatch', 'Configuration': monitoring_recs['cloudwatch']},
+                {'Component': 'Alerting', 'Configuration': monitoring_recs['alerting']},
+                {'Component': 'Dashboards', 'Configuration': monitoring_recs['dashboards']},
+                {'Component': 'Log Retention', 'Configuration': monitoring_recs['log_retention']}
+            ]
+            
+            df_monitoring_core = pd.DataFrame(monitoring_core_data)
+            st.dataframe(df_monitoring_core, use_container_width=True, hide_index=True)
+        
+        with col2:
+            st.markdown("**Monitoring Cost Breakdown**")
+            
+            monitoring_cost_data = []
+            for service, details in monitoring_costs.items():
+                if service != 'total' and service != 'optimization_notes':
+                    monitoring_cost_data.append({
+                        'Monitoring Service': service.replace('_', ' ').title(),
+                        'Monthly Cost': f"${details['cost']:.2f}",
+                        'Details': details['details']
+                    })
+            
+            df_monitoring_costs = pd.DataFrame(monitoring_cost_data)
+            st.dataframe(df_monitoring_costs, use_container_width=True, hide_index=True)
+        
+        # Advanced monitoring services
+        st.markdown("**Advanced Monitoring Services**")
+        
+        monitoring_advanced_data = [
+            {'Service': 'APM (X-Ray)', 'Configuration': monitoring_recs['apm']},
+            {'Service': 'Synthetic Monitoring', 'Configuration': monitoring_recs['synthetic_monitoring']},
+            {'Service': 'Cost Monitoring', 'Configuration': monitoring_recs['cost_monitoring']},
+            {'Service': 'Health Checks', 'Configuration': monitoring_recs['health_checks']}
+        ]
+        
+        df_monitoring_advanced = pd.DataFrame(monitoring_advanced_data)
+        st.dataframe(df_monitoring_advanced, use_container_width=True, hide_index=True)
+        
+        # Cost optimization notes
+        st.markdown("**💡 Monitoring Cost Optimization**")
+        for note in monitoring_costs.get('optimization_notes', []):
+            st.markdown(note)
+    
+    # Cost comparison across environments
+    st.markdown("---")
+    st.markdown("### 📊 Cost Comparison Across Environments")
+    
+    # Calculate costs for all environments
+    all_env_costs = []
+    
+    for env in ['DEV', 'QA', 'UAT', 'PREPROD', 'PROD']:
+        env_results_temp = results['recommendations'].get(env, {})
+        if env_results_temp:
+            tech_recs_temp = analyzer.get_technical_recommendations(env, env_results_temp)
+            requirements_temp = env_results_temp.get('requirements', {})
+            costs_temp = cost_calculator.calculate_service_costs(env, tech_recs_temp, requirements_temp)
+            
+            all_env_costs.append({
+                'Environment': env,
+                'Compute': costs_temp['compute']['total'],
+                'Network': costs_temp['network']['total'],
+                'Storage': costs_temp['storage']['total'],
+                'Database': costs_temp['database']['total'],
+                'Security': costs_temp['security']['total'],
+                'Monitoring': costs_temp['monitoring']['total'],
+                'Total Monthly': costs_temp['summary']['total_monthly']
+            })
+    
+    if all_env_costs:
+        df_env_costs = pd.DataFrame(all_env_costs)
+        
+        # Create stacked bar chart
+        fig_bar = go.Figure()
+        
+        categories = ['Compute', 'Network', 'Storage', 'Database', 'Security', 'Monitoring']
+        colors = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4']
+        
+        for i, category in enumerate(categories):
+            fig_bar.add_trace(go.Bar(
+                name=category,
+                x=df_env_costs['Environment'],
+                y=df_env_costs[category],
+                marker_color=colors[i]
+            ))
+        
+        fig_bar.update_layout(
+            title="Monthly Cost Comparison Across Environments",
+            barmode='stack',
+            xaxis_title="Environment",
+            yaxis_title="Monthly Cost ($)",
+            height=500
+        )
+        
+        st.plotly_chart(fig_bar, use_container_width=True)
+        
+        # Show detailed comparison table
+        st.dataframe(df_env_costs, use_container_width=True, hide_index=True)
+        
+        # Cost insights
+        st.markdown("**💡 Cost Insights:**")
+        total_costs = df_env_costs['Total Monthly'].tolist()
+        if len(total_costs) >= 2:
+            prod_cost = df_env_costs[df_env_costs['Environment'] == 'PROD']['Total Monthly'].iloc[0] if 'PROD' in df_env_costs['Environment'].values else 0
+            dev_cost = df_env_costs[df_env_costs['Environment'] == 'DEV']['Total Monthly'].iloc[0] if 'DEV' in df_env_costs['Environment'].values else 0
+            
+            if prod_cost > 0 and dev_cost > 0:
+                cost_ratio = prod_cost / dev_cost
+                st.markdown(f"• Production environment costs {cost_ratio:.1f}x more than Development")
+            
+            total_all_envs = sum(total_costs)
+            st.markdown(f"• Total monthly cost across all environments: ${total_all_envs:,.2f}")
+            st.markdown(f"• Annual cost across all environments: ${total_all_envs * 12:,.2f}")
+    
+    # Summary recommendations for the environment
+    st.markdown("---")
+    st.markdown(f"### 📋 {selected_env} Environment Implementation Summary")
+    
+    total_cost = service_costs['summary']['total_monthly']
+    annual_cost = service_costs['summary']['total_annual']
+    
+    summary_recommendations = [
+        f"🏗️ **Architecture:** Deploy using {tech_recs['compute']['placement_strategy'].lower()}",
+        f"🔧 **Compute:** Use {tech_recs['compute']['primary_instance']['type']} instances (${compute_costs['total']:.2f}/month)",
+        f"🌐 **Network:** Implement {tech_recs['network']['vpc_design'].lower()} (${network_costs['total']:.2f}/month)",
+        f"💾 **Storage:** Configure {tech_recs['storage']['primary_storage']} (${storage_costs['total']:.2f}/month)",
+        f"🗄️ **Database:** Deploy {tech_recs['database']['engine']} (${db_costs['total']:.2f}/month)",
+        f"🔒 **Security:** Implement {len([k for k, v in security_costs.items() if isinstance(v, dict) and v.get('cost', 0) > 0])} security services (${security_costs['total']:.2f}/month)",
+        f"📊 **Monitoring:** Set up comprehensive monitoring (${monitoring_costs['total']:.2f}/month)",
+        f"💰 **Total Cost:** ${total_cost:.2f}/month (${annual_cost:,.2f}/year)"
+    ]
+    
+    for rec in summary_recommendations:
+        st.markdown(rec)
 
 def generate_enhanced_pdf_report():
     """Generate enhanced PDF report."""
@@ -1997,39 +3090,172 @@ def generate_enhanced_pdf_report():
         
         # Technical Recommendations Section
         story.append(PageBreak())
-        story.append(Paragraph("Technical Recommendations Summary", styles['Heading1']))
+        story.append(Paragraph("Technical Recommendations & Cost Analysis", styles['Heading1']))
         
         # Production environment technical specs
         prod_env_results = results['recommendations'].get('PROD', {})
         if prod_env_results:
             tech_recs = analyzer.get_technical_recommendations('PROD', prod_env_results)
+            requirements = prod_env_results.get('requirements', {})
+            service_costs = cost_calculator.calculate_service_costs('PROD', tech_recs, requirements)
             
-            # Compute recommendations
-            story.append(Paragraph("Production Compute Configuration", styles['Heading2']))
-            compute_recs = tech_recs['compute']
+            # Cost Summary Section
+            story.append(Paragraph("Production Environment Cost Summary", styles['Heading2']))
             
-            compute_data = [
-                ['Component', 'Specification'],
-                ['Instance Type', compute_recs['primary_instance']['type']],
-                ['vCPUs', str(compute_recs['primary_instance']['vcpus'])],
-                ['Memory (GB)', str(compute_recs['primary_instance']['memory_gb'])],
-                ['Placement Strategy', compute_recs['placement_strategy']],
-                ['Auto Scaling', compute_recs['auto_scaling']],
-                ['Pricing Strategy', compute_recs['pricing_optimization']]
+            cost_summary_data = [
+                ['Service Category', 'Monthly Cost', 'Annual Cost', 'Key Components'],
+                ['Compute', f"${service_costs['compute']['total']:.2f}", f"${service_costs['compute']['total'] * 12:.2f}", 'EC2 instances, Auto Scaling'],
+                ['Network', f"${service_costs['network']['total']:.2f}", f"${service_costs['network']['total'] * 12:.2f}", 'Load balancers, NAT Gateway, CloudFront'],
+                ['Storage', f"${service_costs['storage']['total']:.2f}", f"${service_costs['storage']['total'] * 12:.2f}", 'EBS volumes, Snapshots, S3'],
+                ['Database', f"${service_costs['database']['total']:.2f}", f"${service_costs['database']['total'] * 12:.2f}", 'RDS/Aurora, Backup storage'],
+                ['Security', f"${service_costs['security']['total']:.2f}", f"${service_costs['security']['total'] * 12:.2f}", 'KMS, Secrets Manager, GuardDuty'],
+                ['Monitoring', f"${service_costs['monitoring']['total']:.2f}", f"${service_costs['monitoring']['total'] * 12:.2f}", 'CloudWatch, X-Ray, Synthetics'],
+                ['TOTAL', f"${service_costs['summary']['total_monthly']:.2f}", f"${service_costs['summary']['total_annual']:.2f}", 'All AWS services']
             ]
             
-            compute_table = Table(compute_data, colWidths=[2.5*inch, 4*inch])
+            cost_summary_table = Table(cost_summary_data, colWidths=[1.5*inch, 1.2*inch, 1.2*inch, 2.1*inch])
+            cost_summary_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1f2937')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('BACKGROUND', (-1, -1), (-1, -1), colors.HexColor('#059669')),
+                ('TEXTCOLOR', (-1, -1), (-1, -1), colors.white),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTNAME', (-1, -1), (-1, -1), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#6b7280')),
+                ('FONTSIZE', (0, 1), (-1, -1), 9)
+            ]))
+            
+            story.append(cost_summary_table)
+            story.append(Spacer(1, 0.3*inch))
+            
+            # Compute recommendations with costs
+            story.append(Paragraph("Compute Configuration & Costs", styles['Heading2']))
+            compute_recs = tech_recs['compute']
+            compute_costs = service_costs['compute']
+            
+            compute_data = [
+                ['Component', 'Specification', 'Monthly Cost'],
+                ['Instance Type', compute_recs['primary_instance']['type'], f"${compute_costs['ec2_instances']['cost']:.2f}"],
+                ['vCPUs', str(compute_recs['primary_instance']['vcpus']), 'Included'],
+                ['Memory (GB)', str(compute_recs['primary_instance']['memory_gb']), 'Included'],
+                ['Placement Strategy', compute_recs['placement_strategy'], '$0.00'],
+                ['Auto Scaling', compute_recs['auto_scaling'], '$0.00'],
+                ['Elastic IPs', 'Production deployment', f"${compute_costs['elastic_ip']['cost']:.2f}"],
+                ['Total Compute Cost', '', f"${compute_costs['total']:.2f}"]
+            ]
+            
+            compute_table = Table(compute_data, colWidths=[2*inch, 2.5*inch, 1.5*inch])
             compute_table.setStyle(TableStyle([
                 ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#059669')),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('BACKGROUND', (-1, -1), (-1, -1), colors.HexColor('#f3f4f6')),
                 ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
                 ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTNAME', (-1, -1), (-1, -1), 'Helvetica-Bold'),
                 ('FONTSIZE', (0, 0), (-1, 0), 10),
                 ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#10b981')),
                 ('FONTSIZE', (0, 1), (-1, -1), 9)
             ]))
             
             story.append(compute_table)
+            story.append(Spacer(1, 0.2*inch))
+            
+            # Network recommendations with costs
+            story.append(Paragraph("Network Configuration & Costs", styles['Heading2']))
+            network_recs = tech_recs['network']
+            network_costs = service_costs['network']
+            
+            network_data = [
+                ['Network Component', 'Configuration', 'Monthly Cost'],
+                ['VPC Design', network_recs['vpc_design'], '$0.00'],
+                ['Load Balancer', network_recs['load_balancer'], f"${network_costs['load_balancer']['cost']:.2f}"],
+                ['NAT Gateway', network_recs['nat_gateway'], f"${network_costs['nat_gateway']['cost']:.2f}"],
+                ['CloudFront CDN', network_recs['cdn'], f"${network_costs['cloudfront_cdn']['cost']:.2f}"],
+                ['Route 53 DNS', network_recs['dns'], f"${network_costs['route53_dns']['cost']:.2f}"],
+                ['VPN Gateway', network_recs['vpn'], f"${network_costs['vpn_gateway']['cost']:.2f}"],
+                ['Data Transfer', 'Estimated costs', f"${network_costs['data_transfer']['cost']:.2f}"],
+                ['Total Network Cost', '', f"${network_costs['total']:.2f}"]
+            ]
+            
+            network_table = Table(network_data, colWidths=[2*inch, 2.5*inch, 1.5*inch])
+            network_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#dc2626')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('BACKGROUND', (-1, -1), (-1, -1), colors.HexColor('#fef2f2')),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTNAME', (-1, -1), (-1, -1), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#f87171')),
+                ('FONTSIZE', (0, 1), (-1, -1), 9)
+            ]))
+            
+            story.append(network_table)
+            story.append(Spacer(1, 0.2*inch))
+            
+            # Storage recommendations with costs
+            storage_recs = tech_recs['storage']
+            storage_costs = service_costs['storage']
+            
+            storage_data = [
+                ['Storage Component', 'Configuration', 'Monthly Cost'],
+                ['Primary Storage', storage_recs['primary_storage'], f"${storage_costs['ebs_primary']['cost']:.2f}"],
+                ['Storage Size', storage_recs['recommended_size'], 'Included above'],
+                ['IOPS', storage_recs['iops_recommendation'], 'Included above'],
+                ['EBS Snapshots', storage_recs['backup_strategy'], f"${storage_costs['ebs_snapshots']['cost']:.2f}"],
+                ['S3 Backup', 'Long-term retention', f"${storage_costs['s3_backup']['cost']:.2f}"],
+                ['Total Storage Cost', '', f"${storage_costs['total']:.2f}"]
+            ]
+            
+            storage_table = Table(storage_data, colWidths=[2*inch, 2.5*inch, 1.5*inch])
+            storage_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#7c2d12')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('BACKGROUND', (-1, -1), (-1, -1), colors.HexColor('#f5f3ff')),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTNAME', (-1, -1), (-1, -1), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#a78bfa')),
+                ('FONTSIZE', (0, 1), (-1, -1), 9)
+            ]))
+            
+            story.append(storage_table)
+            story.append(PageBreak())
+            
+            # Cost optimization recommendations
+            story.append(Paragraph("Cost Optimization Recommendations", styles['Heading2']))
+            
+            optimization_text = """
+            <b>Compute Optimization:</b><br/>
+            • Consider Reserved Instances for production workloads (up to 40% savings)<br/>
+            • Monitor CPU utilization to right-size instances<br/>
+            • Use Spot Instances for development environments<br/><br/>
+            
+            <b>Network Optimization:</b><br/>
+            • Implement VPC endpoints to reduce NAT Gateway costs<br/>
+            • Use CloudFront to minimize data transfer costs<br/>
+            • Single NAT Gateway sufficient for non-production environments<br/><br/>
+            
+            <b>Storage Optimization:</b><br/>
+            • Use gp3 volumes for better price-performance<br/>
+            • Implement S3 lifecycle policies for backup data<br/>
+            • Regular cleanup of unused snapshots<br/><br/>
+            
+            <b>Database Optimization:</b><br/>
+            • Use Aurora for better performance at scale<br/>
+            • Single-AZ for non-production environments<br/>
+            • Monitor and optimize database performance<br/><br/>
+            
+            <b>Overall Cost Management:</b><br/>
+            • Implement AWS Budgets and Cost Anomaly Detection<br/>
+            • Regular cost reviews and optimization cycles<br/>
+            • Use AWS Cost Explorer for detailed cost analysis
+            """
+            
+            story.append(Paragraph(optimization_text, styles['Normal']))
             story.append(Spacer(1, 0.2*inch))
         
         # Recommendations
