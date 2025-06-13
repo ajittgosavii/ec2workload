@@ -1,3 +1,12 @@
+# Required dependencies for requirements.txt:
+# streamlit>=1.28.0
+# pandas>=1.5.0
+# plotly>=5.0.0
+# boto3>=1.26.0
+# numpy>=1.24.0
+# reportlab>=3.6.0
+# kaleido>=0.2.1
+
 import streamlit as st
 
 # Configure page - MUST be first Streamlit command
@@ -27,8 +36,7 @@ import hashlib
 import hmac
 import numpy as np
 from typing import Dict, List, Tuple, Optional, Any
-import seaborn as sns
-import matplotlib.pyplot as plt
+# Removed seaborn and matplotlib dependencies - using plotly for all visualizations
 
 # Try to import reportlab for PDF generation
 try:
@@ -1246,6 +1254,10 @@ def render_enhanced_configuration():
 def render_enhanced_single_configuration():
     """Render enhanced single workload configuration."""
     
+    if 'enhanced_calculator' not in st.session_state or st.session_state.enhanced_calculator is None:
+        st.error("⚠️ Calculator not initialized. Please refresh the page.")
+        return
+        
     calculator = st.session_state.enhanced_calculator
     
     # Basic workload information
@@ -1778,17 +1790,38 @@ def generate_heat_map_report():
 
 def initialize_enhanced_session_state():
     """Initialize enhanced session state."""
-    if 'enhanced_calculator' not in st.session_state:
-        st.session_state.enhanced_calculator = EnhancedEnterpriseEC2Calculator()
-    if 'enhanced_results' not in st.session_state:
+    try:
+        if 'enhanced_calculator' not in st.session_state:
+            st.session_state.enhanced_calculator = EnhancedEnterpriseEC2Calculator()
+        if 'enhanced_results' not in st.session_state:
+            st.session_state.enhanced_results = None
+        if 'enhanced_bulk_results' not in st.session_state:
+            st.session_state.enhanced_bulk_results = []
+        if 'demo_mode' not in st.session_state:
+            st.session_state.demo_mode = True
+        if 'authenticated' not in st.session_state:
+            st.session_state.authenticated = True
+    except Exception as e:
+        st.error(f"Error initializing session state: {str(e)}")
+        # Fallback initialization
+        st.session_state.enhanced_calculator = None
         st.session_state.enhanced_results = None
-    if 'enhanced_bulk_results' not in st.session_state:
         st.session_state.enhanced_bulk_results = []
 
 def main():
     """Enhanced main application with Claude AI and AWS integration."""
     
-    initialize_enhanced_session_state()
+    # Initialize session state with error handling
+    try:
+        initialize_enhanced_session_state()
+    except Exception as e:
+        st.error(f"Error initializing application: {str(e)}")
+        st.stop()
+    
+    # Check if calculator is properly initialized
+    if st.session_state.enhanced_calculator is None:
+        st.error("⚠️ Application initialization failed. Please refresh the page.")
+        st.stop()
     
     # Enhanced header
     st.markdown("""
