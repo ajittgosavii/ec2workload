@@ -1621,7 +1621,6 @@ class EnhancedPDFReportGenerator:
         self.page_size = page_size
         self.width, self.height = page_size
         self.styles = getSampleStyleSheet()
-        self._setup_custom_styles()
         self.colors = {
             'primary': colors.HexColor('#667eea'),
             'secondary': colors.HexColor('#764ba2'),
@@ -1630,6 +1629,7 @@ class EnhancedPDFReportGenerator:
             'header_bg': colors.HexColor('#f8fafc'),
             'border': colors.HexColor('#e2e8f0'),
         }
+        self._setup_custom_styles()
 
     def _setup_custom_styles(self):
         """Setup custom styles for enterprise reports."""
@@ -2259,7 +2259,7 @@ def render_enhanced_workload_configuration():
                         'inputs': calculator.inputs.copy(),
                         'recommendations': results
                     }
-
+                    st.session_state.bulk_results = [] # Clear bulk results
                     st.success("✅ Enterprise analysis completed successfully!")
 
                 except Exception as e:
@@ -2287,7 +2287,7 @@ def render_enhanced_workload_configuration():
                         'recommendations': results,
                         'migration_decision': decision_result
                     }
-
+                    st.session_state.bulk_results = [] # Clear bulk results
                     st.success("✅ Complete analysis with migration decision completed successfully!")
 
                 except Exception as e:
@@ -2871,14 +2871,12 @@ def execute_bulk_analysis(include_migration_decision=False):
 
         # Store results
         st.session_state.bulk_results = bulk_results
+        st.session_state.analysis_results = None # Clear single analysis results
 
         progress_bar.empty()
         status_text.empty()
 
         st.success(f"✅ Successfully analyzed {total_workloads} workloads!")
-
-        # Show summary
-        render_bulk_analysis_summary()
 
     except Exception as e:
         st.error(f"❌ Error during bulk analysis: {str(e)}")
@@ -3780,27 +3778,33 @@ def main():
     # Enhanced tab structure
     tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "⚙️ Workload Configuration",
+    "📊 Analysis Results",
     "🎯 Migration Decision",
     "🚀 Migration Planning",
     "📋 Reports & Export",
-    "💰 Cost Optimization"
-])
+    ])
 
     with tab1:
         render_enhanced_workload_configuration()
-
-        # Show results based on analysis type
-        if st.session_state.analysis_results:
-            st.markdown("---")
-            st.markdown("### 🎯 Single Workload Analysis Results")
-            render_enhanced_analysis_results(st.session_state.analysis_results['recommendations'])
-
-        if st.session_state.bulk_results:
-            st.markdown("---")
-            st.markdown("### 📦 Bulk Analysis Results")
-            render_bulk_analysis_summary()
-
+    
     with tab2:
+        # Conditionally display results based on the config mode
+        config_mode = st.session_state.get("config_mode", "🎯 Single Workload Analysis")
+        
+        if config_mode == "🎯 Single Workload Analysis":
+            if st.session_state.analysis_results:
+                render_enhanced_analysis_results(st.session_state.analysis_results['recommendations'])
+            else:
+                st.info("💡 Run a single workload analysis to see the results here.")
+        
+        elif config_mode == "📦 Bulk Workload Analysis":
+            if st.session_state.bulk_results:
+                render_bulk_analysis_summary()
+            else:
+                st.info("💡 Run a bulk workload analysis to see the results here.")
+
+
+    with tab3:
         st.markdown("### 🎯 Migration Decision Analysis")
 
         if not st.session_state.analysis_results:
@@ -3834,10 +3838,10 @@ def main():
         else:
             render_migration_decision_results(st.session_state.analysis_results['migration_decision'])
 
-    with tab3:
+    with tab4:
         render_migration_planning()
 
-    with tab4:
+    with tab5:
         st.markdown("### 📋 Enterprise Reports & Export")
         if not st.session_state.analysis_results and not st.session_state.bulk_results:
             st.info("💡 Please run a workload analysis first to generate reports.")
@@ -3972,71 +3976,6 @@ def main():
 
                         except Exception as e:
                             st.error(f"❌ Error generating CSV: {str(e)}")
-
-    with tab5:
-        st.markdown("### 🎯 Advanced Cost Optimization")
-
-        if st.session_state.analysis_results:
-            results = st.session_state.analysis_results['recommendations']['PROD']
-
-            st.subheader("💰 Cost Optimization Dashboard")
-
-            # Optimization opportunities
-            cost_breakdown = results['cost_breakdown']
-            total_costs = cost_breakdown['total_costs']
-
-            # Create optimization comparison
-            optimization_data = []
-            base_cost = total_costs.get('on_demand', 0)
-
-            for pricing_model, cost in total_costs.items():
-                if pricing_model != 'on_demand':
-                    savings = base_cost - cost
-                    savings_pct = (savings / base_cost * 100) if base_cost > 0 else 0
-
-                    optimization_data.append({
-                        'Strategy': pricing_model.replace('_', ' ').title(),
-                        'Monthly Cost': cost,
-                        'Monthly Savings': savings,
-                        'Savings %': savings_pct,
-                        'Annual Savings': savings * 12
-                    })
-
-            if optimization_data:
-                df_opt = pd.DataFrame(optimization_data)
-                df_opt = df_opt.sort_values('Monthly Savings', ascending=False)
-
-                # Format currency columns
-                df_opt['Monthly Cost'] = df_opt['Monthly Cost'].apply(lambda x: f"${x:,.2f}")
-                df_opt['Monthly Savings'] = df_opt['Monthly Savings'].apply(lambda x: f"${x:,.2f}")
-                df_opt['Annual Savings'] = df_opt['Annual Savings'].apply(lambda x: f"${x:,.2f}")
-                df_opt['Savings %'] = df_opt['Savings %'].apply(lambda x: f"{x:.1f}%")
-
-                st.dataframe(df_opt, use_container_width=True, hide_index=True)
-
-            # Add migration decision insights to cost optimization
-            if 'migration_decision' in st.session_state.analysis_results:
-                st.markdown("---")
-                st.subheader("🎯 Migration Decision Insights")
-
-                decision = st.session_state.analysis_results['migration_decision']
-                financial_score = decision['category_scores']['financial']
-
-                if financial_score >= 70:
-                    st.success(f"💰 Strong financial case for cloud migration (Score: {financial_score}/100)")
-                elif financial_score >= 50:
-                    st.info(f"💡 Moderate financial benefits from cloud migration (Score: {financial_score}/100)")
-                else:
-                    st.warning(f"⚠️ Limited financial benefits from cloud migration (Score: {financial_score}/100)")
-                
-                # Show top financial drivers
-                financial_factors = decision['detailed_factors']['financial']
-                st.markdown("**Top Financial Factors:**")
-                for factor, score in sorted(financial_factors.items(), key=lambda x: x[1], reverse=True)[:3]:
-                    factor_name = factor.replace('_', ' ').title()
-                    st.markdown(f"• {factor_name}: {score:.0f}/100")
-        else:
-            st.info("💡 Run a workload analysis to access cost optimization features.")
     
     # Enhanced footer
     st.markdown("---")
