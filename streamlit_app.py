@@ -31,14 +31,22 @@ from typing import Dict, List, Tuple, Optional, Any
 # Try to import reportlab for PDF generation
 try:
     from reportlab.lib.pagesizes import letter, A4
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak, Image, KeepInFrame
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib.units import inch
     from reportlab.lib import colors
-    from reportlab.lib.enums import TA_CENTER, TA_LEFT
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
     REPORTLAB_AVAILABLE = True
 except ImportError:
     REPORTLAB_AVAILABLE = False
+    
+# Try to import kaleido for static image export
+try:
+    import kaleido
+    KALEIDO_AVAILABLE = True
+except ImportError:
+    KALEIDO_AVAILABLE = False
+
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -1606,101 +1614,329 @@ class CloudMigrationDecisionEngine:
 class EnhancedPDFReportGenerator:
     """Enhanced PDF report generator with comprehensive enterprise features."""
 
-    def __init__(self):
+    def __init__(self, page_size=A4):
         if not REPORTLAB_AVAILABLE:
-            raise ImportError("ReportLab library required")
+            raise ImportError("ReportLab library not found. Please install with: pip install reportlab")
+        
+        self.page_size = page_size
+        self.width, self.height = page_size
         self.styles = getSampleStyleSheet()
         self._setup_custom_styles()
+        self.colors = {
+            'primary': colors.HexColor('#667eea'),
+            'secondary': colors.HexColor('#764ba2'),
+            'text': colors.HexColor('#2d3748'),
+            'light_text': colors.HexColor('#718096'),
+            'header_bg': colors.HexColor('#f8fafc'),
+            'border': colors.HexColor('#e2e8f0'),
+        }
 
     def _setup_custom_styles(self):
         """Setup custom styles for enterprise reports."""
         self.styles.add(ParagraphStyle(
-            name='CustomTitle',
-            parent=self.styles['Heading1'],
-            fontSize=24,
-            spaceAfter=30,
-            textColor=colors.HexColor('#1a365d'),
-            alignment=TA_CENTER
+            name='CustomTitle', parent=self.styles['h1'], fontSize=24, spaceAfter=20,
+            textColor=self.colors['primary'], alignment=TA_CENTER
+        ))
+        self.styles.add(ParagraphStyle(
+            name='SectionHeader', parent=self.styles['h2'], fontSize=16, spaceBefore=16, spaceAfter=10,
+            textColor=self.colors['text'], borderLeftWidth=4, borderLeftColor=self.colors['primary'],
+            leftIndent=6, paddingLeft=10
+        ))
+        self.styles.add(ParagraphStyle(
+            name='SubHeader', parent=self.styles['h3'], fontSize=12, spaceBefore=10, spaceAfter=4,
+            textColor=self.colors['text']
+        ))
+        self.styles.add(ParagraphStyle(
+            name='WorkloadHeader', parent=self.styles['h2'], fontSize=18, spaceBefore=24, spaceAfter=12,
+            textColor=colors.white, backColor=self.colors['secondary'], padding=8, borderRadius=4
+        ))
+        self.styles.add(ParagraphStyle(
+            name='Footer', parent=self.styles['Normal'], fontSize=8, alignment=TA_CENTER,
+            textColor=self.colors['light_text']
         ))
 
-        self.styles.add(ParagraphStyle(
-            name='SectionHeader',
-            parent=self.styles['Heading2'],
-            fontSize=16,
-            spaceBefore=20,
-            spaceAfter=12,
-            textColor=colors.HexColor('#2d3748'),
-        ))
+    def _header_footer(self, canvas, doc):
+        """Add header and footer to each page."""
+        canvas.saveState()
+        # Footer
+        footer = Paragraph(f"Enterprise AWS Workload Sizing Report | Page {doc.page}", self.styles['Footer'])
+        w, h = footer.wrap(doc.width, doc.bottomMargin)
+        footer.drawOn(canvas, doc.leftMargin, h)
+        canvas.restoreState()
+
+    def _df_to_table(self, df, col_widths=None):
+        """Convert a pandas DataFrame to a ReportLab table with styling."""
+        data = [df.columns.tolist()] + df.values.tolist()
+        table = Table(data, colWidths=col_widths, repeatRows=1)
+        
+        style = TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), self.colors['primary']),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), self.colors['header_bg']),
+            ('GRID', (0, 0), (-1, -1), 1, self.colors['border']),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ])
+        table.setStyle(style)
+        return table
+
+    def _get_chart_as_image(self, fig, width=6*inch, height=3*inch):
+        """Convert a Plotly figure to a ReportLab Image."""
+        if not KALEIDO_AVAILABLE:
+            return Paragraph("<i>Chart could not be rendered: Kaleido library not installed.</i>", self.styles['Italic'])
+        
+        try:
+            img_bytes = fig.to_image(format='png', scale=2) # Higher scale for better quality
+            img = Image(io.BytesIO(img_bytes), width=width, height=height)
+            return img
+        except Exception as e:
+            logger.error(f"Failed to convert chart to image: {e}")
+            return Paragraph(f"<i>Chart generation failed: {e}</i>", self.styles['Italic'])
+
+    def _add_executive_summary(self, story, result):
+        story.append(Paragraph("Executive Summary", self.styles['SectionHeader']))
+        prod_results = result['recommendations'].get('PROD', {})
+        tco_analysis = prod_results.get('tco_analysis', {})
+
+        summary_text = f"""
+        This analysis outlines the recommended AWS configuration and associated costs for the workload.
+        The optimal pricing strategy identified is <b>{tco_analysis.get('best_pricing_option', 'N/A').replace('_', ' ').title()}</b>,
+        which could result in monthly savings of <b>${tco_analysis.get('monthly_savings', 0):,.2f}</b>
+        compared to On-Demand pricing. The projected 3-year ROI for this migration is
+        <b>{tco_analysis.get('roi_3_years', 'N/A')}%</b> with a break-even point at approximately
+        <b>{tco_analysis.get('break_even_months', 'N/A')} months</b>.
+        """
+        story.append(Paragraph(summary_text, self.styles['Normal']))
+        story.append(Spacer(1, 0.2*inch))
+
+    def _add_detailed_cost_analysis(self, story, result, include_charts):
+        story.append(Paragraph("Detailed Cost Analysis", self.styles['SectionHeader']))
+        prod_results = result['recommendations'].get('PROD', {})
+        cost_breakdown = prod_results.get('cost_breakdown', {})
+        total_costs = cost_breakdown.get('total_costs', {})
+
+        if not total_costs:
+            story.append(Paragraph("No cost data available.", self.styles['Normal']))
+            return
+
+        # Cost comparison table
+        story.append(Paragraph("Cost Comparison by Pricing Model", self.styles['SubHeader']))
+        cost_data = []
+        base_cost = total_costs.get('on_demand', 1)
+        for model, cost in sorted(total_costs.items()):
+            savings = (base_cost - cost) / base_cost * 100 if base_cost > 0 else 0
+            cost_data.append([
+                model.replace('_', ' ').title(),
+                f"${cost:,.2f}",
+                f"${cost*12:,.2f}",
+                f"{savings:.1f}%"
+            ])
+        
+        df_costs = pd.DataFrame(cost_data, columns=['Pricing Model', 'Monthly Cost', 'Annual Cost', 'Savings vs OD'])
+        story.append(self._df_to_table(df_costs, col_widths=[2*inch, 1.2*inch, 1.2*inch, 1.2*inch]))
+        
+        if include_charts:
+            fig_costs = px.bar(df_costs, x='Pricing Model', y='Monthly Cost', title='Cost Comparison')
+            story.append(self._get_chart_as_image(fig_costs))
+
+        # Detailed cost breakdown
+        story.append(Paragraph("Detailed Monthly Cost Breakdown (Optimal)", self.styles['SubHeader']))
+        breakdown_data = []
+        for category, costs in cost_breakdown.items():
+            if category != 'total_costs' and isinstance(costs, dict):
+                for service, amount in costs.items():
+                    if amount > 0:
+                        breakdown_data.append([
+                            category.replace('_', ' ').title(),
+                            service.replace('_', ' ').title(),
+                            f"${amount:,.2f}"
+                        ])
+        
+        if breakdown_data:
+            df_breakdown = pd.DataFrame(breakdown_data, columns=['Category', 'Service', 'Monthly Cost'])
+            story.append(self._df_to_table(df_breakdown, col_widths=[2*inch, 2.6*inch, 1*inch]))
+        else:
+            story.append(Paragraph("No detailed breakdown available.", self.styles['Normal']))
+            
+        story.append(Spacer(1, 0.2*inch))
+
+
+    def _add_technical_specifications(self, story, result):
+        story.append(Paragraph("Technical Specifications", self.styles['SectionHeader']))
+        prod_results = result['recommendations'].get('PROD', {})
+        requirements = prod_results.get('requirements', {})
+        instance_options = prod_results.get('instance_options', {})
+
+        # Requirements table
+        story.append(Paragraph("Calculated Requirements (Production)", self.styles['SubHeader']))
+        req_data = [
+            ['vCPUs', requirements.get('vCPUs', 'N/A')],
+            ['RAM (GB)', requirements.get('RAM_GB', 'N/A')],
+            ['Storage (GB)', requirements.get('storage_GB', 'N/A')],
+            ['IOPS', requirements.get('iops_required', 'N/A')],
+            ['Throughput', requirements.get('throughput_required', 'N/A')],
+            ['Multi-AZ', 'Yes' if requirements.get('multi_az') else 'No'],
+        ]
+        df_req = pd.DataFrame(req_data, columns=['Metric', 'Value'])
+        story.append(self._df_to_table(df_req, col_widths=[2*inch, 4*inch]))
+        
+        # Instance recommendations table
+        story.append(Paragraph("Instance Recommendations", self.styles['SubHeader']))
+        instance_data = []
+        for scenario, instance in instance_options.items():
+            if instance:
+                instance_data.append([
+                    scenario.replace('_', ' ').title(),
+                    instance.get('type', 'N/A'),
+                    instance.get('vCPU', 'N/A'),
+                    instance.get('RAM', 'N/A'),
+                    instance.get('processor', 'N/A')
+                ])
+        
+        if instance_data:
+            df_inst = pd.DataFrame(instance_data, columns=['Scenario', 'Instance Type', 'vCPUs', 'RAM (GB)', 'Processor'])
+            story.append(self._df_to_table(df_inst, col_widths=[1.5*inch, 1.5*inch, 0.8*inch, 0.8*inch, 1*inch]))
+        else:
+             story.append(Paragraph("No instance recommendations available.", self.styles['Normal']))
+        
+        story.append(Spacer(1, 0.2*inch))
+
+
+    def _add_risk_assessment(self, story, result):
+        story.append(Paragraph("Migration Risk Assessment", self.styles['SectionHeader']))
+        prod_results = result['recommendations'].get('PROD', {})
+        risk_assessment = prod_results.get('risk_assessment', {})
+
+        overall_risk = risk_assessment.get('overall_risk', 'Unknown')
+        story.append(Paragraph(f"<b>Overall Risk Level:</b> {overall_risk}", self.styles['Normal']))
+        
+        story.append(Paragraph("Risk Factors", self.styles['SubHeader']))
+        for factor in risk_assessment.get('risk_factors', []):
+            story.append(Paragraph(f"• {factor}", self.styles['Normal']))
+        
+        story.append(Paragraph("Mitigation Strategies", self.styles['SubHeader']))
+        for strategy in risk_assessment.get('mitigation_strategies', []):
+            story.append(Paragraph(f"• {strategy}", self.styles['Normal']))
+
+        story.append(Spacer(1, 0.2*inch))
+
+
+    def _add_migration_decision(self, story, result):
+        decision = result.get('migration_decision')
+        if not decision:
+            return
+            
+        story.append(Paragraph("Migration Decision Analysis", self.styles['SectionHeader']))
+        
+        rec_text = decision.get('recommendation_text', 'N/A')
+        score = decision.get('overall_score', 0)
+        story.append(Paragraph(f"<b>Recommendation: {rec_text} (Score: {score:.1f}/100)</b>", self.styles['Normal']))
+        
+        story.append(Paragraph("Decision Score Breakdown", self.styles['SubHeader']))
+        scores = decision.get('category_scores', {})
+        score_data = [[cat.title(), f"{val:.1f}"] for cat, val in scores.items()]
+        df_scores = pd.DataFrame(score_data, columns=['Category', 'Score'])
+        story.append(self._df_to_table(df_scores, col_widths=[2*inch, 1*inch]))
+
+        story.append(Paragraph("Key Drivers & Concerns", self.styles['SubHeader']))
+        key_factors = decision.get('key_factors', {})
+        drivers_text = ", ".join([f[1].replace('_',' ').title() for f in key_factors.get('top_drivers', [])])
+        concerns_text = ", ".join([f[1].replace('_',' ').title() for f in key_factors.get('top_concerns', [])])
+        story.append(Paragraph(f"<b>Top Drivers:</b> {drivers_text}", self.styles['Normal']))
+        story.append(Paragraph(f"<b>Top Concerns:</b> {concerns_text}", self.styles['Normal']))
+        
+        story.append(Spacer(1, 0.2*inch))
 
     def generate_comprehensive_report(self, all_results, selected_sections, company_name, report_title, include_charts=True, include_raw_data=False):
-        """Generate comprehensive PDF report with enterprise features."""
+        """Generate a comprehensive, multi-section PDF report."""
         buffer = io.BytesIO()
-        doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=1*inch, leftMargin=0.75*inch, rightMargin=0.75*inch)
+        doc = SimpleDocTemplate(buffer, pagesize=self.page_size,
+                                topMargin=0.75*inch, leftMargin=0.75*inch,
+                                rightMargin=0.75*inch, bottomMargin=0.75*inch)
+        
         story = []
-
-        # Handle both single and bulk results
-        if isinstance(all_results, dict) and 'recommendations' in all_results:
-            results_list = [all_results]
-        elif isinstance(all_results, list):
-            results_list = all_results
-        else:
-            results_list = [all_results] if all_results else []
-
+        
+        # Handle single vs bulk results
+        is_bulk = isinstance(all_results, list)
+        results_list = all_results if is_bulk else [all_results]
+        
         if not results_list:
-            story.append(Paragraph("No analysis data available", self.styles['Normal']))
+            story.append(Paragraph("No analysis data available to generate a report.", self.styles['Normal']))
             doc.build(story)
             buffer.seek(0)
             return buffer.getvalue()
 
-        # Title page
+        # --- Title Page ---
         story.append(Paragraph(report_title, self.styles['CustomTitle']))
         story.append(Spacer(1, 0.2 * inch))
         story.append(Paragraph(company_name, ParagraphStyle(
-            name='CompanyStyle', parent=self.styles['Normal'], fontSize=18, alignment=TA_CENTER, textColor=colors.HexColor('#2d3748')
+            name='CompanyStyle', parent=self.styles['Normal'], fontSize=18, alignment=TA_CENTER, textColor=self.colors['text']
         )))
-        story.append(Spacer(1, 0.2 * inch))
-        story.append(Paragraph(f"Generated: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}",
-                              ParagraphStyle(name='DateStyle', parent=self.styles['Normal'], fontSize=12, alignment=TA_CENTER)))
-        story.append(Spacer(1, 0.3 * inch))
-
-        # Add enterprise branding box
-        story.append(Paragraph("Enterprise Cloud Migration Analysis", ParagraphStyle(
-            name='BrandingStyle', parent=self.styles['Normal'], fontSize=14, alignment=TA_CENTER,
-            borderWidth=1, borderColor=colors.HexColor('#667eea'), borderPadding=10,
-            backColor=colors.HexColor('#f8fafc')
-        )))
+        story.append(Paragraph(f"Report Generated: {datetime.now().strftime('%B %d, %Y')}", self.styles['Footer']))
         story.append(PageBreak())
 
-        # Generate basic executive summary
-        story.append(Paragraph("Executive Summary", self.styles['SectionHeader']))
+        # --- Portfolio Summary (for bulk reports) ---
+        if is_bulk:
+            story.append(Paragraph("Portfolio Summary", self.styles['SectionHeader']))
+            total_workloads = len(results_list)
+            total_monthly_cost = sum(r['recommendations']['PROD']['tco_analysis']['monthly_cost'] for r in results_list)
+            total_monthly_savings = sum(r['recommendations']['PROD']['tco_analysis']['monthly_savings'] for r in results_list)
+            
+            summary_text = f"""
+            This report covers a portfolio of <b>{total_workloads} workloads</b>. The total estimated optimal monthly cost
+            for the portfolio is <b>${total_monthly_cost:,.2f}</b>, with a potential total monthly savings of
+            <b>${total_monthly_savings:,.2f}</b> against On-Demand pricing.
+            """
+            story.append(Paragraph(summary_text, self.styles['Normal']))
+            story.append(Spacer(1, 0.2*inch))
+            
+            # Summary Table
+            summary_data = []
+            for res in results_list:
+                tco = res['recommendations']['PROD']['tco_analysis']
+                summary_data.append([
+                    res['inputs']['workload_name'],
+                    tco['best_pricing_option'].replace('_', ' ').title(),
+                    f"${tco['monthly_cost']:,.2f}",
+                    f"${tco['monthly_savings']:,.2f}"
+                ])
+            df_summary = pd.DataFrame(summary_data, columns=['Workload', 'Best Pricing', 'Monthly Cost', 'Monthly Savings'])
+            story.append(self._df_to_table(df_summary))
+            story.append(PageBreak())
 
-        # Calculate key metrics
-        total_workloads = len(results_list)
-        total_monthly_cost = sum(
-            result.get('recommendations', {}).get('PROD', {}).get('cost_breakdown', {}).get('total_costs', {}).get('on_demand', 0)
-            for result in results_list
-        )
+        # --- Detailed sections for each workload ---
+        for result in results_list:
+            workload_name = result.get('inputs', {}).get('workload_name', 'Unnamed Workload')
+            story.append(Paragraph(f"Analysis for: {workload_name}", self.styles['WorkloadHeader']))
+            
+            if "Executive Summary" in selected_sections:
+                self._add_executive_summary(story, result)
 
-        summary_text = f"""
-        <b>Analysis Overview:</b><br/>
-        This comprehensive enterprise analysis covers {total_workloads} critical workload(s) for AWS cloud migration.
+            if "Detailed Cost Analysis" in selected_sections:
+                self._add_detailed_cost_analysis(story, result, include_charts)
 
-        <br/><br/><b>Financial Highlights:</b><br/>
-        • Current Monthly Cost (On-Demand): <b>${total_monthly_cost:,.2f}</b><br/>
-        • Annual Cost Projection: <b>${total_monthly_cost * 12:,.2f}</b><br/>
+            if "Technical Specifications" in selected_sections:
+                self._add_technical_specifications(story, result)
+            
+            if "Risk Assessment" in selected_sections:
+                self._add_risk_assessment(story, result)
 
-        <br/><br/><b>Strategic Recommendations:</b><br/>
-        • Implement Reserved Instances or Savings Plans for cost optimization<br/>
-        • Consider AWS Graviton processors for compatible workloads<br/>
-        • Deploy multi-AZ architecture for high availability<br/>
-        • Plan phased migration approach to minimize business disruption
-        """
+            if "Migration Decision Analysis" in selected_sections:
+                self._add_migration_decision(story, result)
 
-        story.append(Paragraph(summary_text, self.styles['Normal']))
-        story.append(Spacer(1, 0.3 * inch))
+            # Raw data section
+            if include_raw_data:
+                story.append(Paragraph("Raw Input Data", self.styles['SectionHeader']))
+                raw_data = [[k, v] for k, v in result.get('inputs', {}).items()]
+                df_raw = pd.DataFrame(raw_data, columns=['Parameter', 'Value'])
+                story.append(self._df_to_table(df_raw))
 
-        # Build PDF
-        doc.build(story)
+            if len(results_list) > 1: # Add page break if it's a bulk report
+                story.append(PageBreak())
+
+        doc.build(story, onFirstPage=self._header_footer, onLaterPages=self._header_footer)
         buffer.seek(0)
         return buffer.getvalue()
 
@@ -1709,6 +1945,9 @@ def generate_comprehensive_pdf_report(results_data, selected_sections, company_n
     """Generate comprehensive PDF report - bridge function to PDF generator class."""
     if not REPORTLAB_AVAILABLE:
         raise ImportError("ReportLab library is required for PDF generation")
+    if include_charts and not KALEIDO_AVAILABLE:
+        st.warning("Kaleido library not found (`pip install kaleido`). Charts will not be included in the PDF.")
+        include_charts = False
 
     try:
         pdf_generator = EnhancedPDFReportGenerator()
@@ -1716,6 +1955,7 @@ def generate_comprehensive_pdf_report(results_data, selected_sections, company_n
             results_data, selected_sections, company_name, report_title, include_charts, include_raw_data
         )
     except Exception as e:
+        logger.error(f"PDF generation failed: {e}", exc_info=True)
         raise Exception(f"PDF generation failed: {str(e)}")
 
 
@@ -3606,6 +3846,9 @@ def main():
             if not REPORTLAB_AVAILABLE:
                 st.error("📄 PDF generation requires ReportLab library. Install with: `pip install reportlab`")
                 st.info("You can still export data as CSV and Excel formats.")
+            if not KALEIDO_AVAILABLE:
+                st.warning("📊 Chart generation requires Kaleido library. Install with: `pip install kaleido`. Charts will not be included in PDFs.")
+
 
             # Report options
             col1, col2 = st.columns(2)
@@ -3642,7 +3885,7 @@ def main():
             with col2:
                 st.markdown("#### 🎨 Report Options")
 
-                include_charts = st.checkbox("Include Charts and Graphs", value=True)
+                include_charts = st.checkbox("Include Charts and Graphs", value=True, disabled=not KALEIDO_AVAILABLE)
                 include_raw_data = st.checkbox("Include Raw Data Tables", value=False)
                 company_name = st.text_input("Company Name", value="Enterprise Corporation")
                 report_title = st.text_input("Report Title", value="AWS Migration Analysis")
@@ -3656,8 +3899,11 @@ def main():
                 if REPORTLAB_AVAILABLE and st.button("📄 Generate PDF Report", type="primary"):
                     with st.spinner("🔄 Generating comprehensive PDF report..."):
                         try:
+                            # Determine which data to use (bulk or single)
+                            results_to_report = st.session_state.bulk_results if st.session_state.bulk_results else st.session_state.analysis_results
+                            
                             pdf_data = generate_comprehensive_pdf_report(
-                                st.session_state.analysis_results or st.session_state.bulk_results,
+                                results_to_report,
                                 selected_reports,
                                 company_name,
                                 report_title,
@@ -3685,9 +3931,8 @@ def main():
                 if st.button("📊 Export to Excel"):
                     with st.spinner("🔄 Generating Excel report..."):
                         try:
-                            excel_data = generate_excel_report(
-                                st.session_state.analysis_results or st.session_state.bulk_results
-                            )
+                            results_to_report = st.session_state.bulk_results if st.session_state.bulk_results else st.session_state.analysis_results
+                            excel_data = generate_excel_report(results_to_report)
 
                             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                             filename = f"AWS_Migration_Data_{timestamp}.xlsx"
@@ -3709,9 +3954,8 @@ def main():
                 if st.button("📄 Export to CSV"):
                     with st.spinner("🔄 Generating CSV export..."):
                         try:
-                            csv_data = generate_csv_report(
-                                st.session_state.analysis_results or st.session_state.bulk_results
-                            )
+                            results_to_report = st.session_state.bulk_results if st.session_state.bulk_results else st.session_state.analysis_results
+                            csv_data = generate_csv_report(results_to_report)
 
                             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                             filename = f"AWS_Migration_Summary_{timestamp}.csv"
@@ -3784,7 +4028,7 @@ def main():
                     st.info(f"💡 Moderate financial benefits from cloud migration (Score: {financial_score}/100)")
                 else:
                     st.warning(f"⚠️ Limited financial benefits from cloud migration (Score: {financial_score}/100)")
-
+                
                 # Show top financial drivers
                 financial_factors = decision['detailed_factors']['financial']
                 st.markdown("**Top Financial Factors:**")
@@ -3793,7 +4037,7 @@ def main():
                     st.markdown(f"• {factor_name}: {score:.0f}/100")
         else:
             st.info("💡 Run a workload analysis to access cost optimization features.")
-
+    
     # Enhanced footer
     st.markdown("---")
     st.markdown("""
