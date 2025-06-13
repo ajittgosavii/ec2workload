@@ -2411,9 +2411,9 @@ def render_enhanced_workload_configuration():
             )
             calculator.inputs["vpc_endpoints"] = vpc_endpoints
             
-            # Advanced Network Features
-        with st.expander("🔧 Advanced Network Features"):                
-                # Transit Gateway
+# Advanced Network Features
+    with st.expander("🔧 Advanced Network Features"):                
+    # Transit Gateway
                 calculator.inputs["transit_gateway"] = st.checkbox(
                     "Transit Gateway Integration",
                     value=calculator.inputs.get("transit_gateway", False),
