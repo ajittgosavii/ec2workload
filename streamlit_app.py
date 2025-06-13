@@ -1704,6 +1704,21 @@ class EnhancedPDFReportGenerator:
         buffer.seek(0)
         return buffer.getvalue()
 
+
+def generate_comprehensive_pdf_report(results_data, selected_sections, company_name, report_title, include_charts=True, include_raw_data=False):
+    """Generate comprehensive PDF report - bridge function to PDF generator class."""
+    if not REPORTLAB_AVAILABLE:
+        raise ImportError("ReportLab library is required for PDF generation")
+    
+    try:
+        pdf_generator = EnhancedPDFReportGenerator()
+        return pdf_generator.generate_comprehensive_report(
+            results_data, selected_sections, company_name, report_title, include_charts, include_raw_data
+        )
+    except Exception as e:
+        raise Exception(f"PDF generation failed: {str(e)}")
+
+
 def render_enhanced_workload_configuration():
     """Render enhanced workload configuration with enterprise features."""
     calculator = st.session_state.calculator
