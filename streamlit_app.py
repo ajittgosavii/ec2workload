@@ -1,4 +1,48 @@
-# Required dependencies for requirements.txt:
+with col1:
+            complexity_score = claude_analysis.get('complexity_score', 50)
+            complexity_level = claude_analysis.get('complexity_level', 'MEDIUM')
+            
+            st.markdown(f"""
+            <div class="metric-card">
+                <div class="metric-title">🤖 Migration Complexity</div>
+                <div class="metric-value">{complexity_score:.0f}/100</div>
+                <div class="metric-description">{complexity_level}</div>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col2:
+            monthly_cost = tco_analysis.get('monthly_cost', 0)
+            
+            st.markdown(f"""
+            <div class="metric-card">
+                <div class="metric-title">☁️ AWS Monthly Cost</div>
+                <div class="metric-value">${monthly_cost:,.0f}</div>
+                <div class="metric-description">Optimized Pricing</div>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col3:
+            timeline = claude_analysis.get('estimated_timeline', {})
+            max_weeks = timeline.get('max_weeks', 8)
+            
+            st.markdown(f"""
+            <div class="metric-card">
+                <div class="metric-title">⏱️ Migration Timeline</div>
+                <div class="metric-value">{max_weeks}</div>
+                <div class="metric-description">Weeks (Estimated)</div>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col4:
+            instance_count = len(aws_analysis.get('recommended_instances', []))
+            
+            st.markdown(f"""
+            <div class="metric-card">
+                <div class="metric-title">🖥️ Instance Options</div>
+                <div class="metric-value">{instance_count}</div>
+                <div class="metric-description">Recommendations</div>
+            </div>
+            """, unsafe_allow_html=True)# Required dependencies for requirements.txt:
 # streamlit>=1.28.0
 # pandas>=1.5.0
 # plotly>=5.0.0
@@ -1179,11 +1223,11 @@ def render_enhanced_single_configuration():
     col1, col2 = st.columns(2)
     
     with col1:
-        if st.button("🚀 Run Enhanced Analysis", type="primary", key="enhanced_single_analysis"):
+        if st.button("🚀 Run Enhanced Analysis", type="primary", key="enhanced_single_analysis_main"):
             run_enhanced_single_analysis()
     
     with col2:
-        if st.button("🎯 Full AI + AWS Analysis", type="secondary", key="full_enhanced_analysis"):
+        if st.button("🎯 Full AI + AWS Analysis", type="secondary", key="full_enhanced_analysis_main"):
             run_full_enhanced_analysis()
 
 def render_enhanced_bulk_configuration():
@@ -1211,7 +1255,7 @@ def render_enhanced_bulk_configuration():
             df = pd.read_csv(uploaded_file)
             st.dataframe(df.head(), use_container_width=True)
             
-            if st.button("🤖 Run Bulk AI Analysis", type="primary"):
+            if st.button("🤖 Run Bulk AI Analysis", type="primary", key="bulk_ai_analysis_main"):
                 run_enhanced_bulk_analysis(df)
                 
         except Exception as e:
@@ -1347,6 +1391,11 @@ def render_enhanced_results():
         
         prod_results = recommendations['PROD']
         
+        # Safely extract analysis data
+        claude_analysis = prod_results.get('claude_analysis', {})
+        aws_analysis = prod_results.get('aws_analysis', {})
+        tco_analysis = prod_results.get('tco_analysis', {})
+        
         # Enhanced summary metrics
         col1, col2, col3, col4 = st.columns(4)
         
@@ -1403,13 +1452,14 @@ def render_enhanced_results():
         st.subheader("🌡️ Environment Impact Heat Map")
         
         if 'heat_map_fig' in results:
-            st.plotly_chart(results['heat_map_fig'], use_container_width=True)
+            st.plotly_chart(results['heat_map_fig'], use_container_width=True, key="results_heat_map")
         else:
             st.info("Heat map data not available.")
         
         # Claude AI Analysis Section
         st.subheader("🤖 Claude AI Migration Analysis")
         
+        claude_analysis = prod_results.get('claude_analysis')
         if claude_analysis:
             render_claude_analysis_section(claude_analysis)
         else:
@@ -1418,6 +1468,7 @@ def render_enhanced_results():
         # AWS Analysis Section
         st.subheader("☁️ AWS Cost & Instance Analysis")
         
+        aws_analysis = prod_results.get('aws_analysis')
         if aws_analysis:
             render_aws_analysis_section(aws_analysis)
         else:
@@ -1431,6 +1482,11 @@ def render_claude_analysis_section(claude_analysis):
     """Render Claude AI analysis section."""
     
     try:
+        # Check if claude_analysis is None
+        if claude_analysis is None:
+            st.info("Claude AI analysis data not available.")
+            return
+            
         col1, col2 = st.columns(2)
         
         with col1:
@@ -1479,6 +1535,11 @@ def render_aws_analysis_section(aws_analysis):
     """Render AWS analysis section."""
     
     try:
+        # Check if aws_analysis is None
+        if aws_analysis is None:
+            st.info("AWS analysis data not available.")
+            return
+            
         # Instance recommendations
         recommended_instances = aws_analysis.get('recommended_instances', [])
         
@@ -1551,15 +1612,15 @@ def render_enhanced_reports():
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        if st.button("📄 Generate Enhanced PDF", type="primary"):
+        if st.button("📄 Generate Enhanced PDF", type="primary", key="generate_pdf_report"):
             generate_enhanced_reports("pdf", report_sections, company_name, report_title)
     
     with col2:
-        if st.button("📊 Export to Excel"):
+        if st.button("📊 Export to Excel", key="generate_excel_report"):
             generate_enhanced_reports("excel", report_sections, company_name, report_title)
     
     with col3:
-        if st.button("📈 Generate Heat Map Report"):
+        if st.button("📈 Generate Heat Map Report", key="generate_heatmap_report"):
             generate_enhanced_reports("heatmap", report_sections, company_name, report_title)
 
 def generate_enhanced_reports(report_type, sections, company_name, title):
@@ -1609,7 +1670,7 @@ def generate_enhanced_reports(report_type, sections, company_name, title):
                     data=output.getvalue(),
                     file_name=filename,
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    key="download_enhanced_excel"
+                    key=f"download_enhanced_excel_{timestamp}"
                 )
                 
             elif report_type == "heatmap":
@@ -1624,7 +1685,7 @@ def generate_enhanced_reports(report_type, sections, company_name, title):
                         data=heat_map_csv,
                         file_name=filename,
                         mime="text/csv",
-                        key="download_heat_map"
+                        key=f"download_heat_map_{timestamp}"
                     )
                 else:
                     st.warning("No heat map data available.")
@@ -1672,7 +1733,7 @@ def main():
     # Check if calculator is properly initialized
     if st.session_state.enhanced_calculator is None:
         st.error("⚠️ Application initialization failed. Please refresh the page.")
-        if st.button("🔄 Retry Initialization"):
+        if st.button("🔄 Retry Initialization", key="retry_init_button"):
             st.experimental_rerun()
         st.stop()
     
@@ -1778,7 +1839,7 @@ def main():
             
             # Heat map visualization
             if 'heat_map_fig' in st.session_state.enhanced_results:
-                st.plotly_chart(st.session_state.enhanced_results['heat_map_fig'], use_container_width=True)
+                st.plotly_chart(st.session_state.enhanced_results['heat_map_fig'], use_container_width=True, key="environment_heat_map")
         else:
             st.info("💡 Run an enhanced analysis to see environment heat maps.")
     
