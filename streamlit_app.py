@@ -616,14 +616,10 @@ class EnterpriseEC2WorkloadSizingCalculator:
     }
     def calculate_network_costs(self, calculator_inputs):
     # Copy the calculate_network_costs function from the artifact
-    
     def analyze_network_requirements(self, calculator_inputs, workload_profile):
     # Copy the analyze_network_requirements function from the artifact
-    
     def optimize_network_costs(self, calculator_inputs, current_costs):
     # Copy the optimize_network_costs function from the artifact
-    
-       
     def __init__(self):
         """Initialize calculator with default settings."""
         self.inputs = {
