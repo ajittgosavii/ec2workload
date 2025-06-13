@@ -2293,7 +2293,7 @@ def render_enhanced_workload_configuration():
             )
     
     # Advanced Configuration
-     with st.expander("⚙️ Advanced Enterprise Settings"):
+with st.expander("⚙️ Advanced Enterprise Settings"):
         col1, col2, col3 = st.columns(3)
         
         with col1:
@@ -2818,7 +2818,7 @@ with col1:
         fig_costs.update_layout(height=400, xaxis_tickangle=-45)
         st.plotly_chart(fig_costs, use_container_width=True)
     
- with col2:
+with col2:
         fig_savings = px.bar(df_costs, x='Pricing Model', y='Savings %',
                            title='Savings Percentage vs On-Demand',
                            color='Savings %', color_continuous_scale='RdYlGn')
@@ -2936,8 +2936,8 @@ with col2:
                 st.markdown(f"• {strategy}")
     
     # Compliance Information
-    compliance = prod_results['compliance']
-    if compliance['requirements']:
+compliance = prod_results['compliance']
+if compliance['requirements']:
         st.subheader("🛡️ Compliance Requirements")
         
         for req in compliance['requirements']:
