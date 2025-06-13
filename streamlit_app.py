@@ -1597,6 +1597,47 @@ def render_claude_analysis_section(claude_analysis):
         st.error(f"Error displaying Claude analysis: {str(e)}")
         logger.error(f"Error in render_claude_analysis_section: {e}")
 
+def render_aws_analysis_section(aws_analysis):
+    """Render AWS analysis section."""
+    
+    try:
+        # Check if aws_analysis is None
+        if aws_analysis is None:
+            st.info("AWS analysis data not available.")
+            return
+            
+        # Instance recommendations
+        recommended_instances = aws_analysis.get('recommended_instances', [])
+        
+        if recommended_instances:
+            st.markdown("**Recommended Instance Types:**")
+            
+            instance_data = []
+            for instance in recommended_instances:
+                if isinstance(instance, dict):
+                    instance_data.append({
+                        'Instance Type': instance.get('type', 'N/A'),
+                        'vCPUs': instance.get('vCPU', 'N/A'),
+                        'RAM (GB)': instance.get('RAM', 'N/A'),
+                        'Family': instance.get('family', 'N/A').title(),
+                        'Fit Score': f"{instance.get('score', 0):.2f}"
+                    })
+            
+            if instance_data:
+                df_instances = pd.DataFrame(instance_data)
+                st.dataframe(df_instances, use_container_width=True, hide_index=True)
+        
+        # Cost savings opportunities
+        savings_opps = aws_analysis.get('cost_savings_opportunities', [])
+        if savings_opps:
+            st.markdown("**Cost Savings Opportunities:**")
+            for opp in savings_opps:
+                st.markdown(f"• {opp}")
+                
+    except Exception as e:
+        st.error(f"Error displaying AWS analysis: {str(e)}")
+        logger.error(f"Error in render_aws_analysis_section: {e}")
+
 def render_cost_breakdown_section(prod_results):
     """Render detailed cost breakdown section."""
     
