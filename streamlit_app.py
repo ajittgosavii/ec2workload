@@ -2497,6 +2497,54 @@ def render_enhanced_workload_configuration():
             )
 
     
+    with col1:
+        if st.button("🚀 Generate Enterprise Analysis", type="primary", key="generate_single"):
+            with st.spinner("🔄 Analyzing workload with enterprise features..."):
+                try:
+                    results = {}
+                    for env in calculator.ENV_MULTIPLIERS.keys():
+                        results[env] = calculator.calculate_comprehensive_requirements(env)
+                    
+                    st.session_state.analysis_results = {
+                        'inputs': calculator.inputs.copy(),
+                        'recommendations': results
+                    }
+                    
+                    st.success("✅ Enterprise analysis completed successfully!")
+                    
+                except Exception as e:
+                    st.error(f"❌ Error during analysis: {str(e)}")
+                    import traceback
+                    st.text(traceback.format_exc())
+    
+    with col2:
+        if st.button("🎯 Complete Analysis with Migration Decision", type="primary", key="generate_with_decision"):
+            with st.spinner("🔄 Analyzing workload and migration decision factors..."):
+                try:
+                    # Generate cloud analysis
+                    results = {}
+                    for env in calculator.ENV_MULTIPLIERS.keys():
+                        results[env] = calculator.calculate_comprehensive_requirements(env)
+                    
+                    # Generate migration decision
+                    decision_result = enhanced_migration_decision_analysis(
+                        calculator.inputs, 
+                        results['PROD']
+                    )
+                    
+                    st.session_state.analysis_results = {
+                        'inputs': calculator.inputs.copy(),
+                        'recommendations': results,
+                        'migration_decision': decision_result
+                    }
+                    
+                    st.success("✅ Complete analysis with migration decision completed successfully!")
+                    
+                except Exception as e:
+                    st.error(f"❌ Error during analysis: {str(e)}")
+                    import traceback
+                    st.text(traceback.format_exc())
+    
 with col2:
         if st.button("🎯 Complete Analysis with Migration Decision", type="primary", key="generate_with_decision"):
             with st.spinner("🔄 Analyzing workload and migration decision factors..."):
