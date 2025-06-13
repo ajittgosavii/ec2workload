@@ -2292,8 +2292,8 @@ def render_enhanced_workload_configuration():
                 help="Select applicable compliance frameworks"
             )
     
-    # Advanced Configuration (FIXED - NO NESTED EXPANDERS)
-    with st.expander("⚙️ Advanced Enterprise Settings"):
+    # Advanced Configuration
+with st.expander("⚙️ Advanced Enterprise Settings"):
         col1, col2, col3 = st.columns(3)
         
         with col1:
@@ -2392,8 +2392,24 @@ def render_enhanced_workload_configuration():
                 help="Select network performance optimization"
             )
     
-    # ✅ SEPARATE EXPANDER - NO NESTING
-    with st.expander("🔧 Advanced Network Features"):
+            # Security Groups
+            calculator.inputs["security_group_rules"] = st.number_input(
+                "Estimated Security Group Rules",
+                min_value=5, max_value=100,
+                value=calculator.inputs.get("security_group_rules", 20),
+                help="Approximate number of security group rules needed"
+            )
+            
+            # VPC Endpoints
+            vpc_endpoints = st.multiselect(
+                "VPC Endpoints Required",
+                ["s3", "dynamodb", "ec2", "ssm", "kms", "cloudwatch", "sns", "sqs"],
+                default=calculator.inputs.get("vpc_endpoints", ["s3", "ec2"]),
+                help="Select AWS services requiring VPC endpoints"
+            )
+            calculator.inputs["vpc_endpoints"] = vpc_endpoints
+            
+with st.expander("🔧 Advanced Network Features"):
         col1, col2 = st.columns(2)
         
         with col1:
@@ -2495,9 +2511,178 @@ def render_enhanced_workload_configuration():
                 }.get(x, x),
                 help="Application latency requirements"
             )
-
     
-    with col1:
+    # Network Cost Calculation Function (add this after the class definition)
+def calculate_network_costs(self, calculator_inputs):
+        """Calculate network-related costs based on configuration."""
+        network_costs = {}
+        
+        # VPC Costs (mostly free, but some components have costs)
+        vpc_cost = 0.0
+        
+        # Internet Gateway (free)
+        if calculator_inputs.get("internet_connectivity") == "internet_gateway":
+            vpc_cost += 0.0
+        
+        # NAT Gateway costs
+        elif calculator_inputs.get("internet_connectivity") == "nat_gateway":
+            # NAT Gateway: $0.045/hour + $0.045/GB processed
+            nat_gateway_cost = 0.045 * 24 * 30  # Monthly cost
+            estimated_data_gb = 100  # Estimate based on workload
+            nat_data_cost = estimated_data_gb * 0.045
+            vpc_cost += nat_gateway_cost + nat_data_cost
+        
+        # NAT Instance costs (EC2 instance cost - handled separately)
+        elif calculator_inputs.get("internet_connectivity") == "nat_instance":
+            # t3.micro for NAT instance
+            vpc_cost += 0.0104 * 24 * 30  # ~$7.50/month
+        
+        # VPC Endpoints
+        vpc_endpoints = calculator_inputs.get("vpc_endpoints", [])
+        if vpc_endpoints:
+            # $0.01/hour per endpoint + data processing
+            endpoint_cost = len(vpc_endpoints) * 0.01 * 24 * 30
+            # Estimated data processing: $0.01/GB
+            endpoint_data_cost = 50 * 0.01  # Assume 50GB/month
+            vpc_cost += endpoint_cost + endpoint_data_cost
+        
+        network_costs["vpc_networking"] = round(vpc_cost, 2)
+        
+        # Transit Gateway costs
+        if calculator_inputs.get("transit_gateway"):
+            # $36/month per attachment + data processing
+            tgw_cost = 36.0 + (100 * 0.02)  # Assume 100GB/month processing
+            network_costs["transit_gateway"] = round(tgw_cost, 2)
+        
+        # Direct Connect costs
+        if calculator_inputs.get("direct_connect"):
+            # 1Gbps dedicated connection: ~$300/month
+            network_costs["direct_connect"] = 300.0
+        
+        # Site-to-Site VPN costs
+        if calculator_inputs.get("vpn_connection"):
+            # $36/month per VPN connection
+            network_costs["vpn_connection"] = 36.0
+        
+        # CloudFront costs
+        if calculator_inputs.get("cloudfront_distribution"):
+            # Estimate based on data transfer
+            estimated_requests = 1000000  # 1M requests/month
+            estimated_data_gb = 100       # 100GB/month
+            
+            request_cost = estimated_requests * 0.0000012  # $0.0000012 per request
+            data_cost = estimated_data_gb * 0.085         # $0.085/GB
+            network_costs["cloudfront"] = round(request_cost + data_cost, 2)
+        
+        # Route 53 costs
+        if calculator_inputs.get("route53_hosted_zone"):
+            # $0.50 per hosted zone + query costs
+            hosted_zone_cost = 0.50
+            query_cost = 1000000 * 0.0000004  # 1M queries at $0.0000004 each
+            network_costs["route53"] = round(hosted_zone_cost + query_cost, 2)
+        
+        # VPC Flow Logs costs
+        if calculator_inputs.get("vpc_flow_logs"):
+            # Estimate based on instance count and data volume
+            flow_logs_cost = 50 * 0.50  # Assume 50GB logs at $0.50/GB
+            network_costs["vpc_flow_logs"] = round(flow_logs_cost, 2)
+        
+        return network_costs
+
+    # Network Requirements Analysis Function
+def analyze_network_requirements(self, calculator_inputs, workload_profile):
+        """Analyze and recommend network configuration based on workload."""
+        recommendations = []
+        
+        workload_type = calculator_inputs.get("workload_type", "")
+        multi_az = calculator_inputs.get("multi_az", False)
+        compliance_reqs = calculator_inputs.get("compliance_requirements", [])
+        
+        # VPC Recommendations
+        if workload_type == "database_server":
+            recommendations.append("Private subnets recommended for database servers")
+            recommendations.append("Consider VPC endpoints for S3 and other AWS services")
+        
+        if workload_type == "web_application":
+            recommendations.append("Public subnets with Internet Gateway for web servers")
+            recommendations.append("Consider CloudFront for global content delivery")
+        
+        # Multi-AZ recommendations
+        if multi_az:
+            recommendations.append("Deploy across multiple Availability Zones for high availability")
+            recommendations.append("Use Application Load Balancer for cross-AZ traffic distribution")
+        
+        # Compliance recommendations
+        if compliance_reqs:
+            recommendations.append("Private subnets recommended for compliance requirements")
+            recommendations.append("Enable VPC Flow Logs for audit and monitoring")
+            recommendations.append("Consider AWS PrivateLink for secure service connectivity")
+        
+        # Performance recommendations
+        bandwidth_req = calculator_inputs.get("bandwidth_requirements", "standard")
+        if bandwidth_req in ["high", "very_high"]:
+            recommendations.append("Consider Enhanced Networking for high bandwidth applications")
+            recommendations.append("Use placement groups for low-latency communication")
+        
+        latency_req = calculator_inputs.get("latency_requirements", "standard")
+        if latency_req in ["low", "ultra_low"]:
+            recommendations.append("Deploy in single AZ or use placement groups for ultra-low latency")
+            recommendations.append("Consider dedicated tenancy for consistent performance")
+        
+        # Security recommendations
+        if len(calculator_inputs.get("vpc_endpoints", [])) > 0:
+            recommendations.append("VPC endpoints reduce data transfer costs and improve security")
+        
+        return recommendations
+
+    # Network Cost Optimization Function
+def optimize_network_costs(self, calculator_inputs, current_costs):
+        """Provide network cost optimization recommendations."""
+        optimizations = []
+        
+        # NAT Gateway optimization
+        if calculator_inputs.get("internet_connectivity") == "nat_gateway":
+            optimizations.append({
+                "recommendation": "Consider NAT Instance for lower cost",
+                "potential_savings": "Up to 80% reduction in NAT costs",
+                "trade_off": "Requires more management overhead"
+            })
+        
+        # VPC Endpoints optimization
+        vpc_endpoints = calculator_inputs.get("vpc_endpoints", [])
+        if not vpc_endpoints and calculator_inputs.get("workload_type") in ["database_server", "application_server"]:
+            optimizations.append({
+                "recommendation": "Add VPC endpoints for S3 and DynamoDB",
+                "potential_savings": "Reduce data transfer charges",
+                "trade_off": "Small hourly endpoint cost"
+            })
+        
+        # CloudFront optimization
+        if not calculator_inputs.get("cloudfront_distribution") and calculator_inputs.get("workload_type") == "web_application":
+            optimizations.append({
+                "recommendation": "Consider CloudFront for global content delivery",
+                "potential_savings": "Reduce bandwidth costs and improve performance",
+                "trade_off": "Additional complexity in cache management"
+            })
+        
+        # Direct Connect vs VPN
+        if calculator_inputs.get("vpn_connection") and not calculator_inputs.get("direct_connect"):
+            optimizations.append({
+                "recommendation": "Evaluate Direct Connect for high data transfer volumes",
+                "potential_savings": "Significant savings on data transfer > 1TB/month",
+                "trade_off": "Higher monthly fixed cost"
+            })
+        
+        return optimizations
+    
+# ADD MIGRATION DECISION INPUTS
+st.markdown("---")
+render_migration_decision_inputs()
+    
+    # ENHANCED ANALYSIS BUTTON
+col1, col2 = st.columns(2)
+    
+with col1:
         if st.button("🚀 Generate Enterprise Analysis", type="primary", key="generate_single"):
             with st.spinner("🔄 Analyzing workload with enterprise features..."):
                 try:
@@ -2511,34 +2696,6 @@ def render_enhanced_workload_configuration():
                     }
                     
                     st.success("✅ Enterprise analysis completed successfully!")
-                    
-                except Exception as e:
-                    st.error(f"❌ Error during analysis: {str(e)}")
-                    import traceback
-                    st.text(traceback.format_exc())
-    
-    with col2:
-        if st.button("🎯 Complete Analysis with Migration Decision", type="primary", key="generate_with_decision"):
-            with st.spinner("🔄 Analyzing workload and migration decision factors..."):
-                try:
-                    # Generate cloud analysis
-                    results = {}
-                    for env in calculator.ENV_MULTIPLIERS.keys():
-                        results[env] = calculator.calculate_comprehensive_requirements(env)
-                    
-                    # Generate migration decision
-                    decision_result = enhanced_migration_decision_analysis(
-                        calculator.inputs, 
-                        results['PROD']
-                    )
-                    
-                    st.session_state.analysis_results = {
-                        'inputs': calculator.inputs.copy(),
-                        'recommendations': results,
-                        'migration_decision': decision_result
-                    }
-                    
-                    st.success("✅ Complete analysis with migration decision completed successfully!")
                     
                 except Exception as e:
                     st.error(f"❌ Error during analysis: {str(e)}")
