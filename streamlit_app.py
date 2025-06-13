@@ -589,13 +589,27 @@ class EnhancedAWSIntegration:
             return self._get_fallback_pricing(instance_type)
 
     def _get_fallback_pricing(self, instance_type: str) -> Dict[str, float]:
-        """Fallback pricing when AWS API is not available."""
+        """Enhanced fallback pricing with more instance types."""
         fallback_prices = {
+            # M6i instances (Intel Ice Lake)
             'm6i.large': {'on_demand': 0.0864, 'ri_1y_no_upfront': 0.0605, 'ri_3y_no_upfront': 0.0432, 'spot': 0.0259},
             'm6i.xlarge': {'on_demand': 0.1728, 'ri_1y_no_upfront': 0.1210, 'ri_3y_no_upfront': 0.0864, 'spot': 0.0518},
             'm6i.2xlarge': {'on_demand': 0.3456, 'ri_1y_no_upfront': 0.2419, 'ri_3y_no_upfront': 0.1728, 'spot': 0.1037},
+            'm6i.4xlarge': {'on_demand': 0.6912, 'ri_1y_no_upfront': 0.4838, 'ri_3y_no_upfront': 0.3456, 'spot': 0.2074},
+            
+            # R6i instances (Memory optimized)
             'r6i.large': {'on_demand': 0.1008, 'ri_1y_no_upfront': 0.0706, 'ri_3y_no_upfront': 0.0504, 'spot': 0.0302},
-            'c6i.large': {'on_demand': 0.0765, 'ri_1y_no_upfront': 0.0536, 'ri_3y_no_upfront': 0.0383, 'spot': 0.0230}
+            'r6i.xlarge': {'on_demand': 0.2016, 'ri_1y_no_upfront': 0.1411, 'ri_3y_no_upfront': 0.1008, 'spot': 0.0605},
+            'r6i.2xlarge': {'on_demand': 0.4032, 'ri_1y_no_upfront': 0.2822, 'ri_3y_no_upfront': 0.2016, 'spot': 0.1210},
+            
+            # C6i instances (Compute optimized)
+            'c6i.large': {'on_demand': 0.0765, 'ri_1y_no_upfront': 0.0536, 'ri_3y_no_upfront': 0.0383, 'spot': 0.0230},
+            'c6i.xlarge': {'on_demand': 0.1530, 'ri_1y_no_upfront': 0.1071, 'ri_3y_no_upfront': 0.0765, 'spot': 0.0459},
+            'c6i.2xlarge': {'on_demand': 0.3060, 'ri_1y_no_upfront': 0.2142, 'ri_3y_no_upfront': 0.1530, 'spot': 0.0918},
+            
+            # M6a instances (AMD-based)
+            'm6a.large': {'on_demand': 0.0777, 'ri_1y_no_upfront': 0.0544, 'ri_3y_no_upfront': 0.0389, 'spot': 0.0233},
+            'm6a.xlarge': {'on_demand': 0.1555, 'ri_1y_no_upfront': 0.1089, 'ri_3y_no_upfront': 0.0778, 'spot': 0.0467}
         }
         return fallback_prices.get(instance_type, {'on_demand': 0.1, 'ri_1y_no_upfront': 0.07, 'ri_3y_no_upfront': 0.05, 'spot': 0.03})
 
@@ -608,20 +622,22 @@ class EnhancedAWSIntegration:
             return self._get_fallback_recommendations()
 
     def _intelligent_instance_matching(self, requirements: Dict) -> List[Dict]:
-        """Intelligent instance matching based on requirements."""
+        """Intelligent instance matching based on requirements with enhanced details."""
         try:
             required_vcpus = requirements.get('vCPUs', 2)
             required_ram = requirements.get('RAM_GB', 8)
             
-            # Instance database
-            instances = [
-                {'type': 'm6i.large', 'vCPU': 2, 'RAM': 8, 'family': 'general', 'score': 0},
-                {'type': 'm6i.xlarge', 'vCPU': 4, 'RAM': 16, 'family': 'general', 'score': 0},
-                {'type': 'm6i.2xlarge', 'vCPU': 8, 'RAM': 32, 'family': 'general', 'score': 0},
-                {'type': 'r6i.large', 'vCPU': 2, 'RAM': 16, 'family': 'memory', 'score': 0},
-                {'type': 'r6i.xlarge', 'vCPU': 4, 'RAM': 32, 'family': 'memory', 'score': 0},
-                {'type': 'c6i.large', 'vCPU': 2, 'RAM': 4, 'family': 'compute', 'score': 0}
-            ]
+            # Use the enhanced instance database from calculator
+            calculator = st.session_state.get('enhanced_calculator')
+            if calculator and hasattr(calculator, 'INSTANCE_TYPES'):
+                instances = calculator.INSTANCE_TYPES.copy()
+            else:
+                # Fallback to basic instance list
+                instances = [
+                    {'type': 'm6i.large', 'vCPU': 2, 'RAM': 8, 'family': 'general', 'score': 0, 'max_ebs_bandwidth': 4750, 'network_performance': 'Up to 12.5 Gigabit'},
+                    {'type': 'm6i.xlarge', 'vCPU': 4, 'RAM': 16, 'family': 'general', 'score': 0, 'max_ebs_bandwidth': 9500, 'network_performance': 'Up to 12.5 Gigabit'},
+                    {'type': 'r6i.large', 'vCPU': 2, 'RAM': 16, 'family': 'memory', 'score': 0, 'max_ebs_bandwidth': 4750, 'network_performance': 'Up to 12.5 Gigabit'}
+                ]
             
             # Score instances based on fit
             for instance in instances:
@@ -629,22 +645,36 @@ class EnhancedAWSIntegration:
                     cpu_efficiency = required_vcpus / instance['vCPU']
                     ram_efficiency = required_ram / instance['RAM']
                     instance['score'] = (cpu_efficiency + ram_efficiency) / 2
+                else:
+                    instance['score'] = 0
             
             # Filter and sort
             valid_instances = [i for i in instances if i['score'] > 0]
             valid_instances.sort(key=lambda x: x['score'], reverse=True)
             
-            return valid_instances[:3]  # Top 3 recommendations
+            return valid_instances[:5]  # Top 5 recommendations
         except Exception as e:
             logger.error(f"Error in instance matching: {e}")
             return self._get_fallback_recommendations()
 
     def _get_fallback_recommendations(self) -> List[Dict]:
-        """Fallback recommendations."""
+        """Enhanced fallback recommendations with network details."""
         return [
-            {'type': 'm6i.large', 'vCPU': 2, 'RAM': 8, 'family': 'general', 'score': 0.8},
-            {'type': 'm6i.xlarge', 'vCPU': 4, 'RAM': 16, 'family': 'general', 'score': 0.7},
-            {'type': 'r6i.large', 'vCPU': 2, 'RAM': 16, 'family': 'memory', 'score': 0.6}
+            {
+                'type': 'm6i.large', 'vCPU': 2, 'RAM': 8, 'family': 'general', 'score': 0.8,
+                'max_ebs_bandwidth': 4750, 'network_performance': 'Up to 12.5 Gigabit',
+                'processor': 'Intel Xeon Ice Lake', 'enhanced_networking': True
+            },
+            {
+                'type': 'm6i.xlarge', 'vCPU': 4, 'RAM': 16, 'family': 'general', 'score': 0.7,
+                'max_ebs_bandwidth': 9500, 'network_performance': 'Up to 12.5 Gigabit',
+                'processor': 'Intel Xeon Ice Lake', 'enhanced_networking': True
+            },
+            {
+                'type': 'r6i.large', 'vCPU': 2, 'RAM': 16, 'family': 'memory', 'score': 0.6,
+                'max_ebs_bandwidth': 4750, 'network_performance': 'Up to 12.5 Gigabit',
+                'processor': 'Intel Xeon Ice Lake', 'enhanced_networking': True
+            }
         ]
 
 class EnvironmentHeatMapGenerator:
@@ -848,13 +878,80 @@ class EnhancedEnterpriseEC2Calculator:
             self.aws_integration = EnhancedAWSIntegration()
             self.heat_map_generator = EnvironmentHeatMapGenerator()
             
-            # Instance types
+            # Instance types with comprehensive specifications
             self.INSTANCE_TYPES = [
-                {"type": "m6i.large", "vCPU": 2, "RAM": 8, "max_ebs_bandwidth": 4750, "network": "Up to 12.5 Gbps", "family": "general", "processor": "Intel", "architecture": "x86_64"},
-                {"type": "m6i.xlarge", "vCPU": 4, "RAM": 16, "max_ebs_bandwidth": 9500, "network": "Up to 12.5 Gbps", "family": "general", "processor": "Intel", "architecture": "x86_64"},
-                {"type": "m6i.2xlarge", "vCPU": 8, "RAM": 32, "max_ebs_bandwidth": 19000, "network": "Up to 12.5 Gbps", "family": "general", "processor": "Intel", "architecture": "x86_64"},
-                {"type": "r6i.large", "vCPU": 2, "RAM": 16, "max_ebs_bandwidth": 4750, "network": "Up to 12.5 Gbps", "family": "memory", "processor": "Intel", "architecture": "x86_64"},
-                {"type": "c6i.large", "vCPU": 2, "RAM": 4, "max_ebs_bandwidth": 4750, "network": "Up to 12.5 Gbps", "family": "compute", "processor": "Intel", "architecture": "x86_64"},
+                {
+                    "type": "m6i.large", "vCPU": 2, "RAM": 8, "max_ebs_bandwidth": 4750, 
+                    "network": "Up to 12.5 Gbps", "family": "general", "processor": "Intel Xeon Ice Lake", 
+                    "architecture": "x86_64", "storage": "EBS Only", "network_performance": "Up to 12.5 Gigabit",
+                    "ebs_optimized": True, "enhanced_networking": True, "placement_group": True
+                },
+                {
+                    "type": "m6i.xlarge", "vCPU": 4, "RAM": 16, "max_ebs_bandwidth": 9500, 
+                    "network": "Up to 12.5 Gbps", "family": "general", "processor": "Intel Xeon Ice Lake", 
+                    "architecture": "x86_64", "storage": "EBS Only", "network_performance": "Up to 12.5 Gigabit",
+                    "ebs_optimized": True, "enhanced_networking": True, "placement_group": True
+                },
+                {
+                    "type": "m6i.2xlarge", "vCPU": 8, "RAM": 32, "max_ebs_bandwidth": 19000, 
+                    "network": "Up to 12.5 Gbps", "family": "general", "processor": "Intel Xeon Ice Lake", 
+                    "architecture": "x86_64", "storage": "EBS Only", "network_performance": "Up to 12.5 Gigabit",
+                    "ebs_optimized": True, "enhanced_networking": True, "placement_group": True
+                },
+                {
+                    "type": "m6i.4xlarge", "vCPU": 16, "RAM": 64, "max_ebs_bandwidth": 38000, 
+                    "network": "Up to 12.5 Gbps", "family": "general", "processor": "Intel Xeon Ice Lake", 
+                    "architecture": "x86_64", "storage": "EBS Only", "network_performance": "Up to 12.5 Gigabit",
+                    "ebs_optimized": True, "enhanced_networking": True, "placement_group": True
+                },
+                {
+                    "type": "r6i.large", "vCPU": 2, "RAM": 16, "max_ebs_bandwidth": 4750, 
+                    "network": "Up to 12.5 Gbps", "family": "memory", "processor": "Intel Xeon Ice Lake", 
+                    "architecture": "x86_64", "storage": "EBS Only", "network_performance": "Up to 12.5 Gigabit",
+                    "ebs_optimized": True, "enhanced_networking": True, "placement_group": True
+                },
+                {
+                    "type": "r6i.xlarge", "vCPU": 4, "RAM": 32, "max_ebs_bandwidth": 9500, 
+                    "network": "Up to 12.5 Gbps", "family": "memory", "processor": "Intel Xeon Ice Lake", 
+                    "architecture": "x86_64", "storage": "EBS Only", "network_performance": "Up to 12.5 Gigabit",
+                    "ebs_optimized": True, "enhanced_networking": True, "placement_group": True
+                },
+                {
+                    "type": "r6i.2xlarge", "vCPU": 8, "RAM": 64, "max_ebs_bandwidth": 19000, 
+                    "network": "Up to 12.5 Gbps", "family": "memory", "processor": "Intel Xeon Ice Lake", 
+                    "architecture": "x86_64", "storage": "EBS Only", "network_performance": "Up to 12.5 Gigabit",
+                    "ebs_optimized": True, "enhanced_networking": True, "placement_group": True
+                },
+                {
+                    "type": "c6i.large", "vCPU": 2, "RAM": 4, "max_ebs_bandwidth": 4750, 
+                    "network": "Up to 12.5 Gbps", "family": "compute", "processor": "Intel Xeon Ice Lake", 
+                    "architecture": "x86_64", "storage": "EBS Only", "network_performance": "Up to 12.5 Gigabit",
+                    "ebs_optimized": True, "enhanced_networking": True, "placement_group": True
+                },
+                {
+                    "type": "c6i.xlarge", "vCPU": 4, "RAM": 8, "max_ebs_bandwidth": 9500, 
+                    "network": "Up to 12.5 Gbps", "family": "compute", "processor": "Intel Xeon Ice Lake", 
+                    "architecture": "x86_64", "storage": "EBS Only", "network_performance": "Up to 12.5 Gigabit",
+                    "ebs_optimized": True, "enhanced_networking": True, "placement_group": True
+                },
+                {
+                    "type": "c6i.2xlarge", "vCPU": 8, "RAM": 16, "max_ebs_bandwidth": 19000, 
+                    "network": "Up to 12.5 Gbps", "family": "compute", "processor": "Intel Xeon Ice Lake", 
+                    "architecture": "x86_64", "storage": "EBS Only", "network_performance": "Up to 12.5 Gigabit",
+                    "ebs_optimized": True, "enhanced_networking": True, "placement_group": True
+                },
+                {
+                    "type": "m6a.large", "vCPU": 2, "RAM": 8, "max_ebs_bandwidth": 3170, 
+                    "network": "Up to 12.5 Gbps", "family": "general", "processor": "AMD EPYC 7R13", 
+                    "architecture": "x86_64", "storage": "EBS Only", "network_performance": "Up to 12.5 Gigabit",
+                    "ebs_optimized": True, "enhanced_networking": True, "placement_group": True
+                },
+                {
+                    "type": "m6a.xlarge", "vCPU": 4, "RAM": 16, "max_ebs_bandwidth": 6300, 
+                    "network": "Up to 12.5 Gbps", "family": "general", "processor": "AMD EPYC 7R13", 
+                    "architecture": "x86_64", "storage": "EBS Only", "network_performance": "Up to 12.5 Gigabit",
+                    "ebs_optimized": True, "enhanced_networking": True, "placement_group": True
+                }
             ]
             
             # Environment multipliers
@@ -1598,7 +1695,7 @@ def render_claude_analysis_section(claude_analysis):
         logger.error(f"Error in render_claude_analysis_section: {e}")
 
 def render_aws_analysis_section(aws_analysis):
-    """Render AWS analysis section."""
+    """Render AWS analysis section with enhanced network details."""
     
     try:
         # Check if aws_analysis is None
@@ -1606,33 +1703,75 @@ def render_aws_analysis_section(aws_analysis):
             st.info("AWS analysis data not available.")
             return
             
-        # Instance recommendations
+        # Instance recommendations with network details
         recommended_instances = aws_analysis.get('recommended_instances', [])
         
         if recommended_instances:
-            st.markdown("**Recommended Instance Types:**")
+            st.markdown("**🎯 Top Recommended Instance Types**")
             
             instance_data = []
-            for instance in recommended_instances:
+            for instance in recommended_instances[:3]:  # Top 3
                 if isinstance(instance, dict):
                     instance_data.append({
                         'Instance Type': instance.get('type', 'N/A'),
                         'vCPUs': instance.get('vCPU', 'N/A'),
                         'RAM (GB)': instance.get('RAM', 'N/A'),
                         'Family': instance.get('family', 'N/A').title(),
-                        'Fit Score': f"{instance.get('score', 0):.2f}"
+                        'Fit Score': f"{instance.get('score', 0):.2f}",
+                        'Network Performance': instance.get('network_performance', 'N/A'),
+                        'EBS Bandwidth (Mbps)': f"{instance.get('max_ebs_bandwidth', 'N/A'):,}" if instance.get('max_ebs_bandwidth') else 'N/A'
                     })
             
             if instance_data:
                 df_instances = pd.DataFrame(instance_data)
                 st.dataframe(df_instances, use_container_width=True, hide_index=True)
         
+        # Network Performance Recommendations
+        st.markdown("**📡 Network Performance Recommendations**")
+        
+        network_recommendations = [
+            {
+                'Optimization': 'Enhanced Networking',
+                'Description': 'Enable SR-IOV for higher bandwidth and lower latency',
+                'Impact': 'Up to 1.2M packets per second',
+                'Cost': 'No additional cost'
+            },
+            {
+                'Optimization': 'Placement Groups',
+                'Description': 'Cluster instances for low-latency networking',
+                'Impact': '10 Gbps network performance',
+                'Cost': 'No additional cost'
+            },
+            {
+                'Optimization': 'EBS Optimization',
+                'Description': 'Dedicated bandwidth for storage operations',
+                'Impact': 'Consistent storage performance',
+                'Cost': 'Included in newer generations'
+            },
+            {
+                'Optimization': 'Multiple ENIs',
+                'Description': 'Multiple network interfaces for traffic separation',
+                'Impact': 'Better network organization',
+                'Cost': 'No additional cost'
+            }
+        ]
+        
+        df_network_recs = pd.DataFrame(network_recommendations)
+        st.dataframe(df_network_recs, use_container_width=True, hide_index=True)
+        
         # Cost savings opportunities
         savings_opps = aws_analysis.get('cost_savings_opportunities', [])
         if savings_opps:
-            st.markdown("**Cost Savings Opportunities:**")
+            st.markdown("**💡 Cost Optimization Opportunities**")
             for opp in savings_opps:
                 st.markdown(f"• {opp}")
+        
+        # Rightsizing recommendations
+        rightsizing_recs = aws_analysis.get('rightsizing_recommendations', [])
+        if rightsizing_recs:
+            st.markdown("**📊 Rightsizing Recommendations**")
+            for rec in rightsizing_recs:
+                st.markdown(f"• {rec}")
                 
     except Exception as e:
         st.error(f"Error displaying AWS analysis: {str(e)}")
@@ -1713,11 +1852,12 @@ def render_cost_breakdown_section(prod_results):
         logger.error(f"Error in render_cost_breakdown_section: {e}")
 
 def render_instance_recommendations_section(prod_results):
-    """Render EC2 instance recommendations section."""
+    """Render EC2 instance recommendations section with detailed specifications."""
     
     try:
         requirements = prod_results.get('requirements', {})
         aws_analysis = prod_results.get('aws_analysis', {})
+        cost_breakdown = prod_results.get('cost_breakdown', {})
         
         if not requirements:
             st.info("Instance requirements not available.")
@@ -1739,40 +1879,161 @@ def render_instance_recommendations_section(prod_results):
             st.dataframe(df_requirements, use_container_width=True, hide_index=True)
         
         with col2:
-            st.markdown("**🎯 Recommended Instance Types**")
+            st.markdown("**🎯 Selected Instance Type**")
             
-            recommended_instances = aws_analysis.get('recommended_instances', [])
-            
-            if recommended_instances:
-                instance_data = []
-                for instance in recommended_instances[:3]:  # Top 3
-                    if isinstance(instance, dict):
-                        instance_data.append({
-                            'Instance Type': instance.get('type', 'N/A'),
-                            'vCPUs': instance.get('vCPU', 'N/A'),
-                            'RAM (GB)': instance.get('RAM', 'N/A'),
-                            'Family': instance.get('family', 'N/A').title(),
-                            'Fit Score': f"{instance.get('score', 0):.2f}"
-                        })
+            selected_instance = cost_breakdown.get('selected_instance')
+            if selected_instance:
+                instance_info = [
+                    {'Attribute': 'Instance Type', 'Value': selected_instance.get('type', 'N/A')},
+                    {'Attribute': 'vCPUs', 'Value': selected_instance.get('vCPU', 'N/A')},
+                    {'Attribute': 'RAM (GB)', 'Value': selected_instance.get('RAM', 'N/A')},
+                    {'Attribute': 'Family', 'Value': selected_instance.get('family', 'N/A').title()},
+                    {'Attribute': 'Efficiency Score', 'Value': f"{selected_instance.get('efficiency_score', 0):.2f}"}
+                ]
                 
-                if instance_data:
-                    df_instances = pd.DataFrame(instance_data)
-                    st.dataframe(df_instances, use_container_width=True, hide_index=True)
+                df_instance = pd.DataFrame(instance_info)
+                st.dataframe(df_instance, use_container_width=True, hide_index=True)
             else:
-                st.info("No specific instance recommendations available.")
+                st.info("No specific instance selected.")
         
-        # Additional Instance Details
-        st.markdown("**⚙️ Instance Family Comparison**")
+        # Detailed Instance Specifications
+        st.markdown("**🔧 Detailed Instance Specifications**")
         
-        # Static instance comparison for demo
+        selected_instance = cost_breakdown.get('selected_instance')
+        if selected_instance:
+            # Find full instance details
+            instance_type = selected_instance.get('type', 'm6i.large')
+            
+            # Get instance details from calculator's INSTANCE_TYPES
+            calculator = st.session_state.enhanced_calculator
+            full_instance_details = None
+            
+            for instance in calculator.INSTANCE_TYPES:
+                if instance['type'] == instance_type:
+                    full_instance_details = instance
+                    break
+            
+            if full_instance_details:
+                col3, col4 = st.columns(2)
+                
+                with col3:
+                    st.markdown("**Compute & Memory**")
+                    compute_specs = [
+                        {'Specification': 'Instance Type', 'Value': full_instance_details.get('type', 'N/A')},
+                        {'Specification': 'vCPUs', 'Value': full_instance_details.get('vCPU', 'N/A')},
+                        {'Specification': 'Memory (GB)', 'Value': full_instance_details.get('RAM', 'N/A')},
+                        {'Specification': 'Processor', 'Value': full_instance_details.get('processor', 'N/A')},
+                        {'Specification': 'Architecture', 'Value': full_instance_details.get('architecture', 'N/A')},
+                        {'Specification': 'Instance Family', 'Value': full_instance_details.get('family', 'N/A').title()}
+                    ]
+                    
+                    df_compute = pd.DataFrame(compute_specs)
+                    st.dataframe(df_compute, use_container_width=True, hide_index=True)
+                
+                with col4:
+                    st.markdown("**Network & Storage**")
+                    network_specs = [
+                        {'Specification': 'Network Performance', 'Value': full_instance_details.get('network_performance', 'N/A')},
+                        {'Specification': 'Max EBS Bandwidth (Mbps)', 'Value': f"{full_instance_details.get('max_ebs_bandwidth', 'N/A'):,}" if full_instance_details.get('max_ebs_bandwidth') else 'N/A'},
+                        {'Specification': 'Storage Type', 'Value': full_instance_details.get('storage', 'N/A')},
+                        {'Specification': 'EBS Optimized', 'Value': 'Yes' if full_instance_details.get('ebs_optimized', False) else 'No'},
+                        {'Specification': 'Enhanced Networking', 'Value': 'Yes' if full_instance_details.get('enhanced_networking', False) else 'No'},
+                        {'Specification': 'Placement Group Support', 'Value': 'Yes' if full_instance_details.get('placement_group', False) else 'No'}
+                    ]
+                    
+                    df_network = pd.DataFrame(network_specs)
+                    st.dataframe(df_network, use_container_width=True, hide_index=True)
+        
+        # Network Performance Analysis
+        st.markdown("**📡 Network Performance Analysis**")
+        
+        # Calculate network requirements based on workload
+        calculator = st.session_state.enhanced_calculator
+        peak_throughput = calculator.inputs.get('peak_throughput_mbps', 250)
+        peak_iops = calculator.inputs.get('peak_iops', 5000)
+        
+        col5, col6 = st.columns(2)
+        
+        with col5:
+            st.markdown("**Current Workload Requirements**")
+            workload_network = [
+                {'Metric': 'Peak Throughput (Mbps)', 'Current': f"{peak_throughput:,}", 'AWS Recommendation': 'Monitor and adjust'},
+                {'Metric': 'Peak IOPS', 'Current': f"{peak_iops:,}", 'AWS Recommendation': 'Use gp3 volumes'},
+                {'Metric': 'Network Latency', 'Current': 'Variable', 'AWS Recommendation': 'Single AZ for low latency'},
+                {'Metric': 'Bandwidth Consistency', 'Current': 'Shared', 'AWS Recommendation': 'Enhanced networking enabled'}
+            ]
+            
+            df_workload_network = pd.DataFrame(workload_network)
+            st.dataframe(df_workload_network, use_container_width=True, hide_index=True)
+        
+        with col6:
+            st.markdown("**Instance Network Capabilities**")
+            if full_instance_details:
+                network_analysis = [
+                    {'Capability': 'Max Network Performance', 'Value': full_instance_details.get('network_performance', 'N/A')},
+                    {'Capability': 'EBS Bandwidth (Mbps)', 'Value': f"{full_instance_details.get('max_ebs_bandwidth', 0):,}"},
+                    {'Capability': 'Network Optimization', 'Value': 'SR-IOV & Enhanced Networking'},
+                    {'Capability': 'Packet Per Second (PPS)', 'Value': 'Up to 1.2M PPS (estimated)'}
+                ]
+                
+                df_network_analysis = pd.DataFrame(network_analysis)
+                st.dataframe(df_network_analysis, use_container_width=True, hide_index=True)
+        
+        # Instance Family Comparison with Network Details
+        st.markdown("**⚙️ Instance Family Comparison (Network Focus)**")
+        
         comparison_data = [
-            {'Family': 'General Purpose (M6i)', 'Use Case': 'Web applications, microservices', 'CPU:Memory Ratio': '1:4', 'Best For': 'Balanced workloads'},
-            {'Family': 'Memory Optimized (R6i)', 'Use Case': 'In-memory databases, real-time analytics', 'CPU:Memory Ratio': '1:8', 'Best For': 'Memory-intensive apps'},
-            {'Family': 'Compute Optimized (C6i)', 'Use Case': 'High-performance computing, gaming', 'CPU:Memory Ratio': '1:2', 'Best For': 'CPU-intensive apps'}
+            {
+                'Family': 'General Purpose (M6i)', 
+                'Network Performance': 'Up to 12.5 Gbps', 
+                'EBS Bandwidth': '4,750 - 19,000 Mbps',
+                'Use Case': 'Web applications, microservices', 
+                'CPU:Memory Ratio': '1:4', 
+                'Network Features': 'Enhanced networking, SR-IOV'
+            },
+            {
+                'Family': 'Memory Optimized (R6i)', 
+                'Network Performance': 'Up to 12.5 Gbps', 
+                'EBS Bandwidth': '4,750 - 19,000 Mbps',
+                'Use Case': 'In-memory databases, real-time analytics', 
+                'CPU:Memory Ratio': '1:8', 
+                'Network Features': 'Enhanced networking, High bandwidth'
+            },
+            {
+                'Family': 'Compute Optimized (C6i)', 
+                'Network Performance': 'Up to 12.5 Gbps', 
+                'EBS Bandwidth': '4,750 - 19,000 Mbps',
+                'Use Case': 'High-performance computing, gaming', 
+                'CPU:Memory Ratio': '1:2', 
+                'Network Features': 'Optimized for compute workloads'
+            },
+            {
+                'Family': 'General Purpose (M6a)', 
+                'Network Performance': 'Up to 12.5 Gbps', 
+                'EBS Bandwidth': '3,170 - 6,300 Mbps',
+                'Use Case': 'Cost-optimized general workloads', 
+                'CPU:Memory Ratio': '1:4', 
+                'Network Features': 'AMD-based, Enhanced networking'
+            }
         ]
         
         df_comparison = pd.DataFrame(comparison_data)
         st.dataframe(df_comparison, use_container_width=True, hide_index=True)
+        
+        # Network Recommendations
+        st.markdown("**💡 Network Optimization Recommendations**")
+        
+        network_recommendations = [
+            "🔧 **Enable Enhanced Networking**: All recommended instances support SR-IOV for better network performance",
+            "📊 **Monitor Network Utilization**: Use CloudWatch to track network in/out and packet rates",
+            "🎯 **Placement Groups**: Consider cluster placement groups for low-latency, high-throughput workloads",
+            "💾 **EBS Optimization**: Ensure EBS-optimized instances for consistent storage performance",
+            "🌐 **Multi-AZ Considerations**: Factor in cross-AZ data transfer costs for high-traffic applications",
+            "⚡ **Instance Size Impact**: Larger instances provide higher network and EBS bandwidth limits"
+        ]
+        
+        for rec in network_recommendations:
+            st.markdown(rec)
         
     except Exception as e:
         st.error(f"Error displaying instance recommendations: {str(e)}")
