@@ -1648,10 +1648,8 @@ class CloudMigrationDecisionEngine:
 
 # END OF DECISION ENGINE CLASS INSERTION
 
-
 class FirebaseAuthenticator:
-    """Enhanced Firebase authentication manager with better debugging and fallback methods."""
-    
+    """Enhanced Firebase authentication manager with better debugging and fallback methods."""    
     def __init__(self):
         self.firebase_app = None
         self.auth_client = None
@@ -1780,8 +1778,7 @@ class FirebaseAuthenticator:
     def sign_up_admin_only(self, email, password, display_name):
         """Create user using only Firebase Admin SDK (fallback method)."""
         if not self.firebase_available or not self.initialized or not self.admin_auth_available:
-            return False, "Firebase Admin authentication not available."
-            
+            return False, "Firebase Admin authentication not available."            
         try:
             # Create user with Firebase Admin SDK
             user_record = auth.create_user(
@@ -3766,33 +3763,33 @@ with col4:
                 st.info("Please download the template and ensure all required columns are present.")
                 return
             
-            # Show data preview
-            with st.expander("👀 Data Preview", expanded=True):
-                st.dataframe(df.head(10), use_container_width=True)
+    # Show data preview
+        with st.expander("👀 Data Preview", expanded=True):
+             st.dataframe(df.head(10), use_container_width=True)
                 
-                if len(df) > 10:
+        if len(df) > 10:
                     st.info(f"Showing first 10 rows of {len(df)} total rows")
             
-            # Validation summary
-            col1, col2, col3 = st.columns(3)
+    # Validation summary
+        col1, col2, col3 = st.columns(3)
             
-            with col1:
+        with col1:
                 st.metric("Total Workloads", len(df))
             
-            with col2:
+        with col2:
                 unique_types = df['workload_type'].nunique()
                 st.metric("Workload Types", unique_types)
             
-            with col3:
+        with col3:
                 unique_regions = df['region'].nunique()
                 st.metric("AWS Regions", unique_regions)
             
             # Advanced bulk options
             st.subheader("⚙️ Bulk Analysis Options")
             
-            col1, col2 = st.columns(2)
+        col1, col2 = st.columns(2)
             
-            with col1:
+        with col1:
                 bulk_pricing_model = st.selectbox(
                     "Default Pricing Model for All Workloads",
                     ["on_demand", "ri_1y", "ri_3y", "savings_plan_compute_1y", "savings_plan_compute_3y"],
@@ -3812,7 +3809,7 @@ with col4:
                     help="Select which environments to include in bulk analysis"
                 )
             
-            with col2:
+        with col2:
                 generate_summary_report = st.checkbox(
                     "Generate Portfolio Summary Report", 
                     value=True,
@@ -3832,7 +3829,7 @@ with col4:
                 )
             
             # Execute bulk analysis
-            if st.button("🚀 Execute Bulk Analysis", type="primary", key="bulk_analysis"):
+        if st.button("🚀 Execute Bulk Analysis", type="primary", key="bulk_analysis"):
                 
                 # Validate data before processing
                 validation_errors = []
@@ -3932,9 +3929,9 @@ with col4:
                 if bulk_results:
                     render_bulk_analysis_summary(bulk_results, bulk_environments)
         
-        except Exception as e:
-            st.error(f"❌ Error reading CSV file: {str(e)}")
-            st.info("Please ensure your CSV file is properly formatted and contains valid data.")
+    except Exception as e:
+    st.error(f"❌ Error reading CSV file: {str(e)}")
+    st.info("Please ensure your CSV file is properly formatted and contains valid data.")
 
 def render_bulk_analysis_summary(bulk_results, environments):
     """Render summary of bulk analysis results."""
