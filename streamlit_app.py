@@ -33,6 +33,15 @@ from datetime import datetime, timedelta  # (this should already exist)
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import json
 
+# In the main tab where results are shown
+if st.session_state.analysis_results:
+    st.markdown("---")
+    try:
+        render_enhanced_analysis_results(st.session_state.analysis_results['recommendations'])
+    except Exception as e:
+        st.error(f"Error displaying results: {str(e)}")
+        st.info("Please try running the analysis again.")
+
 # Firebase imports with error handling
 FIREBASE_AVAILABLE = False
 try:
@@ -2713,9 +2722,35 @@ def render_enhanced_workload_configuration():
 
 # END OF FUNCTION MODIFICATION
 
-def render_enhanced_analysis_results(results):
-    """Render enhanced analysis results with enterprise features."""
-    st.markdown('<div class="section-header"><h3>📊 Enterprise Analysis Results</h3></div>', unsafe_allow_html=True)
+def safe_format_currency(value, default="N/A"):
+    """Safely format currency values."""
+    try:
+        if value is None or pd.isna(value):
+            return default
+        return f"${float(value):,.2f}"
+    except (ValueError, TypeError):
+        return default
+
+def safe_format_percentage(value, default="N/A"):
+    """Safely format percentage values."""
+    try:
+        if value is None or pd.isna(value):
+            return default
+        return f"{float(value):.1f}%"
+    except (ValueError, TypeError):
+        return default
+
+def safe_format_number(value, decimals=0, default="N/A"):
+    """Safely format numeric values."""
+    try:
+        if value is None or pd.isna(value):
+            return default
+        if decimals == 0:
+            return f"{float(value):,.0f}"
+        else:
+            return f"{float(value):,.{decimals}f}"
+    except (ValueError, TypeError):
+        return default
     
     # Enterprise Summary Cards
     prod_results = results['PROD']
@@ -2762,13 +2797,18 @@ def render_enhanced_analysis_results(results):
         """, unsafe_allow_html=True)
     
     # TCO Savings Highlight
-    if tco_analysis['monthly_savings'] > 0:
-        st.markdown(f"""
-        <div class="savings-highlight">
-            💰 <strong>Potential Savings:</strong> ${tco_analysis['monthly_savings']:,.2f}/month 
-            (${tco_analysis['monthly_savings'] * 12:,.2f}/year) by switching to {tco_analysis['best_pricing_option'].replace('_', ' ').title()}
-        </div>
-        """, unsafe_allow_html=True)
+    monthly_savings = tco_analysis.get('monthly_savings', 0)
+    if monthly_savings and monthly_savings > 0:
+        monthly_savings_display = safe_format_currency(monthly_savings)
+        annual_savings_display = safe_format_currency(monthly_savings * 12)
+        best_option = tco_analysis.get('best_pricing_option', 'N/A').replace('_', ' ').title()
+    
+    st.markdown(f"""
+    <div class="savings-highlight">
+        💰 <strong>Potential Savings:</strong> {monthly_savings_display}/month 
+        ({annual_savings_display}/year) by switching to {best_option}
+    </div>
+    """, unsafe_allow_html=True)
     
     # Enhanced Cost Breakdown
     st.subheader("💰 Comprehensive Cost Analysis")
@@ -2777,16 +2817,28 @@ def render_enhanced_analysis_results(results):
     cost_breakdown = prod_results['cost_breakdown']
     total_costs = cost_breakdown['total_costs']
     
-    # Create cost comparison chart
-    cost_data = []
-    for pricing_model, cost in total_costs.items():
+    cost_breakdown = prod_results['cost_breakdown']
+total_costs = cost_breakdown['total_costs']
+
+# Create cost comparison chart
+cost_data = []
+for pricing_model, cost in total_costs.items():
+    if cost is not None and not pd.isna(cost):
         model_name = pricing_model.replace('_', ' ').title()
-        savings = ((total_costs.get('on_demand', cost) - cost) / total_costs.get('on_demand', cost) * 100) if total_costs.get('on_demand', 0) > 0 else 0
+        base_cost = total_costs.get('on_demand', 0)
+        if base_cost and base_cost > 0:
+            savings = ((base_cost - cost) / base_cost * 100)
+        else:
+            savings = 0
+        
         cost_data.append({
             'Pricing Model': model_name,
-            'Monthly Cost': cost,
-            'Savings %': round(savings, 1)
+            'Monthly Cost': float(cost),
+            'Savings %': round(float(savings), 1) if not pd.isna(savings) else 0
         })
+
+if cost_data:  # Only create chart if we have valid data
+    df_costs = pd.DataFrame(cost_data)
     
     df_costs = pd.DataFrame(cost_data)
     
@@ -3530,7 +3582,57 @@ def main():
        render_enhanced_workload_configuration()        
     if st.session_state.analysis_results:
             st.markdown("---")
-            render_enhanced_analysis_results(st.session_state.analysis_results['recommendations'])
+            # Enterprise Summary Cards
+prod_results = results['PROD']
+tco_analysis = prod_results['tco_analysis']
+
+col1, col2, col3, col4 = st.columns(4)
+
+with col1:
+    monthly_cost = safe_format_currency(tco_analysis.get('monthly_cost', 0))
+    best_option = tco_analysis.get('best_pricing_option', 'N/A').replace('_', ' ').title()
+    st.markdown(f"""
+    <div class="metric-card">
+        <div class="metric-title">Best Monthly Cost</div>
+        <div class="metric-value">{monthly_cost}</div>
+        <div class="metric-description">{best_option}</div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+with col2:
+    monthly_savings = tco_analysis.get('monthly_savings', 0)
+    annual_savings = safe_format_currency(monthly_savings * 12 if monthly_savings else 0)
+    savings_pct = safe_format_percentage(tco_analysis.get('savings_percentage', 0))
+    st.markdown(f"""
+    <div class="metric-card">
+        <div class="metric-title">Annual Savings</div>
+        <div class="metric-value">{annual_savings}</div>
+        <div class="metric-description">{savings_pct} vs On-Demand</div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+with col3:
+    roi_value = tco_analysis.get('roi_3_years')
+    roi_display = safe_format_percentage(roi_value) if roi_value != "N/A" else "N/A"
+    roi_color = "green" if isinstance(roi_value, (int, float)) and roi_value > 100 else "orange"
+    st.markdown(f"""
+    <div class="metric-card">
+        <div class="metric-title">3-Year ROI</div>
+        <div class="metric-value" style="color: {roi_color}">{roi_display}</div>
+        <div class="metric-description">Return on Investment</div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+with col4:
+    break_even = tco_analysis.get('break_even_months', "N/A")
+    break_even_display = safe_format_number(break_even, 1) if break_even != "N/A" else "N/A"
+    st.markdown(f"""
+    <div class="metric-card">
+        <div class="metric-title">Break-Even</div>
+        <div class="metric-value">{break_even_display}</div>
+        <div class="metric-description">Months to recover migration cost</div>
+    </div>
+    """, unsafe_allow_html=True)
     
     # NEW MIGRATION DECISION TAB
     with tab2:
