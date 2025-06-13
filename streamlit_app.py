@@ -2158,81 +2158,331 @@ def generate_enhanced_reports(report_type, sections, company_name, title):
             logger.error(f"Error generating {report_type} report: {e}")
 
 def generate_pdf_report(results, sections, company_name, title, timestamp):
-    """Generate PDF report using reportlab."""
+    """Generate comprehensive PDF report with AI+AWS analysis."""
     
     try:
         if not REPORTLAB_AVAILABLE:
             st.warning("📄 ReportLab not available. Please install with: `pip install reportlab`")
-            # Generate text-based report as fallback
-            generate_text_report(results, sections, company_name, title, timestamp)
+            generate_comprehensive_text_report(results, sections, company_name, title, timestamp)
             return
         
-        from reportlab.lib.pagesizes import letter
-        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-        from reportlab.lib.styles import getSampleStyleSheet
+        from reportlab.lib.pagesizes import letter, A4
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
         from reportlab.lib.units import inch
         from reportlab.lib import colors
+        from reportlab.lib.enums import TA_CENTER, TA_LEFT
         
         buffer = io.BytesIO()
-        doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.75*inch)
+        doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=0.75*inch, leftMargin=0.75*inch, 
+                              rightMargin=0.75*inch, bottomMargin=0.75*inch)
         
-        # Get styles
+        # Get styles and create custom ones
         styles = getSampleStyleSheet()
+        
+        # Custom styles
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=18,
+            spaceAfter=12,
+            alignment=TA_CENTER,
+            textColor=colors.HexColor('#2563eb')
+        )
+        
+        heading_style = ParagraphStyle(
+            'CustomHeading',
+            parent=styles['Heading2'],
+            fontSize=14,
+            spaceBefore=16,
+            spaceAfter=8,
+            textColor=colors.HexColor('#1f2937')
+        )
+        
+        subheading_style = ParagraphStyle(
+            'CustomSubHeading',
+            parent=styles['Heading3'],
+            fontSize=12,
+            spaceBefore=12,
+            spaceAfter=6,
+            textColor=colors.HexColor('#374151')
+        )
+        
         story = []
         
-        # Title
-        story.append(Paragraph(title, styles['Title']))
-        story.append(Paragraph(company_name, styles['Normal']))
-        story.append(Paragraph(f"Generated: {datetime.now().strftime('%B %d, %Y')}", styles['Normal']))
-        story.append(Spacer(1, 0.2*inch))
+        # Title Page
+        story.append(Paragraph(title, title_style))
+        story.append(Spacer(1, 0.1*inch))
+        story.append(Paragraph(f"<b>{company_name}</b>", styles['Normal']))
+        story.append(Paragraph(f"Generated: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}", styles['Normal']))
+        story.append(Spacer(1, 0.3*inch))
         
         # Executive Summary
-        story.append(Paragraph("Executive Summary", styles['Heading1']))
+        story.append(Paragraph("Executive Summary", heading_style))
+        
         prod_results = results['recommendations']['PROD']
+        claude_analysis = prod_results.get('claude_analysis', {})
+        tco_analysis = prod_results.get('tco_analysis', {})
         
         summary_text = f"""
-        This comprehensive analysis provides AWS migration recommendations for {results['inputs']['workload_name']}.
-        
-        Key Findings:
-        • Migration Complexity: {prod_results['claude_analysis']['complexity_level']} ({prod_results['claude_analysis']['complexity_score']:.0f}/100)
-        • Estimated Timeline: {prod_results['claude_analysis']['estimated_timeline']['max_weeks']} weeks
-        • Monthly Cost: ${prod_results['tco_analysis']['monthly_cost']:,.2f}
-        • Recommended Approach: {prod_results['claude_analysis']['migration_strategy']['approach']}
+        <b>Workload:</b> {results['inputs']['workload_name']}<br/>
+        <b>Migration Complexity:</b> {claude_analysis.get('complexity_level', 'MEDIUM')} ({claude_analysis.get('complexity_score', 50):.0f}/100)<br/>
+        <b>Recommended Strategy:</b> {claude_analysis.get('migration_strategy', {}).get('approach', 'Standard Migration')}<br/>
+        <b>Estimated Timeline:</b> {claude_analysis.get('estimated_timeline', {}).get('max_weeks', 8)} weeks<br/>
+        <b>Monthly Cost:</b> ${tco_analysis.get('monthly_cost', 0):,.2f}<br/>
+        <b>Best Pricing Option:</b> {tco_analysis.get('best_pricing_option', 'N/A').replace('_', ' ').title()}<br/>
+        <b>Projected 3-Year ROI:</b> {tco_analysis.get('roi_3_years', 0):.1f}%
         """
         
         story.append(Paragraph(summary_text, styles['Normal']))
         story.append(Spacer(1, 0.2*inch))
         
-        # Cost Analysis
-        if "AWS Cost & Instance Analysis" in sections:
-            story.append(Paragraph("Cost Analysis", styles['Heading1']))
+        # Claude AI Migration Analysis
+        if "Claude AI Migration Analysis" in sections:
+            story.append(Paragraph("🤖 Claude AI Migration Complexity Analysis", heading_style))
             
-            cost_breakdown = prod_results.get('cost_breakdown', {})
-            total_costs = cost_breakdown.get('total_costs', {})
+            # Migration Strategy
+            migration_strategy = claude_analysis.get('migration_strategy', {})
+            if migration_strategy:
+                story.append(Paragraph("Migration Strategy", subheading_style))
+                strategy_text = f"""
+                <b>Approach:</b> {migration_strategy.get('approach', 'N/A')}<br/>
+                <b>Methodology:</b> {migration_strategy.get('methodology', 'N/A')}<br/>
+                <b>Timeline:</b> {migration_strategy.get('timeline', 'N/A')}<br/>
+                <b>Risk Level:</b> {migration_strategy.get('risk_level', 'N/A')}<br/>
+                <b>Automation Potential:</b> {migration_strategy.get('automation_potential', 'N/A')}
+                """
+                story.append(Paragraph(strategy_text, styles['Normal']))
+                story.append(Spacer(1, 0.1*inch))
+            
+            # Migration Steps
+            migration_steps = claude_analysis.get('migration_steps', [])
+            if migration_steps:
+                story.append(Paragraph("Detailed Migration Phases", subheading_style))
+                
+                for i, step in enumerate(migration_steps, 1):
+                    if isinstance(step, dict):
+                        phase_title = f"Phase {i}: {step.get('phase', 'N/A')} ({step.get('duration', 'N/A')})"
+                        story.append(Paragraph(phase_title, styles['Heading4']))
+                        
+                        tasks = step.get('tasks', [])
+                        if tasks:
+                            tasks_text = "<b>Key Tasks:</b><br/>" + "<br/>".join([f"• {task}" for task in tasks])
+                            story.append(Paragraph(tasks_text, styles['Normal']))
+                        
+                        deliverables = step.get('deliverables', [])
+                        if deliverables:
+                            deliverables_text = f"<b>Deliverables:</b> {', '.join(deliverables)}"
+                            story.append(Paragraph(deliverables_text, styles['Normal']))
+                        
+                        story.append(Spacer(1, 0.1*inch))
+            
+            # Migration Tools and Technologies
+            story.append(Paragraph("Recommended Migration Tools", subheading_style))
+            
+            migration_tools_data = [
+                ['Tool Category', 'Recommended Tools', 'Use Case'],
+                ['Discovery & Assessment', 'AWS Application Discovery Service, CloudEndure', 'Infrastructure inventory and dependency mapping'],
+                ['Data Migration', 'AWS Database Migration Service (DMS), AWS DataSync', 'Database and file system migration'],
+                ['Application Migration', 'AWS Server Migration Service (SMS), CloudEndure Migration', 'Server and application replication'],
+                ['Network Setup', 'AWS Direct Connect, VPN Gateway, Transit Gateway', 'Secure network connectivity'],
+                ['Security & Compliance', 'AWS Config, CloudTrail, Security Hub', 'Security monitoring and compliance'],
+                ['Monitoring & Logging', 'CloudWatch, X-Ray, VPC Flow Logs', 'Performance monitoring and troubleshooting'],
+                ['Automation', 'AWS Systems Manager, CloudFormation, Terraform', 'Infrastructure as Code and automation']
+            ]
+            
+            tools_table = Table(migration_tools_data, colWidths=[2*inch, 2.5*inch, 2.5*inch])
+            tools_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2563eb')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#f8fafc')),
+                ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#e2e8f0')),
+                ('FONTSIZE', (0, 1), (-1, -1), 9),
+                ('VALIGN', (0, 0), (-1, -1), 'TOP')
+            ]))
+            
+            story.append(tools_table)
+            story.append(Spacer(1, 0.2*inch))
+            
+            # Risk Assessment
+            risk_factors = claude_analysis.get('risk_factors', [])
+            if risk_factors:
+                story.append(Paragraph("Risk Assessment & Mitigation", subheading_style))
+                
+                risk_data = [['Risk Category', 'Risk Description', 'Probability', 'Impact', 'Mitigation Strategy']]
+                for risk in risk_factors[:5]:  # Top 5 risks
+                    if isinstance(risk, dict):
+                        risk_data.append([
+                            risk.get('category', 'N/A'),
+                            risk.get('risk', 'N/A'),
+                            risk.get('probability', 'N/A'),
+                            risk.get('impact', 'N/A'),
+                            risk.get('mitigation', 'N/A')
+                        ])
+                
+                risk_table = Table(risk_data, colWidths=[1.2*inch, 2*inch, 0.8*inch, 0.8*inch, 2.2*inch])
+                risk_table.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#dc2626')),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                    ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0, 0), (-1, 0), 9),
+                    ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                    ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#fef2f2')),
+                    ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#f87171')),
+                    ('FONTSIZE', (0, 1), (-1, -1), 8),
+                    ('VALIGN', (0, 0), (-1, -1), 'TOP')
+                ]))
+                
+                story.append(risk_table)
+                story.append(PageBreak())
+        
+        # AWS Cost & Instance Analysis
+        if "AWS Cost & Instance Analysis" in sections:
+            story.append(Paragraph("☁️ AWS Cost & Instance Analysis", heading_style))
+            
+            # Environment-wise Instance Recommendations
+            story.append(Paragraph("Environment-Specific Instance Recommendations", subheading_style))
+            
+            env_instance_data = [['Environment', 'Instance Type', 'vCPUs', 'RAM (GB)', 'Monthly Cost (On-Demand)', 'Monthly Cost (Reserved 1Y)']]
+            
+            for env in ['DEV', 'QA', 'UAT', 'PREPROD', 'PROD']:
+                env_results = results['recommendations'].get(env, {})
+                cost_breakdown = env_results.get('cost_breakdown', {})
+                selected_instance = cost_breakdown.get('selected_instance', {})
+                total_costs = cost_breakdown.get('total_costs', {})
+                
+                if selected_instance:
+                    env_instance_data.append([
+                        env,
+                        selected_instance.get('type', 'N/A'),
+                        str(selected_instance.get('vCPU', 'N/A')),
+                        str(selected_instance.get('RAM', 'N/A')),
+                        f"${total_costs.get('on_demand', 0):,.0f}",
+                        f"${total_costs.get('ri_1y_no_upfront', 0):,.0f}"
+                    ])
+            
+            env_table = Table(env_instance_data, colWidths=[1*inch, 1.2*inch, 0.8*inch, 0.9*inch, 1.5*inch, 1.6*inch])
+            env_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#059669')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 9),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#ecfdf5')),
+                ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#10b981')),
+                ('FONTSIZE', (0, 1), (-1, -1), 8)
+            ]))
+            
+            story.append(env_table)
+            story.append(Spacer(1, 0.2*inch))
+            
+            # Production Environment Detailed Analysis
+            story.append(Paragraph("Production Environment - Detailed Analysis", subheading_style))
+            
+            prod_cost_breakdown = prod_results.get('cost_breakdown', {})
+            total_costs = prod_cost_breakdown.get('total_costs', {})
             
             if total_costs:
-                cost_data = [['Pricing Model', 'Monthly Cost', 'Annual Cost']]
+                story.append(Paragraph("Cost Comparison by Pricing Model", styles['Heading4']))
+                cost_data = [['Pricing Model', 'Monthly Cost', 'Annual Cost', 'Savings vs On-Demand']]
+                
+                on_demand_cost = total_costs.get('on_demand', 0)
+                
                 for model, cost in total_costs.items():
+                    savings = ((on_demand_cost - cost) / on_demand_cost * 100) if on_demand_cost > 0 else 0
                     cost_data.append([
                         model.replace('_', ' ').title(),
                         f"${cost:,.2f}",
-                        f"${cost*12:,.2f}"
+                        f"${cost*12:,.2f}",
+                        f"{savings:.1f}%"
                     ])
                 
-                cost_table = Table(cost_data)
+                cost_table = Table(cost_data, colWidths=[2*inch, 1.5*inch, 1.5*inch, 2*inch])
                 cost_table.setStyle(TableStyle([
-                    ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1f2937')),
                     ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
                     ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
                     ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                    ('FONTSIZE', (0, 0), (-1, 0), 14),
+                    ('FONTSIZE', (0, 0), (-1, 0), 10),
                     ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                    ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-                    ('GRID', (0, 0), (-1, -1), 1, colors.black)
+                    ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#f9fafb')),
+                    ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#d1d5db')),
+                    ('FONTSIZE', (0, 1), (-1, -1), 9)
                 ]))
                 
                 story.append(cost_table)
                 story.append(Spacer(1, 0.2*inch))
+            
+            # Instance Specifications
+            selected_instance = prod_cost_breakdown.get('selected_instance', {})
+            if selected_instance:
+                story.append(Paragraph("Recommended Production Instance Specifications", styles['Heading4']))
+                
+                # Get full instance details
+                calculator = st.session_state.enhanced_calculator
+                full_instance_details = None
+                
+                for instance in calculator.INSTANCE_TYPES:
+                    if instance['type'] == selected_instance.get('type'):
+                        full_instance_details = instance
+                        break
+                
+                if full_instance_details:
+                    spec_data = [
+                        ['Specification', 'Value'],
+                        ['Instance Type', full_instance_details.get('type', 'N/A')],
+                        ['vCPUs', str(full_instance_details.get('vCPU', 'N/A'))],
+                        ['Memory (GB)', str(full_instance_details.get('RAM', 'N/A'))],
+                        ['Processor', full_instance_details.get('processor', 'N/A')],
+                        ['Architecture', full_instance_details.get('architecture', 'N/A')],
+                        ['Network Performance', full_instance_details.get('network_performance', 'N/A')],
+                        ['EBS Bandwidth (Mbps)', f"{full_instance_details.get('max_ebs_bandwidth', 'N/A'):,}" if full_instance_details.get('max_ebs_bandwidth') else 'N/A'],
+                        ['Enhanced Networking', 'Yes' if full_instance_details.get('enhanced_networking') else 'No'],
+                        ['EBS Optimized', 'Yes' if full_instance_details.get('ebs_optimized') else 'No']
+                    ]
+                    
+                    spec_table = Table(spec_data, colWidths=[3*inch, 3*inch])
+                    spec_table.setStyle(TableStyle([
+                        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#3b82f6')),
+                        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                        ('FONTSIZE', (0, 0), (-1, 0), 10),
+                        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                        ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#eff6ff')),
+                        ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#3b82f6')),
+                        ('FONTSIZE', (0, 1), (-1, -1), 9)
+                    ]))
+                    
+                    story.append(spec_table)
+                    story.append(PageBreak())
+        
+        # Implementation Recommendations
+        story.append(Paragraph("📋 Implementation Recommendations", heading_style))
+        
+        recommendations = claude_analysis.get('recommendations', [])
+        if recommendations:
+            story.append(Paragraph("Key Recommendations", subheading_style))
+            recs_text = "<br/>".join([f"• {rec}" for rec in recommendations])
+            story.append(Paragraph(recs_text, styles['Normal']))
+            story.append(Spacer(1, 0.1*inch))
+        
+        success_factors = claude_analysis.get('success_factors', [])
+        if success_factors:
+            story.append(Paragraph("Critical Success Factors", subheading_style))
+            factors_text = "<br/>".join([f"• {factor}" for factor in success_factors])
+            story.append(Paragraph(factors_text, styles['Normal']))
+        
+        # Footer
+        story.append(Spacer(1, 0.3*inch))
+        story.append(Paragraph(f"Report generated by Enterprise AWS Workload Sizing Platform v5.0 on {datetime.now().strftime('%B %d, %Y')}", 
+                              ParagraphStyle('Footer', parent=styles['Normal'], fontSize=8, alignment=TA_CENTER, textColor=colors.grey)))
         
         # Build PDF
         doc.build(story)
@@ -2241,19 +2491,254 @@ def generate_pdf_report(results, sections, company_name, title, timestamp):
         filename = f"AWS_Migration_Report_{timestamp}.pdf"
         
         st.download_button(
-            label="⬇️ Download PDF Report",
+            label="⬇️ Download Comprehensive PDF Report",
             data=buffer.getvalue(),
             file_name=filename,
             mime="application/pdf",
             key=f"download_pdf_{timestamp}"
         )
         
-        st.success("✅ PDF report generated successfully!")
+        st.success("✅ Comprehensive PDF report with AI+AWS analysis generated successfully!")
         
     except Exception as e:
         st.error(f"Error generating PDF: {str(e)}")
-        # Fallback to text report
-        generate_text_report(results, sections, company_name, title, timestamp)
+        logger.error(f"PDF generation error: {e}")
+        # Fallback to comprehensive text report
+        generate_comprehensive_text_report(results, sections, company_name, title, timestamp)
+
+def generate_comprehensive_text_report(results, sections, company_name, title, timestamp):
+    """Generate comprehensive text-based report with all AI+AWS details."""
+    
+    try:
+        prod_results = results['recommendations']['PROD']
+        claude_analysis = prod_results.get('claude_analysis', {})
+        tco_analysis = prod_results.get('tco_analysis', {})
+        
+        report_content = f"""
+{title}
+{company_name}
+Generated: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}
+
+{'='*80}
+EXECUTIVE SUMMARY
+{'='*80}
+
+Workload: {results['inputs']['workload_name']}
+Migration Complexity: {claude_analysis.get('complexity_level', 'MEDIUM')} ({claude_analysis.get('complexity_score', 50):.0f}/100)
+Recommended Strategy: {claude_analysis.get('migration_strategy', {}).get('approach', 'Standard Migration')}
+Estimated Timeline: {claude_analysis.get('estimated_timeline', {}).get('max_weeks', 8)} weeks
+Monthly Cost: ${tco_analysis.get('monthly_cost', 0):,.2f}
+Best Pricing Option: {tco_analysis.get('best_pricing_option', 'N/A').replace('_', ' ').title()}
+Projected 3-Year ROI: {tco_analysis.get('roi_3_years', 0):.1f}%
+
+{'='*80}
+CLAUDE AI MIGRATION COMPLEXITY ANALYSIS
+{'='*80}
+
+MIGRATION STRATEGY:
+"""
+        
+        migration_strategy = claude_analysis.get('migration_strategy', {})
+        if migration_strategy:
+            report_content += f"""
+Approach: {migration_strategy.get('approach', 'N/A')}
+Methodology: {migration_strategy.get('methodology', 'N/A')}
+Timeline: {migration_strategy.get('timeline', 'N/A')}
+Risk Level: {migration_strategy.get('risk_level', 'N/A')}
+Automation Potential: {migration_strategy.get('automation_potential', 'N/A')}
+
+"""
+        
+        # Migration Steps
+        migration_steps = claude_analysis.get('migration_steps', [])
+        if migration_steps:
+            report_content += "\nDETAILED MIGRATION PHASES:\n\n"
+            
+            for i, step in enumerate(migration_steps, 1):
+                if isinstance(step, dict):
+                    report_content += f"Phase {i}: {step.get('phase', 'N/A')} ({step.get('duration', 'N/A')})\n"
+                    
+                    tasks = step.get('tasks', [])
+                    if tasks:
+                        report_content += "Key Tasks:\n"
+                        for task in tasks:
+                            report_content += f"  • {task}\n"
+                    
+                    deliverables = step.get('deliverables', [])
+                    if deliverables:
+                        report_content += f"Deliverables: {', '.join(deliverables)}\n"
+                    
+                    report_content += "\n"
+        
+        # Migration Tools
+        report_content += f"""
+RECOMMENDED MIGRATION TOOLS:
+
+Discovery & Assessment:
+  • AWS Application Discovery Service - Infrastructure inventory and dependency mapping
+  • CloudEndure - Application dependency analysis
+  • AWS Migration Hub - Centralized migration tracking
+
+Data Migration:
+  • AWS Database Migration Service (DMS) - Database migration
+  • AWS DataSync - File system migration
+  • AWS Storage Gateway - Hybrid cloud storage
+
+Application Migration:
+  • AWS Server Migration Service (SMS) - Server replication
+  • CloudEndure Migration - Application migration
+  • AWS Application Migration Service - Lift-and-shift migrations
+
+Network Setup:
+  • AWS Direct Connect - Dedicated network connection
+  • VPN Gateway - Secure VPN connections
+  • Transit Gateway - Scalable network hub
+
+Security & Compliance:
+  • AWS Config - Configuration management
+  • CloudTrail - API logging and auditing
+  • Security Hub - Centralized security findings
+
+Monitoring & Logging:
+  • CloudWatch - Performance monitoring
+  • X-Ray - Application tracing
+  • VPC Flow Logs - Network traffic analysis
+
+Automation:
+  • AWS Systems Manager - Patch and configuration management
+  • CloudFormation - Infrastructure as Code
+  • Terraform - Multi-cloud infrastructure automation
+
+{'='*80}
+AWS COST & INSTANCE ANALYSIS
+{'='*80}
+
+ENVIRONMENT-SPECIFIC INSTANCE RECOMMENDATIONS:
+
+"""
+        
+        # Environment-wise recommendations
+        for env in ['DEV', 'QA', 'UAT', 'PREPROD', 'PROD']:
+            env_results = results['recommendations'].get(env, {})
+            cost_breakdown = env_results.get('cost_breakdown', {})
+            selected_instance = cost_breakdown.get('selected_instance', {})
+            total_costs = cost_breakdown.get('total_costs', {})
+            requirements = env_results.get('requirements', {})
+            
+            if selected_instance:
+                report_content += f"""{env} Environment:
+  Instance Type: {selected_instance.get('type', 'N/A')}
+  vCPUs: {selected_instance.get('vCPU', 'N/A')}
+  RAM: {selected_instance.get('RAM', 'N/A')} GB
+  Required vCPUs: {requirements.get('vCPUs', 'N/A')}
+  Required RAM: {requirements.get('RAM_GB', 'N/A')} GB
+  Monthly Cost (On-Demand): ${total_costs.get('on_demand', 0):,.0f}
+  Monthly Cost (Reserved 1Y): ${total_costs.get('ri_1y_no_upfront', 0):,.0f}
+  Monthly Cost (Reserved 3Y): ${total_costs.get('ri_3y_no_upfront', 0):,.0f}
+
+"""
+        
+        # Production Detailed Analysis
+        prod_cost_breakdown = prod_results.get('cost_breakdown', {})
+        selected_instance = prod_cost_breakdown.get('selected_instance', {})
+        
+        if selected_instance:
+            # Get full instance details
+            calculator = st.session_state.enhanced_calculator
+            full_instance_details = None
+            
+            for instance in calculator.INSTANCE_TYPES:
+                if instance['type'] == selected_instance.get('type'):
+                    full_instance_details = instance
+                    break
+            
+            if full_instance_details:
+                report_content += f"""
+PRODUCTION INSTANCE DETAILED SPECIFICATIONS:
+
+Instance Type: {full_instance_details.get('type', 'N/A')}
+vCPUs: {full_instance_details.get('vCPU', 'N/A')}
+Memory: {full_instance_details.get('RAM', 'N/A')} GB
+Processor: {full_instance_details.get('processor', 'N/A')}
+Architecture: {full_instance_details.get('architecture', 'N/A')}
+Network Performance: {full_instance_details.get('network_performance', 'N/A')}
+EBS Bandwidth: {full_instance_details.get('max_ebs_bandwidth', 'N/A'):,} Mbps
+Enhanced Networking: {'Yes' if full_instance_details.get('enhanced_networking') else 'No'}
+EBS Optimized: {'Yes' if full_instance_details.get('ebs_optimized') else 'No'}
+Placement Group Support: {'Yes' if full_instance_details.get('placement_group') else 'No'}
+
+"""
+        
+        # Risk Assessment
+        risk_factors = claude_analysis.get('risk_factors', [])
+        if risk_factors:
+            report_content += f"""
+{'='*80}
+RISK ASSESSMENT & MITIGATION
+{'='*80}
+
+"""
+            for risk in risk_factors:
+                if isinstance(risk, dict):
+                    report_content += f"""Risk Category: {risk.get('category', 'N/A')}
+Risk Description: {risk.get('risk', 'N/A')}
+Probability: {risk.get('probability', 'N/A')}
+Impact: {risk.get('impact', 'N/A')}
+Mitigation Strategy: {risk.get('mitigation', 'N/A')}
+
+"""
+        
+        # Recommendations
+        recommendations = claude_analysis.get('recommendations', [])
+        if recommendations:
+            report_content += f"""
+{'='*80}
+IMPLEMENTATION RECOMMENDATIONS
+{'='*80}
+
+"""
+            for i, rec in enumerate(recommendations, 1):
+                report_content += f"{i}. {rec}\n"
+        
+        success_factors = claude_analysis.get('success_factors', [])
+        if success_factors:
+            report_content += f"""
+
+CRITICAL SUCCESS FACTORS:
+
+"""
+            for i, factor in enumerate(success_factors, 1):
+                report_content += f"{i}. {factor}\n"
+        
+        report_content += f"""
+
+{'='*80}
+REPORT METADATA
+{'='*80}
+
+Generated by: Enterprise AWS Workload Sizing Platform v5.0
+Powered by: Claude AI + AWS Integration
+Report Date: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}
+Workload Type: {results['inputs']['workload_type']}
+Target Region: {results['inputs']['region']}
+Operating System: {results['inputs']['operating_system']}
+"""
+        
+        filename = f"AWS_Migration_Comprehensive_Report_{timestamp}.txt"
+        
+        st.download_button(
+            label="⬇️ Download Comprehensive Text Report",
+            data=report_content,
+            file_name=filename,
+            mime="text/plain",
+            key=f"download_comprehensive_text_{timestamp}"
+        )
+        
+        st.success("✅ Comprehensive text report with complete AI+AWS analysis generated successfully!")
+        
+    except Exception as e:
+        st.error(f"Error generating comprehensive text report: {str(e)}")
+        logger.error(f"Text report generation error: {e}")
 
 def generate_text_report(results, sections, company_name, title, timestamp):
     """Generate text-based report as fallback."""
@@ -2326,7 +2811,7 @@ Required Resources:
         st.error(f"Error generating text report: {str(e)}")
 
 def generate_excel_report(results, sections, company_name, title, timestamp):
-    """Generate Excel report with fallback if openpyxl not available."""
+    """Generate comprehensive Excel report with AI+AWS analysis and environment details."""
     
     try:
         # Try to import pandas with excel support
@@ -2338,84 +2823,434 @@ def generate_excel_report(results, sections, company_name, title, timestamp):
         
         if not excel_available:
             st.warning("📊 openpyxl not available. Please install with: `pip install openpyxl`")
-            # Generate CSV as fallback
-            generate_csv_report(results, sections, company_name, title, timestamp)
+            # Generate comprehensive CSV as fallback
+            generate_comprehensive_csv_report(results, sections, company_name, title, timestamp)
             return
         
         # Generate Excel file
         output = BytesIO()
         
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
-            # Summary sheet
+            
+            # 1. Executive Summary Sheet
             prod_results = results['recommendations']['PROD']
+            claude_analysis = prod_results.get('claude_analysis', {})
+            tco_analysis = prod_results.get('tco_analysis', {})
             
             summary_data = {
                 'Metric': [
+                    'Company Name',
+                    'Report Title',
                     'Workload Name',
-                    'Complexity Score',
-                    'Complexity Level', 
-                    'Migration Timeline (weeks)',
+                    'Workload Type',
+                    'Target Region',
+                    'Operating System',
+                    'Migration Complexity Score',
+                    'Migration Complexity Level',
+                    'Recommended Migration Strategy',
+                    'Estimated Timeline (weeks)',
                     'Monthly Cost ($)',
-                    'Best Pricing Option'
+                    'Best Pricing Option',
+                    'Projected 3-Year ROI (%)',
+                    'Report Generation Date'
                 ],
                 'Value': [
+                    company_name,
+                    title,
                     results['inputs']['workload_name'],
-                    prod_results['claude_analysis']['complexity_score'],
-                    prod_results['claude_analysis']['complexity_level'],
-                    prod_results['claude_analysis']['estimated_timeline']['max_weeks'],
-                    prod_results['tco_analysis']['monthly_cost'],
-                    prod_results['tco_analysis']['best_pricing_option']
+                    results['inputs']['workload_type'],
+                    results['inputs']['region'],
+                    results['inputs']['operating_system'],
+                    claude_analysis.get('complexity_score', 50),
+                    claude_analysis.get('complexity_level', 'MEDIUM'),
+                    claude_analysis.get('migration_strategy', {}).get('approach', 'N/A'),
+                    claude_analysis.get('estimated_timeline', {}).get('max_weeks', 8),
+                    tco_analysis.get('monthly_cost', 0),
+                    tco_analysis.get('best_pricing_option', 'N/A').replace('_', ' ').title(),
+                    tco_analysis.get('roi_3_years', 0),
+                    datetime.now().strftime('%B %d, %Y at %I:%M %p')
                 ]
             }
             
-            pd.DataFrame(summary_data).to_excel(writer, sheet_name='Summary', index=False)
+            pd.DataFrame(summary_data).to_excel(writer, sheet_name='Executive_Summary', index=False)
             
-            # Cost breakdown sheet
+            # 2. Environment Instance Recommendations Sheet
+            env_data = []
+            for env in ['DEV', 'QA', 'UAT', 'PREPROD', 'PROD']:
+                env_results = results['recommendations'].get(env, {})
+                cost_breakdown = env_results.get('cost_breakdown', {})
+                selected_instance = cost_breakdown.get('selected_instance', {})
+                total_costs = cost_breakdown.get('total_costs', {})
+                requirements = env_results.get('requirements', {})
+                claude_env_analysis = env_results.get('claude_analysis', {})
+                
+                env_data.append({
+                    'Environment': env,
+                    'Instance Type': selected_instance.get('type', 'N/A'),
+                    'vCPUs': selected_instance.get('vCPU', 'N/A'),
+                    'RAM (GB)': selected_instance.get('RAM', 'N/A'),
+                    'Required vCPUs': requirements.get('vCPUs', 'N/A'),
+                    'Required RAM (GB)': requirements.get('RAM_GB', 'N/A'),
+                    'Required Storage (GB)': requirements.get('storage_GB', 'N/A'),
+                    'Multi-AZ': 'Yes' if requirements.get('multi_az', False) else 'No',
+                    'Complexity Score': claude_env_analysis.get('complexity_score', 50),
+                    'Monthly Cost (On-Demand)': total_costs.get('on_demand', 0),
+                    'Monthly Cost (Reserved 1Y)': total_costs.get('ri_1y_no_upfront', 0),
+                    'Monthly Cost (Reserved 3Y)': total_costs.get('ri_3y_no_upfront', 0),
+                    'Monthly Cost (Spot)': total_costs.get('spot', 0)
+                })
+            
+            pd.DataFrame(env_data).to_excel(writer, sheet_name='Environment_Instances', index=False)
+            
+            # 3. Migration Steps Sheet
+            migration_steps = claude_analysis.get('migration_steps', [])
+            if migration_steps:
+                steps_data = []
+                for i, step in enumerate(migration_steps, 1):
+                    if isinstance(step, dict):
+                        tasks = '; '.join(step.get('tasks', []))
+                        deliverables = '; '.join(step.get('deliverables', []))
+                        
+                        steps_data.append({
+                            'Phase': i,
+                            'Phase Name': step.get('phase', 'N/A'),
+                            'Duration': step.get('duration', 'N/A'),
+                            'Key Tasks': tasks,
+                            'Deliverables': deliverables
+                        })
+                
+                pd.DataFrame(steps_data).to_excel(writer, sheet_name='Migration_Steps', index=False)
+            
+            # 4. Migration Tools Sheet
+            tools_data = [
+                {
+                    'Tool Category': 'Discovery & Assessment',
+                    'Tool Name': 'AWS Application Discovery Service',
+                    'Use Case': 'Infrastructure inventory and dependency mapping',
+                    'Cost Model': 'Per agent per month'
+                },
+                {
+                    'Tool Category': 'Discovery & Assessment',
+                    'Tool Name': 'CloudEndure',
+                    'Use Case': 'Application dependency analysis',
+                    'Cost Model': 'Per server per month'
+                },
+                {
+                    'Tool Category': 'Data Migration',
+                    'Tool Name': 'AWS Database Migration Service (DMS)',
+                    'Use Case': 'Database migration',
+                    'Cost Model': 'Per instance hour'
+                },
+                {
+                    'Tool Category': 'Data Migration',
+                    'Tool Name': 'AWS DataSync',
+                    'Use Case': 'File system migration',
+                    'Cost Model': 'Per GB transferred'
+                },
+                {
+                    'Tool Category': 'Application Migration',
+                    'Tool Name': 'AWS Server Migration Service (SMS)',
+                    'Use Case': 'Server replication',
+                    'Cost Model': 'No additional charge'
+                },
+                {
+                    'Tool Category': 'Application Migration',
+                    'Tool Name': 'CloudEndure Migration',
+                    'Use Case': 'Application migration',
+                    'Cost Model': 'Free for 90 days'
+                },
+                {
+                    'Tool Category': 'Network Setup',
+                    'Tool Name': 'AWS Direct Connect',
+                    'Use Case': 'Dedicated network connection',
+                    'Cost Model': 'Port hours + data transfer'
+                },
+                {
+                    'Tool Category': 'Network Setup',
+                    'Tool Name': 'VPN Gateway',
+                    'Use Case': 'Secure VPN connections',
+                    'Cost Model': 'Per VPN connection hour'
+                },
+                {
+                    'Tool Category': 'Security & Compliance',
+                    'Tool Name': 'AWS Config',
+                    'Use Case': 'Configuration management',
+                    'Cost Model': 'Per configuration item'
+                },
+                {
+                    'Tool Category': 'Security & Compliance',
+                    'Tool Name': 'CloudTrail',
+                    'Use Case': 'API logging and auditing',
+                    'Cost Model': 'Per event recorded'
+                },
+                {
+                    'Tool Category': 'Monitoring & Logging',
+                    'Tool Name': 'CloudWatch',
+                    'Use Case': 'Performance monitoring',
+                    'Cost Model': 'Per metric + log ingestion'
+                },
+                {
+                    'Tool Category': 'Monitoring & Logging',
+                    'Tool Name': 'X-Ray',
+                    'Use Case': 'Application tracing',
+                    'Cost Model': 'Per trace recorded'
+                },
+                {
+                    'Tool Category': 'Automation',
+                    'Tool Name': 'AWS Systems Manager',
+                    'Use Case': 'Patch and configuration management',
+                    'Cost Model': 'No additional charge'
+                },
+                {
+                    'Tool Category': 'Automation',
+                    'Tool Name': 'CloudFormation',
+                    'Use Case': 'Infrastructure as Code',
+                    'Cost Model': 'No additional charge'
+                }
+            ]
+            
+            pd.DataFrame(tools_data).to_excel(writer, sheet_name='Migration_Tools', index=False)
+            
+            # 5. Risk Assessment Sheet
+            risk_factors = claude_analysis.get('risk_factors', [])
+            if risk_factors:
+                risk_data = []
+                for risk in risk_factors:
+                    if isinstance(risk, dict):
+                        risk_data.append({
+                            'Risk Category': risk.get('category', 'N/A'),
+                            'Risk Description': risk.get('risk', 'N/A'),
+                            'Probability': risk.get('probability', 'N/A'),
+                            'Impact': risk.get('impact', 'N/A'),
+                            'Mitigation Strategy': risk.get('mitigation', 'N/A')
+                        })
+                
+                pd.DataFrame(risk_data).to_excel(writer, sheet_name='Risk_Assessment', index=False)
+            
+            # 6. Detailed Cost Analysis Sheet
             cost_breakdown = prod_results.get('cost_breakdown', {})
             total_costs = cost_breakdown.get('total_costs', {})
+            instance_costs = cost_breakdown.get('instance_costs', {})
+            storage_costs = cost_breakdown.get('storage_costs', {})
+            network_costs = cost_breakdown.get('network_costs', {})
             
             if total_costs:
                 cost_data = []
+                on_demand_cost = total_costs.get('on_demand', 0)
+                
                 for model, cost in total_costs.items():
+                    savings = ((on_demand_cost - cost) / on_demand_cost * 100) if on_demand_cost > 0 else 0
                     cost_data.append({
                         'Pricing Model': model.replace('_', ' ').title(),
                         'Monthly Cost': cost,
-                        'Annual Cost': cost * 12
+                        'Annual Cost': cost * 12,
+                        'Savings vs On-Demand (%)': savings,
+                        'Instance Cost Component': instance_costs.get(model, instance_costs.get('on_demand', 0)),
+                        'Storage Cost Component': list(storage_costs.values())[0] if storage_costs else 0,
+                        'Network Cost Component': list(network_costs.values())[0] if network_costs else 0
                     })
                 
-                pd.DataFrame(cost_data).to_excel(writer, sheet_name='Cost_Analysis', index=False)
+                pd.DataFrame(cost_data).to_excel(writer, sheet_name='Detailed_Costs', index=False)
             
-            # Requirements sheet
-            requirements = prod_results.get('requirements', {})
-            if requirements:
-                req_data = []
-                for key, value in requirements.items():
-                    req_data.append({'Specification': key, 'Value': value})
+            # 7. Instance Specifications Sheet
+            selected_instance = cost_breakdown.get('selected_instance', {})
+            if selected_instance:
+                # Get full instance details
+                calculator = st.session_state.enhanced_calculator
+                full_instance_details = None
                 
-                pd.DataFrame(req_data).to_excel(writer, sheet_name='Requirements', index=False)
+                for instance in calculator.INSTANCE_TYPES:
+                    if instance['type'] == selected_instance.get('type'):
+                        full_instance_details = instance
+                        break
+                
+                if full_instance_details:
+                    spec_data = [{
+                        'Instance Type': full_instance_details.get('type', 'N/A'),
+                        'vCPUs': full_instance_details.get('vCPU', 'N/A'),
+                        'Memory (GB)': full_instance_details.get('RAM', 'N/A'),
+                        'Processor': full_instance_details.get('processor', 'N/A'),
+                        'Architecture': full_instance_details.get('architecture', 'N/A'),
+                        'Network Performance': full_instance_details.get('network_performance', 'N/A'),
+                        'EBS Bandwidth (Mbps)': full_instance_details.get('max_ebs_bandwidth', 'N/A'),
+                        'Storage Type': full_instance_details.get('storage', 'N/A'),
+                        'Enhanced Networking': 'Yes' if full_instance_details.get('enhanced_networking') else 'No',
+                        'EBS Optimized': 'Yes' if full_instance_details.get('ebs_optimized') else 'No',
+                        'Placement Group Support': 'Yes' if full_instance_details.get('placement_group') else 'No',
+                        'Instance Family': full_instance_details.get('family', 'N/A').title()
+                    }]
+                    
+                    pd.DataFrame(spec_data).to_excel(writer, sheet_name='Instance_Specifications', index=False)
             
-            # Heat map data
+            # 8. Heat map data (if available)
             if 'heat_map_data' in results and not results['heat_map_data'].empty:
                 results['heat_map_data'].to_excel(writer, sheet_name='Environment_HeatMap', index=False)
+            
+            # 9. Recommendations Sheet
+            recommendations = claude_analysis.get('recommendations', [])
+            success_factors = claude_analysis.get('success_factors', [])
+            
+            if recommendations or success_factors:
+                rec_data = []
+                
+                for i, rec in enumerate(recommendations, 1):
+                    rec_data.append({
+                        'Type': 'Recommendation',
+                        'Priority': i,
+                        'Description': rec
+                    })
+                
+                for i, factor in enumerate(success_factors, 1):
+                    rec_data.append({
+                        'Type': 'Success Factor',
+                        'Priority': i,
+                        'Description': factor
+                    })
+                
+                pd.DataFrame(rec_data).to_excel(writer, sheet_name='Recommendations', index=False)
         
         output.seek(0)
         
-        filename = f"AWS_Migration_Analysis_{timestamp}.xlsx"
+        filename = f"AWS_Migration_Comprehensive_Analysis_{timestamp}.xlsx"
         
         st.download_button(
-            label="⬇️ Download Excel Report",
+            label="⬇️ Download Comprehensive Excel Report",
             data=output.getvalue(),
             file_name=filename,
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             key=f"download_excel_{timestamp}"
         )
         
-        st.success("✅ Excel report generated successfully!")
+        st.success("✅ Comprehensive Excel report with AI+AWS analysis generated successfully!")
         
     except Exception as e:
         st.error(f"Error generating Excel report: {str(e)}")
-        # Fallback to CSV
-        generate_csv_report(results, sections, company_name, title, timestamp)
+        logger.error(f"Excel generation error: {e}")
+        # Fallback to comprehensive CSV
+        generate_comprehensive_csv_report(results, sections, company_name, title, timestamp)
+
+def generate_comprehensive_csv_report(results, sections, company_name, title, timestamp):
+    """Generate comprehensive CSV report as fallback."""
+    
+    try:
+        # Create a comprehensive CSV with all data
+        all_data = []
+        
+        # Executive Summary
+        prod_results = results['recommendations']['PROD']
+        claude_analysis = prod_results.get('claude_analysis', {})
+        tco_analysis = prod_results.get('tco_analysis', {})
+        
+        all_data.append({
+            'Section': 'Executive Summary',
+            'Category': 'Basic Info',
+            'Metric': 'Company Name',
+            'Value': company_name,
+            'Environment': 'N/A',
+            'Notes': ''
+        })
+        
+        all_data.append({
+            'Section': 'Executive Summary',
+            'Category': 'Basic Info',
+            'Metric': 'Workload Name',
+            'Value': results['inputs']['workload_name'],
+            'Environment': 'N/A',
+            'Notes': ''
+        })
+        
+        all_data.append({
+            'Section': 'Executive Summary',
+            'Category': 'Migration Analysis',
+            'Metric': 'Complexity Score',
+            'Value': claude_analysis.get('complexity_score', 50),
+            'Environment': 'N/A',
+            'Notes': 'Score out of 100'
+        })
+        
+        # Environment-specific data
+        for env in ['DEV', 'QA', 'UAT', 'PREPROD', 'PROD']:
+            env_results = results['recommendations'].get(env, {})
+            cost_breakdown = env_results.get('cost_breakdown', {})
+            selected_instance = cost_breakdown.get('selected_instance', {})
+            total_costs = cost_breakdown.get('total_costs', {})
+            requirements = env_results.get('requirements', {})
+            
+            if selected_instance:
+                all_data.extend([
+                    {
+                        'Section': 'Environment Analysis',
+                        'Category': 'Instance Recommendation',
+                        'Metric': 'Instance Type',
+                        'Value': selected_instance.get('type', 'N/A'),
+                        'Environment': env,
+                        'Notes': 'Recommended EC2 instance'
+                    },
+                    {
+                        'Section': 'Environment Analysis',
+                        'Category': 'Instance Recommendation',
+                        'Metric': 'vCPUs',
+                        'Value': selected_instance.get('vCPU', 'N/A'),
+                        'Environment': env,
+                        'Notes': 'Virtual CPUs'
+                    },
+                    {
+                        'Section': 'Environment Analysis',
+                        'Category': 'Instance Recommendation',
+                        'Metric': 'RAM (GB)',
+                        'Value': selected_instance.get('RAM', 'N/A'),
+                        'Environment': env,
+                        'Notes': 'Memory in GB'
+                    },
+                    {
+                        'Section': 'Environment Analysis',
+                        'Category': 'Cost Analysis',
+                        'Metric': 'Monthly Cost (On-Demand)',
+                        'Value': f"${total_costs.get('on_demand', 0):,.2f}",
+                        'Environment': env,
+                        'Notes': 'On-demand pricing'
+                    },
+                    {
+                        'Section': 'Environment Analysis',
+                        'Category': 'Cost Analysis',
+                        'Metric': 'Monthly Cost (Reserved 1Y)',
+                        'Value': f"${total_costs.get('ri_1y_no_upfront', 0):,.2f}",
+                        'Environment': env,
+                        'Notes': '1-year reserved instance'
+                    }
+                ])
+        
+        # Migration Steps
+        migration_steps = claude_analysis.get('migration_steps', [])
+        for i, step in enumerate(migration_steps, 1):
+            if isinstance(step, dict):
+                all_data.append({
+                    'Section': 'Migration Plan',
+                    'Category': f'Phase {i}',
+                    'Metric': 'Phase Name',
+                    'Value': step.get('phase', 'N/A'),
+                    'Environment': 'N/A',
+                    'Notes': f"Duration: {step.get('duration', 'N/A')}"
+                })
+        
+        df_comprehensive = pd.DataFrame(all_data)
+        csv_content = df_comprehensive.to_csv(index=False)
+        
+        filename = f"AWS_Migration_Comprehensive_Data_{timestamp}.csv"
+        
+        st.download_button(
+            label="⬇️ Download Comprehensive CSV Report",
+            data=csv_content,
+            file_name=filename,
+            mime="text/csv",
+            key=f"download_csv_{timestamp}"
+        )
+        
+        st.success("✅ Comprehensive CSV report generated successfully!")
+        
+    except Exception as e:
+        st.error(f"Error generating comprehensive CSV report: {str(e)}")
+        logger.error(f"CSV generation error: {e}")
 
 def generate_csv_report(results, sections, company_name, title, timestamp):
     """Generate CSV report as fallback."""
