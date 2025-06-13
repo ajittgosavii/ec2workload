@@ -1912,9 +1912,11 @@ def render_enhanced_workload_configuration():
             st.markdown("**📊 Growth & Scaling**")
             calculator.inputs["storage_growth_rate"] = st.number_input(
                 "Annual Storage Growth Rate", min_value=0.0, max_value=1.0, 
-                value=calculator.inputs["storage_growth_rate"], step=0.01, format="%.2f",
+                value=calculator.inputs["storage_growth_rate"], step=0.01,
                 help="Expected yearly growth in storage requirements"
             )
+            # Show percentage below input
+            st.caption(f"Selected: {calculator.inputs['storage_growth_rate']*100:.1f}%")
             calculator.inputs["years"] = st.slider(
                 "Growth Projection (Years)", 1, 10, calculator.inputs["years"],
                 help="Planning horizon for capacity growth"
@@ -2035,13 +2037,17 @@ def render_migration_decision_inputs():
                 help="Cloud provides OpEx model vs traditional CapEx for infrastructure"
             )
             
+            # Display growth rate as percentage
+            growth_rate_value = calculator.inputs.get("business_growth_rate", 0.15)
             calculator.inputs["business_growth_rate"] = st.slider(
                 "Expected Annual Business Growth Rate",
                 min_value=0.0, max_value=1.0, 
-                value=calculator.inputs.get("business_growth_rate", 0.15),
-                step=0.05, format="%.0%",
+                value=growth_rate_value,
+                step=0.05,
                 help="Expected annual growth rate affecting infrastructure needs"
             )
+            # Show percentage below slider
+            st.caption(f"Selected: {calculator.inputs['business_growth_rate']*100:.0f}%")
         
         with col2:
             calculator.inputs["innovation_priority"] = st.selectbox(
@@ -2236,31 +2242,44 @@ def render_enhanced_analysis_results(results):
         """, unsafe_allow_html=True)
         
     with col3:
-        roi_color = "green" if isinstance(tco_analysis['roi_3_years'], (int, float)) and tco_analysis['roi_3_years'] > 100 else "orange"
+        roi_value = tco_analysis['roi_3_years']
+        if isinstance(roi_value, (int, float)):
+            roi_display = f"{roi_value:.1f}%"
+            roi_color = "green" if roi_value > 100 else "orange"
+        else:
+            roi_display = str(roi_value)
+            roi_color = "orange"
+            
         st.markdown(f"""
         <div class="metric-card">
             <div class="metric-title">3-Year ROI</div>
-            <div class="metric-value" style="color: {roi_color}">{tco_analysis['roi_3_years']}%</div>
+            <div class="metric-value" style="color: {roi_color}">{roi_display}</div>
             <div class="metric-description">Return on Investment</div>
         </div>
         """, unsafe_allow_html=True)
         
     with col4:
         break_even = tco_analysis['break_even_months']
+        break_even_display = f"{break_even} months" if isinstance(break_even, (int, float)) else str(break_even)
+        
         st.markdown(f"""
         <div class="metric-card">
             <div class="metric-title">Break-Even</div>
-            <div class="metric-value">{break_even}</div>
-            <div class="metric-description">Months to recover migration cost</div>
+            <div class="metric-value">{break_even_display}</div>
+            <div class="metric-description">Time to recover migration cost</div>
         </div>
         """, unsafe_allow_html=True)
     
     # TCO Savings Highlight
     if tco_analysis['monthly_savings'] > 0:
+        monthly_savings = tco_analysis['monthly_savings']
+        annual_savings = monthly_savings * 12
+        best_option = tco_analysis['best_pricing_option'].replace('_', ' ').title()
+        
         st.markdown(f"""
         <div class="savings-highlight">
-            💰 <strong>Potential Savings:</strong> ${tco_analysis['monthly_savings']:,.2f}/month 
-            (${tco_analysis['monthly_savings'] * 12:,.2f}/year) by switching to {tco_analysis['best_pricing_option'].replace('_', ' ').title()}
+            💰 <strong>Potential Savings:</strong> ${monthly_savings:,.2f}/month 
+            (${annual_savings:,.2f}/year) by switching to {best_option}
         </div>
         """, unsafe_allow_html=True)
     
@@ -2430,11 +2449,18 @@ def render_enhanced_analysis_results(results):
 def render_migration_decision_results(decision_result):
     """Render the migration decision analysis results."""
     
+    # Validate decision_result to prevent sprintf errors
+    if not decision_result or not isinstance(decision_result, dict):
+        st.error("❌ Invalid decision result data")
+        return
+    
     st.markdown('<div class="section-header"><h3>🎯 Migration Decision Analysis</h3></div>', unsafe_allow_html=True)
     
     # Overall Recommendation
-    recommendation = decision_result['recommendation']
-    overall_score = decision_result['overall_score']
+    recommendation = decision_result.get('recommendation', 'NEUTRAL')
+    overall_score = decision_result.get('overall_score', 0)
+    recommendation_text = decision_result.get('recommendation_text', 'Analysis Complete')
+    confidence = decision_result.get('confidence', 'Medium')
     
     # Color coding based on recommendation
     if recommendation == "STRONG_MIGRATE":
@@ -2454,10 +2480,10 @@ def render_migration_decision_results(decision_result):
     <div style="background: linear-gradient(135deg, {color}20 0%, {color}10 100%); 
                 border: 2px solid {color}; border-radius: 12px; padding: 2rem; 
                 text-align: center; margin: 1rem 0;">
-        <h2 style="color: {color}; margin: 0;">{icon} {decision_result['recommendation_text']}</h2>
+        <h2 style="color: {color}; margin: 0;">{icon} {recommendation_text}</h2>
         <p style="font-size: 1.2rem; margin: 0.5rem 0;">
-            <strong>Overall Score: {overall_score}/100</strong> | 
-            Confidence: {decision_result['confidence']}
+            <strong>Overall Score: {overall_score:.1f}/100</strong> | 
+            Confidence: {confidence}
         </p>
     </div>
     """, unsafe_allow_html=True)
@@ -2465,45 +2491,49 @@ def render_migration_decision_results(decision_result):
     # Category Scores
     st.subheader("📊 Decision Factor Breakdown")
     
-    category_scores = decision_result['category_scores']
+    category_scores = decision_result.get('category_scores', {})
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
-        financial_score = category_scores['financial']
+        financial_score = category_scores.get('financial', 0)
+        score_color = '#10b981' if financial_score >= 60 else '#f59e0b' if financial_score >= 40 else '#ef4444'
         st.markdown(f"""
         <div class="metric-card">
             <div class="metric-title">💰 Financial</div>
-            <div class="metric-value" style="color: {'#10b981' if financial_score >= 60 else '#f59e0b' if financial_score >= 40 else '#ef4444'}">{financial_score}</div>
+            <div class="metric-value" style="color: {score_color}">{financial_score:.1f}</div>
             <div class="metric-description">Cost & ROI Analysis</div>
         </div>
         """, unsafe_allow_html=True)
     
     with col2:
-        technical_score = category_scores['technical']
+        technical_score = category_scores.get('technical', 0)
+        score_color = '#10b981' if technical_score >= 60 else '#f59e0b' if technical_score >= 40 else '#ef4444'
         st.markdown(f"""
         <div class="metric-card">
             <div class="metric-title">🏗️ Technical</div>
-            <div class="metric-value" style="color: {'#10b981' if technical_score >= 60 else '#f59e0b' if technical_score >= 40 else '#ef4444'}">{technical_score}</div>
+            <div class="metric-value" style="color: {score_color}">{technical_score:.1f}</div>
             <div class="metric-description">Infrastructure & Performance</div>
         </div>
         """, unsafe_allow_html=True)
     
     with col3:
-        operational_score = category_scores['operational']
+        operational_score = category_scores.get('operational', 0)
+        score_color = '#10b981' if operational_score >= 60 else '#f59e0b' if operational_score >= 40 else '#ef4444'
         st.markdown(f"""
         <div class="metric-card">
             <div class="metric-title">⚙️ Operational</div>
-            <div class="metric-value" style="color: {'#10b981' if operational_score >= 60 else '#f59e0b' if operational_score >= 40 else '#ef4444'}">{operational_score}</div>
+            <div class="metric-value" style="color: {score_color}">{operational_score:.1f}</div>
             <div class="metric-description">Skills & Management</div>
         </div>
         """, unsafe_allow_html=True)
     
     with col4:
-        strategic_score = category_scores['strategic']
+        strategic_score = category_scores.get('strategic', 0)
+        score_color = '#10b981' if strategic_score >= 60 else '#f59e0b' if strategic_score >= 40 else '#ef4444'
         st.markdown(f"""
         <div class="metric-card">
             <div class="metric-title">🎯 Strategic</div>
-            <div class="metric-value" style="color: {'#10b981' if strategic_score >= 60 else '#f59e0b' if strategic_score >= 40 else '#ef4444'}">{strategic_score}</div>
+            <div class="metric-value" style="color: {score_color}">{strategic_score:.1f}</div>
             <div class="metric-description">Business & Innovation</div>
         </div>
         """, unsafe_allow_html=True)
@@ -2513,47 +2543,59 @@ def render_migration_decision_results(decision_result):
     
     with col1:
         st.subheader("🚀 Key Drivers (Pro-Cloud)")
-        key_factors = decision_result['key_factors']
+        key_factors = decision_result.get('key_factors', {})
+        top_drivers = key_factors.get('top_drivers', [])
         
-        for category, factor, score in reversed(key_factors['top_drivers']):
-            factor_name = factor.replace('_', ' ').title()
-            st.markdown(f"**{category}:** {factor_name} ({score:.0f}/100)")
+        if top_drivers:
+            for category, factor, score in reversed(top_drivers):
+                factor_name = factor.replace('_', ' ').title()
+                st.markdown(f"**{category}:** {factor_name} ({score:.0f}/100)")
+        else:
+            st.markdown("No key drivers data available")
     
     with col2:
         st.subheader("⚠️ Key Concerns")
+        top_concerns = key_factors.get('top_concerns', [])
         
-        for category, factor, score in key_factors['top_concerns']:
-            factor_name = factor.replace('_', ' ').title()
-            st.markdown(f"**{category}:** {factor_name} ({score:.0f}/100)")
+        if top_concerns:
+            for category, factor, score in top_concerns:
+                factor_name = factor.replace('_', ' ').title()
+                st.markdown(f"**{category}:** {factor_name} ({score:.0f}/100)")
+        else:
+            st.markdown("No key concerns data available")
     
     # Risks and Considerations
-    if decision_result['risks_and_considerations']:
+    risks_and_considerations = decision_result.get('risks_and_considerations', [])
+    if risks_and_considerations:
         st.subheader("⚠️ Risks and Considerations")
-        for risk in decision_result['risks_and_considerations']:
+        for risk in risks_and_considerations:
             st.markdown(f"• {risk}")
     
     # Next Steps
-    st.subheader("📋 Recommended Next Steps")
-    for i, step in enumerate(decision_result['next_steps'], 1):
-        st.markdown(f"{i}. {step}")
+    next_steps = decision_result.get('next_steps', [])
+    if next_steps:
+        st.subheader("📋 Recommended Next Steps")
+        for i, step in enumerate(next_steps, 1):
+            st.markdown(f"{i}. {step}")
     
     # Detailed Factor Analysis
-    with st.expander("🔍 Detailed Factor Analysis"):
-        detailed_factors = decision_result['detailed_factors']
-        
-        for category, factors in detailed_factors.items():
-            st.markdown(f"### {category.title()} Factors")
-            
-            factor_data = []
-            for factor, score in factors.items():
-                factor_data.append({
-                    'Factor': factor.replace('_', ' ').title(),
-                    'Score': f"{score:.1f}/100",
-                    'Impact': 'Positive' if score >= 60 else 'Neutral' if score >= 40 else 'Negative'
-                })
-            
-            df_factors = pd.DataFrame(factor_data)
-            st.dataframe(df_factors, use_container_width=True, hide_index=True)
+    detailed_factors = decision_result.get('detailed_factors', {})
+    if detailed_factors:
+        with st.expander("🔍 Detailed Factor Analysis"):
+            for category, factors in detailed_factors.items():
+                st.markdown(f"### {category.title()} Factors")
+                
+                factor_data = []
+                for factor, score in factors.items():
+                    factor_data.append({
+                        'Factor': factor.replace('_', ' ').title(),
+                        'Score': f"{score:.1f}/100",
+                        'Impact': 'Positive' if score >= 60 else 'Neutral' if score >= 40 else 'Negative'
+                    })
+                
+                if factor_data:
+                    df_factors = pd.DataFrame(factor_data)
+                    st.dataframe(df_factors, use_container_width=True, hide_index=True)
 
 def render_migration_planning():
     """Render migration planning interface."""
@@ -2924,34 +2966,40 @@ def main():
         if st.session_state.analysis_results or st.session_state.bulk_results:
             st.markdown("### 📈 Enterprise Analytics")
             
-            if st.session_state.bulk_results:
-                total_workloads = len(st.session_state.bulk_results)
-                total_cost = sum(r['recommendations']['PROD']['cost_breakdown']['total_costs'].get('on_demand', 0) for r in st.session_state.bulk_results)
-                total_savings = sum(r['recommendations']['PROD']['tco_analysis']['monthly_savings'] for r in st.session_state.bulk_results)
-            else:
-                total_workloads = 1
-                total_cost = st.session_state.analysis_results['recommendations']['PROD']['cost_breakdown']['total_costs'].get('on_demand', 0)
-                total_savings = st.session_state.analysis_results['recommendations']['PROD']['tco_analysis']['monthly_savings']
-            
-            st.metric("Workloads Analyzed", total_workloads)
-            st.metric("Monthly Cost (On-Demand)", f"${total_cost:,.2f}")
-            st.metric("Potential Monthly Savings", f"${total_savings:,.2f}")
-            st.metric("Annual Savings Potential", f"${total_savings * 12:,.2f}")
-            
-            # Show migration decision if available
-            if (st.session_state.analysis_results and 
-                'migration_decision' in st.session_state.analysis_results):
-                decision = st.session_state.analysis_results['migration_decision']
-                recommendation = decision['recommendation']
-                
-                if recommendation == "STRONG_MIGRATE":
-                    st.success(f"🚀 Strong Migration Recommendation ({decision['overall_score']}/100)")
-                elif recommendation == "MODERATE_MIGRATE":
-                    st.info(f"✅ Moderate Migration Recommendation ({decision['overall_score']}/100)")
-                elif recommendation == "NEUTRAL":
-                    st.warning(f"⚖️ Neutral Decision ({decision['overall_score']}/100)")
+            try:
+                if st.session_state.bulk_results:
+                    total_workloads = len(st.session_state.bulk_results)
+                    total_cost = sum(r.get('recommendations', {}).get('PROD', {}).get('cost_breakdown', {}).get('total_costs', {}).get('on_demand', 0) for r in st.session_state.bulk_results)
+                    total_savings = sum(r.get('recommendations', {}).get('PROD', {}).get('tco_analysis', {}).get('monthly_savings', 0) for r in st.session_state.bulk_results)
                 else:
-                    st.error(f"🏢 Stay On-Premises Recommended ({decision['overall_score']}/100)")
+                    total_workloads = 1
+                    analysis_results = st.session_state.analysis_results or {}
+                    prod_results = analysis_results.get('recommendations', {}).get('PROD', {})
+                    total_cost = prod_results.get('cost_breakdown', {}).get('total_costs', {}).get('on_demand', 0)
+                    total_savings = prod_results.get('tco_analysis', {}).get('monthly_savings', 0)
+                
+                st.metric("Workloads Analyzed", total_workloads)
+                st.metric("Monthly Cost (On-Demand)", f"${total_cost:,.2f}")
+                st.metric("Potential Monthly Savings", f"${total_savings:,.2f}")
+                st.metric("Annual Savings Potential", f"${total_savings * 12:,.2f}")
+                
+                # Show migration decision if available
+                if (st.session_state.analysis_results and 
+                    'migration_decision' in st.session_state.analysis_results):
+                    decision = st.session_state.analysis_results['migration_decision']
+                    recommendation = decision.get('recommendation', 'NEUTRAL')
+                    overall_score = decision.get('overall_score', 0)
+                    
+                    if recommendation == "STRONG_MIGRATE":
+                        st.success(f"🚀 Strong Migration Recommendation ({overall_score:.0f}/100)")
+                    elif recommendation == "MODERATE_MIGRATE":
+                        st.info(f"✅ Moderate Migration Recommendation ({overall_score:.0f}/100)")
+                    elif recommendation == "NEUTRAL":
+                        st.warning(f"⚖️ Neutral Decision ({overall_score:.0f}/100)")
+                    else:
+                        st.error(f"🏢 Stay On-Premises Recommended ({overall_score:.0f}/100)")
+            except Exception as e:
+                st.error(f"Error displaying analytics: {str(e)}")
         
         st.markdown("---")
         st.markdown("""
