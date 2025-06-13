@@ -1,48 +1,4 @@
-with col1:
-            complexity_score = claude_analysis.get('complexity_score', 50)
-            complexity_level = claude_analysis.get('complexity_level', 'MEDIUM')
-            
-            st.markdown(f"""
-            <div class="metric-card">
-                <div class="metric-title">🤖 Migration Complexity</div>
-                <div class="metric-value">{complexity_score:.0f}/100</div>
-                <div class="metric-description">{complexity_level}</div>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with col2:
-            monthly_cost = tco_analysis.get('monthly_cost', 0)
-            
-            st.markdown(f"""
-            <div class="metric-card">
-                <div class="metric-title">☁️ AWS Monthly Cost</div>
-                <div class="metric-value">${monthly_cost:,.0f}</div>
-                <div class="metric-description">Optimized Pricing</div>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with col3:
-            timeline = claude_analysis.get('estimated_timeline', {})
-            max_weeks = timeline.get('max_weeks', 8)
-            
-            st.markdown(f"""
-            <div class="metric-card">
-                <div class="metric-title">⏱️ Migration Timeline</div>
-                <div class="metric-value">{max_weeks}</div>
-                <div class="metric-description">Weeks (Estimated)</div>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with col4:
-            instance_count = len(aws_analysis.get('recommended_instances', []))
-            
-            st.markdown(f"""
-            <div class="metric-card">
-                <div class="metric-title">🖥️ Instance Options</div>
-                <div class="metric-value">{instance_count}</div>
-                <div class="metric-description">Recommendations</div>
-            </div>
-            """, unsafe_allow_html=True)# Required dependencies for requirements.txt:
+# Required dependencies for requirements.txt:
 # streamlit>=1.28.0
 # pandas>=1.5.0
 # plotly>=5.0.0
@@ -1400,7 +1356,6 @@ def render_enhanced_results():
         col1, col2, col3, col4 = st.columns(4)
         
         with col1:
-            claude_analysis = prod_results.get('claude_analysis', {})
             complexity_score = claude_analysis.get('complexity_score', 50)
             complexity_level = claude_analysis.get('complexity_level', 'MEDIUM')
             
@@ -1413,8 +1368,7 @@ def render_enhanced_results():
             """, unsafe_allow_html=True)
         
         with col2:
-            tco = prod_results.get('tco_analysis', {})
-            monthly_cost = tco.get('monthly_cost', 0)
+            monthly_cost = tco_analysis.get('monthly_cost', 0)
             
             st.markdown(f"""
             <div class="metric-card">
@@ -1437,7 +1391,6 @@ def render_enhanced_results():
             """, unsafe_allow_html=True)
         
         with col4:
-            aws_analysis = prod_results.get('aws_analysis', {})
             instance_count = len(aws_analysis.get('recommended_instances', []))
             
             st.markdown(f"""
@@ -1734,7 +1687,7 @@ def main():
     if st.session_state.enhanced_calculator is None:
         st.error("⚠️ Application initialization failed. Please refresh the page.")
         if st.button("🔄 Retry Initialization", key="retry_init_button"):
-            st.experimental_rerun()
+            st.rerun()
         st.stop()
     
     # Enhanced header
