@@ -1779,3 +1779,1474 @@ def render_enhanced_workload_configuration():
     # Current Infrastructure Metrics
     with st.expander("🖥️ Current Infrastructure Metrics", expanded=True):
         col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            st.markdown("**Compute Resources**")
+            calculator.inputs["on_prem_cores"] = st.number_input(
+                "CPU Cores", min_value=1, value=calculator.inputs["on_prem_cores"],
+                help="Total number of CPU cores in your current infrastructure"
+            )
+            calculator.inputs["peak_cpu_percent"] = st.slider(
+                "Peak CPU %", 0, 100, calculator.inputs["peak_cpu_percent"],
+                help="Highest CPU utilization observed"
+            )
+            calculator.inputs["avg_cpu_percent"] = st.slider(
+                "Average CPU %", 0, 100, calculator.inputs["avg_cpu_percent"],
+                help="Typical CPU utilization"
+            )
+            
+        with col2:
+            st.markdown("**Memory Resources**")
+            calculator.inputs["on_prem_ram_gb"] = st.number_input(
+                "RAM (GB)", min_value=1, value=calculator.inputs["on_prem_ram_gb"],
+                help="Total memory in gigabytes"
+            )
+            calculator.inputs["peak_ram_percent"] = st.slider(
+                "Peak RAM %", 0, 100, calculator.inputs["peak_ram_percent"],
+                help="Highest memory utilization observed"
+            )
+            calculator.inputs["avg_ram_percent"] = st.slider(
+                "Average RAM %", 0, 100, calculator.inputs["avg_ram_percent"],
+                help="Typical memory utilization"
+            )
+            
+        with col3:
+            st.markdown("**Storage & I/O**")
+            calculator.inputs["storage_current_gb"] = st.number_input(
+                "Storage (GB)", min_value=1, value=calculator.inputs["storage_current_gb"],
+                help="Current total storage requirements"
+            )
+            calculator.inputs["peak_iops"] = st.number_input(
+                "Peak IOPS", min_value=1, value=calculator.inputs["peak_iops"],
+                help="Peak Input/Output Operations Per Second"
+            )
+            calculator.inputs["peak_throughput_mbps"] = st.number_input(
+                "Peak Throughput (MB/s)", min_value=1, value=calculator.inputs["peak_throughput_mbps"],
+                help="Peak data throughput in megabytes per second"
+            )
+    
+    # Enhanced Enterprise Configuration
+    with st.expander("🏢 Enterprise Configuration & Pricing Options", expanded=True):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("**💰 Pricing Strategy**")
+            
+            pricing_options = {
+                "on_demand": "On-Demand (Pay as you go)",
+                "ri_1y": "1-Year Reserved Instances",
+                "ri_3y": "3-Year Reserved Instances", 
+                "savings_plan_compute_1y": "1-Year Compute Savings Plan",
+                "savings_plan_compute_3y": "3-Year Compute Savings Plan",
+                "mixed": "Mixed Strategy (RI + On-Demand + Spot)"
+            }
+            
+            calculator.inputs["pricing_model"] = st.selectbox(
+                "Primary Pricing Model",
+                list(pricing_options.keys()),
+                format_func=lambda x: pricing_options[x],
+                help="Choose your preferred AWS pricing strategy"
+            )
+            
+            if selected_profile["spot_suitable"]:
+                calculator.inputs["spot_percentage"] = st.slider(
+                    "Spot Instance Percentage", 0, 80, calculator.inputs.get("spot_percentage", 0),
+                    help="Percentage of workload suitable for Spot instances (up to 90% savings)"
+                )
+            
+            st.markdown("**🏗️ Architecture Options**")
+            calculator.inputs["enable_graviton"] = st.checkbox(
+                "Enable Graviton Processors", 
+                value=calculator.inputs.get("enable_graviton", True),
+                help="AWS Graviton provides up to 20% better price-performance" if selected_profile["graviton_compatible"] else "Not compatible with selected workload",
+                disabled=not selected_profile["graviton_compatible"]
+            )
+            
+            calculator.inputs["prefer_amd"] = st.checkbox(
+                "Prefer AMD Instances", 
+                value=calculator.inputs["prefer_amd"],
+                help="AMD instances typically offer 10-15% cost savings"
+            )
+            
+        with col2:
+            st.markdown("**🛡️ High Availability & Compliance**")
+            calculator.inputs["multi_az"] = st.checkbox(
+                "Multi-AZ Deployment", 
+                value=calculator.inputs.get("multi_az", True),
+                help="Deploy across multiple Availability Zones for high availability"
+            )
+            
+            calculator.inputs["auto_scaling"] = st.checkbox(
+                "Auto Scaling", 
+                value=calculator.inputs.get("auto_scaling", True),
+                help="Automatically scale instances based on demand"
+            )
+            
+            # Load Balancer selection
+            lb_options = {
+                "alb": "Application Load Balancer (Layer 7)",
+                "nlb": "Network Load Balancer (Layer 4)",
+                "none": "No Load Balancer"
+            }
+            calculator.inputs["load_balancer"] = st.selectbox(
+                "Load Balancer Type",
+                list(lb_options.keys()),
+                format_func=lambda x: lb_options[x],
+                help="Choose appropriate load balancer for your workload"
+            )
+            
+            # Compliance requirements
+            compliance_options = list(calculator.COMPLIANCE_FRAMEWORKS.keys())
+            calculator.inputs["compliance_requirements"] = st.multiselect(
+                "Compliance Requirements",
+                compliance_options,
+                default=calculator.inputs.get("compliance_requirements", []),
+                help="Select applicable compliance frameworks"
+            )
+    
+    # Advanced Configuration
+    with st.expander("⚙️ Advanced Enterprise Settings"):
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            st.markdown("**📊 Growth & Scaling**")
+            calculator.inputs["storage_growth_rate"] = st.number_input(
+                "Annual Storage Growth Rate", min_value=0.0, max_value=1.0, 
+                value=calculator.inputs["storage_growth_rate"], step=0.01, format="%.2f",
+                help="Expected yearly growth in storage requirements"
+            )
+            calculator.inputs["years"] = st.slider(
+                "Growth Projection (Years)", 1, 10, calculator.inputs["years"],
+                help="Planning horizon for capacity growth"
+            )
+            calculator.inputs["seasonality_factor"] = st.number_input(
+                "Seasonality Factor", min_value=1.0, max_value=3.0, 
+                value=calculator.inputs["seasonality_factor"], step=0.1,
+                help="Peak demand multiplier (1.0 = no seasonality, 2.0 = 100% peak)"
+            )
+            
+        with col2:
+            st.markdown("**🔒 Security & Monitoring**")
+            monitoring_options = {
+                "basic": "Basic CloudWatch",
+                "detailed": "Detailed Monitoring",
+                "enhanced": "Enhanced Monitoring + Custom Metrics"
+            }
+            calculator.inputs["monitoring_level"] = st.selectbox(
+                "Monitoring Level",
+                list(monitoring_options.keys()),
+                format_func=lambda x: monitoring_options[x],
+                help="Choose monitoring and observability level"
+            )
+            
+            calculator.inputs["backup_retention_days"] = st.slider(
+                "Backup Retention (Days)", 7, 365, 
+                calculator.inputs.get("backup_retention_days", 30),
+                help="Number of days to retain backups"
+            )
+            
+            calculator.inputs["disaster_recovery"] = st.checkbox(
+                "Disaster Recovery", 
+                value=calculator.inputs.get("disaster_recovery", False),
+                help="Enable cross-region disaster recovery capabilities"
+            )
+            
+        with col3:
+            st.markdown("**🌐 Network & Performance**")
+            st.info("Advanced network configuration options available in enterprise deployment")
+    
+    # Migration Decision Inputs
+    st.markdown("---")
+    render_migration_decision_inputs()
+    
+    # Analysis Buttons
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if st.button("🚀 Generate Enterprise Analysis", type="primary", key="generate_single"):
+            with st.spinner("🔄 Analyzing workload with enterprise features..."):
+                try:
+                    results = {}
+                    for env in calculator.ENV_MULTIPLIERS.keys():
+                        results[env] = calculator.calculate_comprehensive_requirements(env)
+                    
+                    st.session_state.analysis_results = {
+                        'inputs': calculator.inputs.copy(),
+                        'recommendations': results
+                    }
+                    
+                    st.success("✅ Enterprise analysis completed successfully!")
+                    
+                except Exception as e:
+                    st.error(f"❌ Error during analysis: {str(e)}")
+                    import traceback
+                    st.text(traceback.format_exc())
+    
+    with col2:
+        if st.button("🎯 Complete Analysis with Migration Decision", type="primary", key="generate_with_decision"):
+            with st.spinner("🔄 Analyzing workload and migration decision factors..."):
+                try:
+                    # Generate cloud analysis
+                    results = {}
+                    for env in calculator.ENV_MULTIPLIERS.keys():
+                        results[env] = calculator.calculate_comprehensive_requirements(env)
+                    
+                    # Generate migration decision
+                    decision_result = enhanced_migration_decision_analysis(
+                        calculator.inputs, 
+                        results['PROD']
+                    )
+                    
+                    st.session_state.analysis_results = {
+                        'inputs': calculator.inputs.copy(),
+                        'recommendations': results,
+                        'migration_decision': decision_result
+                    }
+                    
+                    st.success("✅ Complete analysis with migration decision completed successfully!")
+                    
+                except Exception as e:
+                    st.error(f"❌ Error during analysis: {str(e)}")
+                    import traceback
+                    st.text(traceback.format_exc())
+
+def render_migration_decision_inputs():
+    """Render additional inputs needed for migration decision analysis."""
+    
+    st.markdown('<div class="section-header"><h3>🎯 Migration Decision Factors</h3></div>', unsafe_allow_html=True)
+    
+    calculator = st.session_state.calculator
+    
+    with st.expander("💰 Financial & Business Context", expanded=True):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            calculator.inputs["current_annual_cost"] = st.number_input(
+                "Current Annual Infrastructure Cost ($)",
+                min_value=0,
+                value=calculator.inputs.get("current_annual_cost", 100000),
+                step=5000,
+                help="Total annual cost of current on-premises infrastructure including hardware, software, maintenance, and staff"
+            )
+            
+            calculator.inputs["prefer_opex"] = st.checkbox(
+                "Prefer Operational Expenditure (OpEx) over Capital Expenditure (CapEx)",
+                value=calculator.inputs.get("prefer_opex", True),
+                help="Cloud provides OpEx model vs traditional CapEx for infrastructure"
+            )
+            
+            calculator.inputs["business_growth_rate"] = st.slider(
+                "Expected Annual Business Growth Rate",
+                min_value=0.0, max_value=1.0, 
+                value=calculator.inputs.get("business_growth_rate", 0.15),
+                step=0.05, format="%.0%",
+                help="Expected annual growth rate affecting infrastructure needs"
+            )
+        
+        with col2:
+            calculator.inputs["innovation_priority"] = st.selectbox(
+                "Innovation and Agility Priority",
+                ["low", "medium", "high"],
+                index=["low", "medium", "high"].index(calculator.inputs.get("innovation_priority", "medium")),
+                help="How important is rapid innovation and new technology adoption?"
+            )
+            
+            calculator.inputs["time_to_market_importance"] = st.selectbox(
+                "Time-to-Market Importance",
+                ["low", "medium", "high"],
+                index=["low", "medium", "high"].index(calculator.inputs.get("time_to_market_importance", "medium")),
+                help="How critical is fast deployment of new services/features?"
+            )
+            
+            calculator.inputs["digital_transformation_priority"] = st.selectbox(
+                "Digital Transformation Priority",
+                ["low", "medium", "high"],
+                index=["low", "medium", "high"].index(calculator.inputs.get("digital_transformation_priority", "medium")),
+                help="Priority level for digital transformation initiatives"
+            )
+    
+    with st.expander("🏗️ Technical Assessment"):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            calculator.inputs["infrastructure_age_years"] = st.slider(
+                "Current Infrastructure Age (Years)",
+                min_value=1, max_value=10,
+                value=calculator.inputs.get("infrastructure_age_years", 3),
+                help="Average age of current servers and infrastructure"
+            )
+            
+            calculator.inputs["scalability_importance"] = st.selectbox(
+                "Scalability Requirements",
+                ["low", "medium", "high"],
+                index=["low", "medium", "high"].index(calculator.inputs.get("scalability_importance", "medium")),
+                help="How important is the ability to scale up/down quickly?"
+            )
+            
+            calculator.inputs["performance_criticality"] = st.selectbox(
+                "Performance Criticality",
+                ["low", "medium", "high"],
+                index=["low", "medium", "high"].index(calculator.inputs.get("performance_criticality", "medium")),
+                help="How performance-sensitive are your applications?"
+            )
+            
+            calculator.inputs["security_level"] = st.selectbox(
+                "Security Requirements Level",
+                ["low", "medium", "high"],
+                index=["low", "medium", "high"].index(calculator.inputs.get("security_level", "medium")),
+                help="Level of security requirements (high might favor on-premises)"
+            )
+        
+        with col2:
+            calculator.inputs["cloud_native_compatible"] = st.checkbox(
+                "Applications are Cloud-Native Compatible",
+                value=calculator.inputs.get("cloud_native_compatible", True),
+                help="Can applications run effectively in cloud environment?"
+            )
+            
+            calculator.inputs["multi_region_required"] = st.checkbox(
+                "Multi-Region Deployment Required",
+                value=calculator.inputs.get("multi_region_required", False),
+                help="Need to deploy across multiple geographic regions?"
+            )
+            
+            calculator.inputs["vendor_lockin_concern"] = st.selectbox(
+                "Vendor Lock-in Concern Level",
+                ["low", "medium", "high"],
+                index=["low", "medium", "high"].index(calculator.inputs.get("vendor_lockin_concern", "medium")),
+                help="Level of concern about being locked into a cloud provider"
+            )
+            
+            calculator.inputs["cloud_competitive_advantage"] = st.selectbox(
+                "Cloud as Competitive Advantage",
+                ["low", "medium", "high"],
+                index=["low", "medium", "high"].index(calculator.inputs.get("cloud_competitive_advantage", "medium")),
+                help="How much competitive advantage would cloud provide?"
+            )
+    
+    with st.expander("⚙️ Operational Factors"):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            calculator.inputs["cloud_expertise"] = st.selectbox(
+                "Team's Cloud Expertise Level",
+                ["low", "medium", "high"],
+                index=["low", "medium", "high"].index(calculator.inputs.get("cloud_expertise", "medium")),
+                help="Current level of cloud knowledge and skills in your team"
+            )
+            
+            calculator.inputs["maintenance_burden"] = st.selectbox(
+                "Current Infrastructure Maintenance Burden",
+                ["low", "medium", "high"],
+                index=["low", "medium", "high"].index(calculator.inputs.get("maintenance_burden", "high")),
+                help="How much effort is spent on infrastructure maintenance?"
+            )
+            
+            calculator.inputs["change_mgmt"] = st.selectbox(
+                "Change Management Capability",
+                ["low", "medium", "high"],
+                index=["low", "medium", "high"].index(calculator.inputs.get("change_mgmt", "medium")),
+                help="Organization's ability to manage large technology changes"
+            )
+        
+        with col2:
+            calculator.inputs["backup_complexity"] = st.selectbox(
+                "Current Backup/Recovery Complexity",
+                ["low", "medium", "high"],
+                index=["low", "medium", "high"].index(calculator.inputs.get("backup_complexity", "medium")),
+                help="Complexity of current backup and disaster recovery"
+            )
+            
+            calculator.inputs["monitoring_quality"] = st.selectbox(
+                "Current Monitoring Quality",
+                ["poor", "medium", "excellent"],
+                index=["poor", "medium", "excellent"].index(calculator.inputs.get("monitoring_quality", "medium")),
+                help="Quality of current infrastructure monitoring and alerting"
+            )
+
+def enhanced_migration_decision_analysis(calculator_inputs, cloud_results):
+    """Enhanced function to integrate decision engine with existing calculator."""
+    
+    # Map calculator inputs to decision engine inputs
+    decision_inputs = {
+        # Financial factors
+        'current_annual_cost': calculator_inputs.get('current_annual_cost', 0),
+        'prefer_opex': calculator_inputs.get('prefer_opex', True),
+        
+        # Technical factors  
+        'infrastructure_age_years': calculator_inputs.get('infrastructure_age_years', 3),
+        'scalability_importance': calculator_inputs.get('scalability_importance', 'medium'),
+        'performance_criticality': calculator_inputs.get('performance_criticality', 'medium'),
+        'disaster_recovery_needs': calculator_inputs.get('disaster_recovery', False),
+        'multi_region_required': calculator_inputs.get('multi_region_required', False),
+        'cloud_native_compatible': calculator_inputs.get('cloud_native_compatible', True),
+        'security_requirements': calculator_inputs.get('security_level', 'medium'),
+        'compliance_requirements': calculator_inputs.get('compliance_requirements', []),
+        
+        # Operational factors
+        'cloud_expertise_level': calculator_inputs.get('cloud_expertise', 'medium'),
+        'maintenance_burden': calculator_inputs.get('maintenance_burden', 'high'),
+        'backup_complexity': calculator_inputs.get('backup_complexity', 'medium'),
+        'current_monitoring_quality': calculator_inputs.get('monitoring_quality', 'medium'),
+        'change_management_capability': calculator_inputs.get('change_mgmt', 'medium'),
+        
+        # Strategic factors
+        'innovation_priority': calculator_inputs.get('innovation_priority', 'medium'),
+        'time_to_market_importance': calculator_inputs.get('time_to_market_importance', 'medium'),
+        'business_growth_rate': calculator_inputs.get('business_growth_rate', 0.15),
+        'cloud_competitive_advantage': calculator_inputs.get('cloud_competitive_advantage', 'medium'),
+        'digital_transformation_priority': calculator_inputs.get('digital_transformation_priority', 'medium'),
+        'vendor_lockin_concern': calculator_inputs.get('vendor_lockin_concern', 'medium')
+    }
+    
+    # Initialize decision engine
+    decision_engine = CloudMigrationDecisionEngine()
+    
+    # Make migration decision
+    decision_result = decision_engine.make_migration_decision(decision_inputs, cloud_results)
+    
+    return decision_result
+
+def render_enhanced_analysis_results(results):
+    """Render enhanced analysis results with enterprise features."""
+    st.markdown('<div class="section-header"><h3>📊 Enterprise Analysis Results</h3></div>', unsafe_allow_html=True)
+    
+    # Enterprise Summary Cards
+    prod_results = results['PROD']
+    tco_analysis = prod_results['tco_analysis']
+    
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-title">Best Monthly Cost</div>
+            <div class="metric-value">${tco_analysis['monthly_cost']:,.0f}</div>
+            <div class="metric-description">{tco_analysis['best_pricing_option'].replace('_', ' ').title()}</div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+    with col2:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-title">Annual Savings</div>
+            <div class="metric-value">${tco_analysis['monthly_savings'] * 12:,.0f}</div>
+            <div class="metric-description">{tco_analysis['savings_percentage']}% vs On-Demand</div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+    with col3:
+        roi_color = "green" if isinstance(tco_analysis['roi_3_years'], (int, float)) and tco_analysis['roi_3_years'] > 100 else "orange"
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-title">3-Year ROI</div>
+            <div class="metric-value" style="color: {roi_color}">{tco_analysis['roi_3_years']}%</div>
+            <div class="metric-description">Return on Investment</div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+    with col4:
+        break_even = tco_analysis['break_even_months']
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-title">Break-Even</div>
+            <div class="metric-value">{break_even}</div>
+            <div class="metric-description">Months to recover migration cost</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # TCO Savings Highlight
+    if tco_analysis['monthly_savings'] > 0:
+        st.markdown(f"""
+        <div class="savings-highlight">
+            💰 <strong>Potential Savings:</strong> ${tco_analysis['monthly_savings']:,.2f}/month 
+            (${tco_analysis['monthly_savings'] * 12:,.2f}/year) by switching to {tco_analysis['best_pricing_option'].replace('_', ' ').title()}
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Enhanced Cost Breakdown
+    st.subheader("💰 Comprehensive Cost Analysis")
+    
+    # Cost comparison across pricing models
+    cost_breakdown = prod_results['cost_breakdown']
+    total_costs = cost_breakdown['total_costs']
+    
+    # Create cost comparison chart
+    cost_data = []
+    for pricing_model, cost in total_costs.items():
+        model_name = pricing_model.replace('_', ' ').title()
+        savings = ((total_costs.get('on_demand', cost) - cost) / total_costs.get('on_demand', cost) * 100) if total_costs.get('on_demand', 0) > 0 else 0
+        cost_data.append({
+            'Pricing Model': model_name,
+            'Monthly Cost': cost,
+            'Savings %': round(savings, 1)
+        })
+    
+    df_costs = pd.DataFrame(cost_data)
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        fig_costs = px.bar(df_costs, x='Pricing Model', y='Monthly Cost',
+                          title='Cost Comparison by Pricing Model',
+                          color='Monthly Cost', color_continuous_scale='RdYlGn_r')
+        fig_costs.update_layout(height=400, xaxis_tickangle=-45)
+        st.plotly_chart(fig_costs, use_container_width=True)
+    
+    with col2:
+        fig_savings = px.bar(df_costs, x='Pricing Model', y='Savings %',
+                           title='Savings Percentage vs On-Demand',
+                           color='Savings %', color_continuous_scale='RdYlGn')
+        fig_savings.update_layout(height=400, xaxis_tickangle=-45)
+        st.plotly_chart(fig_savings, use_container_width=True)
+    
+    # Detailed cost breakdown
+    st.subheader("🔍 Detailed Cost Breakdown")
+    
+    # Create detailed breakdown table
+    breakdown_data = []
+    for cost_category, costs in cost_breakdown.items():
+        if cost_category == 'total_costs':
+            continue
+        if isinstance(costs, dict):
+            for subcategory, amount in costs.items():
+                breakdown_data.append({
+                    'Category': cost_category.replace('_', ' ').title(),
+                    'Service': subcategory.replace('_', ' ').title(),
+                    'Monthly Cost': f"${amount:,.2f}",
+                    'Annual Cost': f"${amount * 12:,.2f}"
+                })
+    
+    if breakdown_data:
+        df_breakdown = pd.DataFrame(breakdown_data)
+        st.dataframe(df_breakdown, use_container_width=True, hide_index=True)
+    
+    # Environment comparison
+    st.subheader("🏢 Multi-Environment Analysis")
+    
+    env_data = []
+    for env, env_results in results.items():
+        instance_options = env_results['instance_options']
+        primary_instance = instance_options.get('balanced', instance_options.get('cost_optimized', {}))
+        
+        env_data.append({
+            'Environment': env,
+            'Instance Type': primary_instance.get('type', 'N/A'),
+            'vCPUs': env_results['requirements']['vCPUs'],
+            'RAM (GB)': env_results['requirements']['RAM_GB'],
+            'Storage (GB)': env_results['requirements']['storage_GB'],
+            'Monthly Cost': f"${env_results['cost_breakdown']['total_costs'].get('on_demand', 0):,.2f}",
+            'Multi-AZ': '✅' if env_results['requirements']['multi_az'] else '❌'
+        })
+    
+    df_env = pd.DataFrame(env_data)
+    st.dataframe(df_env, use_container_width=True, hide_index=True)
+    
+    # Instance recommendations
+    st.subheader("🖥️ Instance Recommendations")
+    
+    instance_options = prod_results['instance_options']
+    
+    for scenario, instance in instance_options.items():
+        col1, col2 = st.columns([3, 1])
+        
+        with col1:
+            processor_badge = ""
+            if instance['processor'] == 'Graviton':
+                processor_badge = '<span class="sp-badge">Graviton (ARM)</span>'
+            elif instance['processor'] == 'AMD':
+                processor_badge = '<span class="ri-badge">AMD</span>'
+            else:
+                processor_badge = '<span class="metric-description">Intel</span>'
+            
+            st.markdown(f"""
+            <div class="cost-comparison-card">
+                <h4>{scenario.replace('_', ' ').title()} Option</h4>
+                <p><strong>Instance:</strong> {instance['type']} {processor_badge}</p>
+                <p><strong>Specs:</strong> {instance['vCPU']} vCPUs, {instance['RAM']} GB RAM</p>
+                <p><strong>Network:</strong> {instance['network']}</p>
+                <p><strong>Family:</strong> {instance['family'].title()}</p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col2:
+            # Show cost for this instance type
+            instance_cost = cost_breakdown['instance_costs'].get('on_demand', 0)
+            st.metric("Monthly Cost", f"${instance_cost:,.2f}")
+    
+    # Optimization Recommendations
+    st.subheader("🎯 Optimization Recommendations")
+    
+    recommendations = prod_results['optimization_recommendations']
+    
+    for i, recommendation in enumerate(recommendations):
+        st.markdown(f"**{i+1}.** {recommendation}")
+    
+    # Risk Assessment
+    risk_assessment = prod_results['risk_assessment']
+    
+    st.subheader("⚠️ Migration Risk Assessment")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        risk_level = risk_assessment['overall_risk']
+        risk_class = f"risk-{risk_level.lower()}"
+        
+        st.markdown(f"""
+        <div class="risk-indicator {risk_class}">
+            Overall Risk Level: {risk_level}
+        </div>
+        """, unsafe_allow_html=True)
+        
+        if risk_assessment['risk_factors']:
+            st.markdown("**Risk Factors:**")
+            for factor in risk_assessment['risk_factors']:
+                st.markdown(f"• {factor}")
+    
+    with col2:
+        if risk_assessment['mitigation_strategies']:
+            st.markdown("**Mitigation Strategies:**")
+            for strategy in risk_assessment['mitigation_strategies']:
+                st.markdown(f"• {strategy}")
+    
+    # Compliance Information
+    compliance = prod_results['compliance']
+    if compliance['requirements']:
+        st.subheader("🛡️ Compliance Requirements")
+        
+        for req in compliance['requirements']:
+            if req in st.session_state.calculator.COMPLIANCE_FRAMEWORKS:
+                framework = st.session_state.calculator.COMPLIANCE_FRAMEWORKS[req]
+                
+                with st.expander(f"{framework['name']} - {framework['description']}"):
+                    st.markdown("**Requirements:**")
+                    for requirement in framework['requirements']:
+                        st.markdown(f"• {requirement}")
+                    
+                    cost_impact = (framework['additional_cost_factor'] - 1) * 100
+                    st.markdown(f"**Cost Impact:** +{cost_impact:.1f}% additional cost")
+
+def render_migration_decision_results(decision_result):
+    """Render the migration decision analysis results."""
+    
+    st.markdown('<div class="section-header"><h3>🎯 Migration Decision Analysis</h3></div>', unsafe_allow_html=True)
+    
+    # Overall Recommendation
+    recommendation = decision_result['recommendation']
+    overall_score = decision_result['overall_score']
+    
+    # Color coding based on recommendation
+    if recommendation == "STRONG_MIGRATE":
+        color = "#10b981"  # Green
+        icon = "🚀"
+    elif recommendation == "MODERATE_MIGRATE":
+        color = "#3b82f6"  # Blue
+        icon = "✅"
+    elif recommendation == "NEUTRAL":
+        color = "#f59e0b"  # Yellow
+        icon = "⚖️"
+    else:  # STAY_ON_PREMISES
+        color = "#ef4444"  # Red
+        icon = "🏢"
+    
+    st.markdown(f"""
+    <div style="background: linear-gradient(135deg, {color}20 0%, {color}10 100%); 
+                border: 2px solid {color}; border-radius: 12px; padding: 2rem; 
+                text-align: center; margin: 1rem 0;">
+        <h2 style="color: {color}; margin: 0;">{icon} {decision_result['recommendation_text']}</h2>
+        <p style="font-size: 1.2rem; margin: 0.5rem 0;">
+            <strong>Overall Score: {overall_score}/100</strong> | 
+            Confidence: {decision_result['confidence']}
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Category Scores
+    st.subheader("📊 Decision Factor Breakdown")
+    
+    category_scores = decision_result['category_scores']
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        financial_score = category_scores['financial']
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-title">💰 Financial</div>
+            <div class="metric-value" style="color: {'#10b981' if financial_score >= 60 else '#f59e0b' if financial_score >= 40 else '#ef4444'}">{financial_score}</div>
+            <div class="metric-description">Cost & ROI Analysis</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col2:
+        technical_score = category_scores['technical']
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-title">🏗️ Technical</div>
+            <div class="metric-value" style="color: {'#10b981' if technical_score >= 60 else '#f59e0b' if technical_score >= 40 else '#ef4444'}">{technical_score}</div>
+            <div class="metric-description">Infrastructure & Performance</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col3:
+        operational_score = category_scores['operational']
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-title">⚙️ Operational</div>
+            <div class="metric-value" style="color: {'#10b981' if operational_score >= 60 else '#f59e0b' if operational_score >= 40 else '#ef4444'}">{operational_score}</div>
+            <div class="metric-description">Skills & Management</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col4:
+        strategic_score = category_scores['strategic']
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-title">🎯 Strategic</div>
+            <div class="metric-value" style="color: {'#10b981' if strategic_score >= 60 else '#f59e0b' if strategic_score >= 40 else '#ef4444'}">{strategic_score}</div>
+            <div class="metric-description">Business & Innovation</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Detailed Analysis
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.subheader("🚀 Key Drivers (Pro-Cloud)")
+        key_factors = decision_result['key_factors']
+        
+        for category, factor, score in reversed(key_factors['top_drivers']):
+            factor_name = factor.replace('_', ' ').title()
+            st.markdown(f"**{category}:** {factor_name} ({score:.0f}/100)")
+    
+    with col2:
+        st.subheader("⚠️ Key Concerns")
+        
+        for category, factor, score in key_factors['top_concerns']:
+            factor_name = factor.replace('_', ' ').title()
+            st.markdown(f"**{category}:** {factor_name} ({score:.0f}/100)")
+    
+    # Risks and Considerations
+    if decision_result['risks_and_considerations']:
+        st.subheader("⚠️ Risks and Considerations")
+        for risk in decision_result['risks_and_considerations']:
+            st.markdown(f"• {risk}")
+    
+    # Next Steps
+    st.subheader("📋 Recommended Next Steps")
+    for i, step in enumerate(decision_result['next_steps'], 1):
+        st.markdown(f"{i}. {step}")
+    
+    # Detailed Factor Analysis
+    with st.expander("🔍 Detailed Factor Analysis"):
+        detailed_factors = decision_result['detailed_factors']
+        
+        for category, factors in detailed_factors.items():
+            st.markdown(f"### {category.title()} Factors")
+            
+            factor_data = []
+            for factor, score in factors.items():
+                factor_data.append({
+                    'Factor': factor.replace('_', ' ').title(),
+                    'Score': f"{score:.1f}/100",
+                    'Impact': 'Positive' if score >= 60 else 'Neutral' if score >= 40 else 'Negative'
+                })
+            
+            df_factors = pd.DataFrame(factor_data)
+            st.dataframe(df_factors, use_container_width=True, hide_index=True)
+
+def render_migration_planning():
+    """Render migration planning interface."""
+    st.markdown('<div class="section-header"><h3>🚀 Migration Planning & Timeline</h3></div>', unsafe_allow_html=True)
+    
+    if not st.session_state.analysis_results:
+        st.info("💡 Please run a workload analysis first to access migration planning features.")
+        return
+    
+    results = st.session_state.analysis_results['recommendations']
+    
+    # Migration phases
+    phases = [
+        {
+            "name": "Assessment & Planning",
+            "duration": "2-4 weeks",
+            "description": "Infrastructure discovery, dependency mapping, and detailed migration planning",
+            "tasks": [
+                "Complete infrastructure inventory",
+                "Map application dependencies",
+                "Create detailed migration plan",
+                "Set up AWS accounts and basic networking"
+            ]
+        },
+        {
+            "name": "Pilot Migration",
+            "duration": "2-3 weeks", 
+            "description": "Migrate non-critical workloads to validate approach and tooling",
+            "tasks": [
+                "Migrate development environment",
+                "Test backup and restore procedures",
+                "Validate monitoring and alerting",
+                "Fine-tune security configurations"
+            ]
+        },
+        {
+            "name": "Production Migration",
+            "duration": "4-8 weeks",
+            "description": "Migrate production workloads with minimal downtime",
+            "tasks": [
+                "Execute production cutover",
+                "Validate application functionality",
+                "Optimize performance and costs",
+                "Implement auto-scaling policies"
+            ]
+        },
+        {
+            "name": "Optimization",
+            "duration": "2-4 weeks",
+            "description": "Post-migration optimization and cost management",
+            "tasks": [
+                "Right-size instances based on actual usage",
+                "Implement Reserved Instances/Savings Plans",
+                "Optimize storage and networking",
+                "Final security and compliance validation"
+            ]
+        }
+    ]
+    
+    for i, phase in enumerate(phases):
+        st.markdown(f"""
+        <div class="migration-phase">
+            <h4>Phase {i+1}: {phase['name']} ({phase['duration']})</h4>
+            <p>{phase['description']}</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        with st.expander(f"Phase {i+1} Tasks"):
+            for task in phase['tasks']:
+                st.markdown(f"✓ {task}")
+    
+    # Timeline visualization
+    st.subheader("📅 Migration Timeline")
+    
+    # Create Gantt chart data
+    import datetime as dt
+    start_date = dt.datetime.now()
+    
+    timeline_data = []
+    current_date = start_date
+    
+    for i, phase in enumerate(phases):
+        weeks = int(phase['duration'].split('-')[1].split()[0])  # Get max weeks
+        end_date = current_date + timedelta(weeks=weeks)
+        
+        timeline_data.append({
+            'Phase': phase['name'],
+            'Start': current_date.strftime('%Y-%m-%d'),
+            'End': end_date.strftime('%Y-%m-%d'),
+            'Duration': f"{weeks} weeks"
+        })
+        
+        current_date = end_date
+    
+    df_timeline = pd.DataFrame(timeline_data)
+    st.dataframe(df_timeline, use_container_width=True, hide_index=True)
+    
+    # Cost-benefit timeline
+    st.subheader("💰 Cost-Benefit Timeline")
+    
+    tco_analysis = results['PROD']['tco_analysis']
+    monthly_savings = tco_analysis['monthly_savings']
+    migration_cost = tco_analysis['migration_cost']
+    
+    # Calculate cumulative savings over time
+    months = list(range(0, 37))  # 3 years
+    cumulative_savings = []
+    
+    for month in months:
+        if month == 0:
+            cumulative_savings.append(-migration_cost)
+        else:
+            cumulative_savings.append(cumulative_savings[-1] + monthly_savings)
+    
+    # Create cost-benefit chart
+    fig = go.Figure()
+    
+    fig.add_trace(go.Scatter(
+        x=months,
+        y=cumulative_savings,
+        mode='lines+markers',
+        name='Cumulative Savings',
+        line=dict(color='green', width=3)
+    ))
+    
+    fig.add_hline(y=0, line_dash="dash", line_color="red", 
+                  annotation_text="Break-even point")
+    
+    fig.update_layout(
+        title="Cumulative Savings Over Time",
+        xaxis_title="Months from Migration Start",
+        yaxis_title="Cumulative Savings ($)",
+        height=400
+    )
+    
+    st.plotly_chart(fig, use_container_width=True)
+
+def render_user_info():
+    """Render user information display."""
+    user_info = st.session_state.get('user_info', {})
+    
+    if st.session_state.get('demo_mode', False):
+        st.markdown(f"""
+        <div class="user-info">
+            <strong>👤 Demo User</strong><br>
+            <small>Enterprise Platform Evaluation</small>
+            <div class="status-badge status-demo">Demo Mode</div>
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        st.markdown(f"""
+        <div class="user-info">
+            <strong>👤 Enterprise User</strong><br>
+            <small>Full Platform Access</small>
+            <div class="status-badge status-success">Authenticated</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+def generate_comprehensive_pdf_report(results_data, selected_sections, company_name, report_title, include_charts, include_raw_data):
+    """Generate comprehensive PDF report with all selected sections."""
+    
+    if not REPORTLAB_AVAILABLE:
+        raise ImportError("ReportLab is required for PDF generation")
+    
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=1*inch, leftMargin=1*inch, rightMargin=1*inch)
+    story = []
+    
+    # Styles
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        name='CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=24,
+        spaceAfter=30,
+        textColor=colors.HexColor('#1a365d'),
+        alignment=TA_CENTER
+    )
+    
+    section_style = ParagraphStyle(
+        name='SectionHeader',
+        parent=styles['Heading2'],
+        fontSize=16,
+        spaceBefore=20,
+        spaceAfter=12,
+        textColor=colors.HexColor('#2d3748'),
+    )
+    
+    # Title page
+    story.append(Paragraph(report_title, title_style))
+    story.append(Paragraph(company_name, styles['Normal']))
+    story.append(Paragraph(f"Generated: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}", styles['Normal']))
+    story.append(Spacer(1, 0.5 * inch))
+    
+    # Handle both single and bulk results
+    if isinstance(results_data, dict) and 'recommendations' in results_data:
+        # Single workload result
+        results_list = [results_data]
+    elif isinstance(results_data, list):
+        # Bulk results
+        results_list = results_data
+    else:
+        # Fallback
+        results_list = [results_data]
+    
+    # Build PDF content based on selected sections
+    for section in selected_sections:
+        if section == "Executive Summary":
+            story.append(Paragraph("Executive Summary", section_style))
+            
+            total_workloads = len(results_list)
+            total_monthly_cost = sum(
+                result['recommendations']['PROD']['cost_breakdown']['total_costs'].get('on_demand', 0) 
+                for result in results_list
+            )
+            
+            summary_text = f"""
+            This comprehensive analysis covers {total_workloads} enterprise workload(s) for AWS cloud migration.
+            
+            Total Monthly Cost (On-Demand): ${total_monthly_cost:,.2f}
+            Annual Cost Projection: ${total_monthly_cost * 12:,.2f}
+            """
+            
+            story.append(Paragraph(summary_text, styles['Normal']))
+    
+    # Build PDF
+    doc.build(story)
+    buffer.seek(0)
+    return buffer.getvalue()
+
+def generate_excel_report(results_data):
+    """Generate Excel report with multiple sheets."""
+    output = BytesIO()
+    
+    # Handle both single and bulk results
+    if isinstance(results_data, dict) and 'recommendations' in results_data:
+        results_list = [results_data]
+    elif isinstance(results_data, list):
+        results_list = results_data
+    else:
+        results_list = [results_data]
+    
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        # Summary sheet
+        summary_data = []
+        for result in results_list:
+            workload_name = result.get('inputs', {}).get('workload_name', 'Unknown')
+            prod_results = result['recommendations']['PROD']
+            tco_analysis = prod_results['tco_analysis']
+            requirements = prod_results['requirements']
+            
+            summary_data.append({
+                'Workload': workload_name,
+                'vCPUs': requirements['vCPUs'],
+                'RAM (GB)': requirements['RAM_GB'], 
+                'Storage (GB)': requirements['storage_GB'],
+                'Best Pricing': tco_analysis['best_pricing_option'],
+                'Monthly Cost': tco_analysis['monthly_cost'],
+                'Monthly Savings': tco_analysis['monthly_savings'],
+                'Annual Savings': tco_analysis['monthly_savings'] * 12,
+                'ROI (3Y)': tco_analysis['roi_3_years'],
+                'Break-even (months)': tco_analysis['break_even_months']
+            })
+        
+        summary_df = pd.DataFrame(summary_data)
+        summary_df.to_excel(writer, sheet_name='Executive Summary', index=False)
+    
+    output.seek(0)
+    return output.getvalue()
+
+def generate_csv_report(results_data):
+    """Generate CSV summary report."""
+    # Handle both single and bulk results
+    if isinstance(results_data, dict) and 'recommendations' in results_data:
+        results_list = [results_data]
+    elif isinstance(results_data, list):
+        results_list = results_data
+    else:
+        results_list = [results_data]
+    
+    summary_data = []
+    for result in results_list:
+        workload_name = result.get('inputs', {}).get('workload_name', 'Unknown')
+        prod_results = result['recommendations']['PROD']
+        tco_analysis = prod_results['tco_analysis']
+        requirements = prod_results['requirements']
+        
+        summary_data.append({
+            'Workload': workload_name,
+            'vCPUs': requirements['vCPUs'],
+            'RAM_GB': requirements['RAM_GB'],
+            'Storage_GB': requirements['storage_GB'],
+            'Best_Pricing_Model': tco_analysis['best_pricing_option'],
+            'Monthly_Cost': tco_analysis['monthly_cost'],
+            'Monthly_Savings': tco_analysis['monthly_savings'],
+            'Annual_Savings': tco_analysis['monthly_savings'] * 12,
+            'ROI_3_Years': tco_analysis['roi_3_years'],
+            'Break_Even_Months': tco_analysis['break_even_months']
+        })
+    
+    df = pd.DataFrame(summary_data)
+    return df.to_csv(index=False)
+
+def initialize_session_state():
+    """Initialize session state with enhanced features."""
+    if 'authenticated' not in st.session_state:
+        st.session_state.authenticated = True  # Simplified for demo
+    if 'demo_mode' not in st.session_state:
+        st.session_state.demo_mode = True  # Enable demo mode by default
+    if 'user_info' not in st.session_state:
+        st.session_state.user_info = {}
+    if 'calculator' not in st.session_state:
+        st.session_state.calculator = EnterpriseEC2WorkloadSizingCalculator()
+    if 'pdf_generator' not in st.session_state and REPORTLAB_AVAILABLE:
+        try:
+            st.session_state.pdf_generator = EnhancedPDFReportGenerator()
+        except Exception:
+            st.session_state.pdf_generator = None
+    if 'analysis_results' not in st.session_state:
+        st.session_state.analysis_results = None
+    if 'bulk_results' not in st.session_state:
+        st.session_state.bulk_results = []
+
+def main():
+    """Main application entry point with enhanced enterprise features."""
+    initialize_session_state()
+    
+    # Show demo mode banner if applicable
+    if st.session_state.get('demo_mode', False):
+        st.markdown("""
+        <div class="demo-banner">
+            🔧 <strong>Enterprise Demo Mode Active</strong> - Full functionality including Reserved Instances, Savings Plans, and intelligent migration decisions
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Main application header
+    st.markdown("""
+    <div class="main-header">
+        <h1>🏢 Enterprise AWS Workload Sizing Platform v4.0</h1>
+        <span class="enterprise-badge">Enterprise Edition</span>
+        <p>Advanced cloud migration planning with Reserved Instances, Savings Plans, comprehensive TCO analysis, and intelligent migration decisions</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    with st.sidebar:
+        st.markdown("### 🔧 Enterprise Configuration")
+        
+        # User info
+        render_user_info()
+        
+        calculator = st.session_state.calculator
+        
+        # AWS Connection Status
+        try:
+            cred_status, cred_message = calculator.validate_aws_credentials()
+        except:
+            cred_status, cred_message = False, "❌ AWS credentials validation failed"
+        
+        if cred_status:
+            st.markdown(f'<span class="status-badge status-success">AWS Connected</span>', unsafe_allow_html=True)
+        else:
+            st.markdown(f'<span class="status-badge status-error">AWS Not Connected</span>', unsafe_allow_html=True)
+        
+        st.markdown(f"<small>{cred_message}</small>", unsafe_allow_html=True)
+        st.markdown("---")
+        
+        # Quick Enterprise Stats
+        if st.session_state.analysis_results or st.session_state.bulk_results:
+            st.markdown("### 📈 Enterprise Analytics")
+            
+            if st.session_state.bulk_results:
+                total_workloads = len(st.session_state.bulk_results)
+                total_cost = sum(r['recommendations']['PROD']['cost_breakdown']['total_costs'].get('on_demand', 0) for r in st.session_state.bulk_results)
+                total_savings = sum(r['recommendations']['PROD']['tco_analysis']['monthly_savings'] for r in st.session_state.bulk_results)
+            else:
+                total_workloads = 1
+                total_cost = st.session_state.analysis_results['recommendations']['PROD']['cost_breakdown']['total_costs'].get('on_demand', 0)
+                total_savings = st.session_state.analysis_results['recommendations']['PROD']['tco_analysis']['monthly_savings']
+            
+            st.metric("Workloads Analyzed", total_workloads)
+            st.metric("Monthly Cost (On-Demand)", f"${total_cost:,.2f}")
+            st.metric("Potential Monthly Savings", f"${total_savings:,.2f}")
+            st.metric("Annual Savings Potential", f"${total_savings * 12:,.2f}")
+            
+            # Show migration decision if available
+            if (st.session_state.analysis_results and 
+                'migration_decision' in st.session_state.analysis_results):
+                decision = st.session_state.analysis_results['migration_decision']
+                recommendation = decision['recommendation']
+                
+                if recommendation == "STRONG_MIGRATE":
+                    st.success(f"🚀 Strong Migration Recommendation ({decision['overall_score']}/100)")
+                elif recommendation == "MODERATE_MIGRATE":
+                    st.info(f"✅ Moderate Migration Recommendation ({decision['overall_score']}/100)")
+                elif recommendation == "NEUTRAL":
+                    st.warning(f"⚖️ Neutral Decision ({decision['overall_score']}/100)")
+                else:
+                    st.error(f"🏢 Stay On-Premises Recommended ({decision['overall_score']}/100)")
+        
+        st.markdown("---")
+        st.markdown("""
+        ### 🚀 Enterprise Features
+        
+        **Advanced Pricing:**
+        - Reserved Instances (1Y & 3Y)
+        - Savings Plans (Compute & EC2)
+        - Spot Instance Integration
+        - Mixed Pricing Strategies
+        
+        **Enterprise Architecture:**
+        - Multi-AZ Deployments
+        - Graviton Processor Support
+        - Auto Scaling Integration
+        - Load Balancer Optimization
+        
+        **Migration Decision Engine:**
+        - Financial Analysis (35% weight)
+        - Technical Assessment (25% weight)
+        - Operational Factors (20% weight)
+        - Strategic Alignment (20% weight)
+        
+        **Compliance & Security:**
+        - SOC 2, PCI-DSS, HIPAA, FedRAMP
+        - Enhanced Monitoring Options
+        - Disaster Recovery Planning
+        - Security Best Practices
+        
+        **Advanced Analytics:**
+        - Total Cost of Ownership (TCO)
+        - ROI Calculations
+        - Migration Risk Assessment
+        - Optimization Recommendations
+        """)
+    
+    # Enhanced tab structure
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+        "⚙️ Workload Configuration", 
+        "🎯 Migration Decision",
+        "🚀 Migration Planning",
+        "📋 Reports & Export",
+        "💰 Cost Optimization"
+    ])
+    
+    with tab1:
+        render_enhanced_workload_configuration()
+        
+        if st.session_state.analysis_results:
+            st.markdown("---")
+            render_enhanced_analysis_results(st.session_state.analysis_results['recommendations'])
+    
+    with tab2:
+        st.markdown("### 🎯 Migration Decision Analysis")
+        
+        if not st.session_state.analysis_results:
+            st.info("💡 Please run a complete workload analysis first to see migration decision analysis.")
+            
+            # Show preview of decision factors
+            st.markdown("#### 📊 Decision Framework Preview")
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                st.markdown("""
+                **🏛️ Decision Categories:**
+                - 💰 **Financial (35%)**: Cost savings, ROI, break-even analysis
+                - 🏗️ **Technical (25%)**: Infrastructure age, scalability, performance
+                - ⚙️ **Operational (20%)**: Skills, maintenance, compliance
+                - 🎯 **Strategic (20%)**: Innovation, growth, competitive advantage
+                """)
+            
+            with col2:
+                st.markdown("""
+                **📋 Decision Outcomes:**
+                - 🚀 **Strong Migrate (75-100)**: Clear cloud benefits
+                - ✅ **Moderate Migrate (60-74)**: Good benefits, pilot recommended
+                - ⚖️ **Neutral (45-59)**: Depends on priorities
+                - 🏢 **Stay On-Premises (0-44)**: Optimize current infrastructure
+                """)
+            
+        elif 'migration_decision' not in st.session_state.analysis_results:
+            st.info("💡 Please run analysis with migration decision factors to see results here.")
+            st.markdown("Click the **🎯 Complete Analysis with Migration Decision** button in the Workload Configuration tab.")
+        else:
+            render_migration_decision_results(st.session_state.analysis_results['migration_decision'])
+    
+    with tab3:
+        render_migration_planning() 
+    
+    with tab4:
+        st.markdown("### 📋 Enterprise Reports & Export")        
+        if not st.session_state.analysis_results and not st.session_state.bulk_results:
+            st.info("💡 Please run a workload analysis first to generate reports.")
+        else:
+            # Check if ReportLab is available
+            if not REPORTLAB_AVAILABLE:
+                st.error("📄 PDF generation requires ReportLab library. Install with: `pip install reportlab`")
+                st.info("You can still export data as CSV and Excel formats.")
+            
+            # Report options
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.markdown("#### 📊 Available Reports")
+                
+                report_options = []
+                if st.session_state.analysis_results:
+                    report_options.extend([
+                        "Executive Summary",
+                        "Detailed Cost Analysis", 
+                        "Technical Specifications",
+                        "Migration Plan",
+                        "Risk Assessment"
+                    ])
+                    
+                    # Add migration decision report if available
+                    if 'migration_decision' in st.session_state.analysis_results:
+                        report_options.append("Migration Decision Analysis")
+                
+                if st.session_state.bulk_results:
+                    report_options.extend([
+                        "Portfolio Overview",
+                        "Bulk Cost Analysis"
+                    ])
+                
+                selected_reports = st.multiselect(
+                    "Select Report Sections",
+                    report_options,
+                    default=report_options[:3] if len(report_options) >= 3 else report_options
+                )
+            
+            with col2:
+                st.markdown("#### 🎨 Report Options")
+                
+                include_charts = st.checkbox("Include Charts and Graphs", value=True)
+                include_raw_data = st.checkbox("Include Raw Data Tables", value=False)
+                company_name = st.text_input("Company Name", value="Enterprise Corporation")
+                report_title = st.text_input("Report Title", value="AWS Migration Analysis")
+            
+            st.markdown("---")
+            
+            # Export buttons
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                if REPORTLAB_AVAILABLE and st.button("📄 Generate PDF Report", type="primary"):
+                    with st.spinner("🔄 Generating comprehensive PDF report..."):
+                        try:
+                            pdf_data = generate_comprehensive_pdf_report(
+                                st.session_state.analysis_results or st.session_state.bulk_results,
+                                selected_reports,
+                                company_name,
+                                report_title,
+                                include_charts,
+                                include_raw_data
+                            )
+                            
+                            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                            filename = f"AWS_Migration_Report_{timestamp}.pdf"
+                            
+                            st.download_button(
+                                label="⬇️ Download PDF Report",
+                                data=pdf_data,
+                                file_name=filename,
+                                mime="application/pdf",
+                                key="download_pdf"
+                            )
+                            
+                            st.success("✅ PDF report generated successfully!")
+                            
+                        except Exception as e:
+                            st.error(f"❌ Error generating PDF: {str(e)}")
+            
+            with col2:
+                if st.button("📊 Export to Excel"):
+                    with st.spinner("🔄 Generating Excel report..."):
+                        try:
+                            excel_data = generate_excel_report(
+                                st.session_state.analysis_results or st.session_state.bulk_results
+                            )
+                            
+                            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                            filename = f"AWS_Migration_Data_{timestamp}.xlsx"
+                            
+                            st.download_button(
+                                label="⬇️ Download Excel File",
+                                data=excel_data,
+                                file_name=filename,
+                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                key="download_excel"
+                            )
+                            
+                            st.success("✅ Excel file generated successfully!")
+                            
+                        except Exception as e:
+                            st.error(f"❌ Error generating Excel: {str(e)}")
+            
+            with col3:
+                if st.button("📄 Export to CSV"):
+                    with st.spinner("🔄 Generating CSV export..."):
+                        try:
+                            csv_data = generate_csv_report(
+                                st.session_state.analysis_results or st.session_state.bulk_results
+                            )
+                            
+                            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                            filename = f"AWS_Migration_Summary_{timestamp}.csv"
+                            
+                            st.download_button(
+                                label="⬇️ Download CSV File",
+                                data=csv_data,
+                                file_name=filename,
+                                mime="text/csv",
+                                key="download_csv"
+                            )
+                            
+                            st.success("✅ CSV file generated successfully!")
+                            
+                        except Exception as e:
+                            st.error(f"❌ Error generating CSV: {str(e)}")
+    
+    with tab5:
+        st.markdown("### 🎯 Advanced Cost Optimization")
+        
+        if st.session_state.analysis_results:
+            results = st.session_state.analysis_results['recommendations']['PROD']
+            
+            st.subheader("💰 Cost Optimization Dashboard")
+            
+            # Optimization opportunities
+            cost_breakdown = results['cost_breakdown']
+            total_costs = cost_breakdown['total_costs']
+            
+            # Create optimization comparison
+            optimization_data = []
+            base_cost = total_costs.get('on_demand', 0)
+            
+            for pricing_model, cost in total_costs.items():
+                if pricing_model != 'on_demand':
+                    savings = base_cost - cost
+                    savings_pct = (savings / base_cost * 100) if base_cost > 0 else 0
+                    
+                    optimization_data.append({
+                        'Strategy': pricing_model.replace('_', ' ').title(),
+                        'Monthly Cost': cost,
+                        'Monthly Savings': savings,
+                        'Savings %': savings_pct,
+                        'Annual Savings': savings * 12
+                    })
+            
+            if optimization_data:
+                df_opt = pd.DataFrame(optimization_data)
+                df_opt = df_opt.sort_values('Monthly Savings', ascending=False)
+                
+                # Format currency columns
+                df_opt['Monthly Cost'] = df_opt['Monthly Cost'].apply(lambda x: f"${x:,.2f}")
+                df_opt['Monthly Savings'] = df_opt['Monthly Savings'].apply(lambda x: f"${x:,.2f}")
+                df_opt['Annual Savings'] = df_opt['Annual Savings'].apply(lambda x: f"${x:,.2f}")
+                df_opt['Savings %'] = df_opt['Savings %'].apply(lambda x: f"{x:.1f}%")
+                
+                st.dataframe(df_opt, use_container_width=True, hide_index=True)
+                
+            # Add migration decision insights to cost optimization
+            if 'migration_decision' in st.session_state.analysis_results:
+                st.markdown("---")
+                st.subheader("🎯 Migration Decision Insights")
+                
+                decision = st.session_state.analysis_results['migration_decision']
+                financial_score = decision['category_scores']['financial']
+                
+                if financial_score >= 70:
+                    st.success(f"💰 Strong financial case for cloud migration (Score: {financial_score}/100)")
+                elif financial_score >= 50:
+                    st.info(f"💡 Moderate financial benefits from cloud migration (Score: {financial_score}/100)")
+                else:
+                    st.warning(f"⚠️ Limited financial benefits from cloud migration (Score: {financial_score}/100)")
+                
+                # Show top financial drivers
+                financial_factors = decision['detailed_factors']['financial']
+                st.markdown("**Top Financial Factors:**")
+                for factor, score in sorted(financial_factors.items(), key=lambda x: x[1], reverse=True)[:3]:
+                    factor_name = factor.replace('_', ' ').title()
+                    st.markdown(f"• {factor_name}: {score:.0f}/100")
+        else:
+            st.info("💡 Run a workload analysis to access cost optimization features.")
+    
+    # Enhanced footer
+    st.markdown("---")
+    st.markdown("""
+    <div style="text-align: center; color: #6b7280; font-size: 0.875rem; padding: 2rem 0;">
+        <strong>Enterprise AWS Workload Sizing Platform v4.0</strong><br>
+        Advanced cloud migration planning with Reserved Instances, Savings Plans, TCO analysis, intelligent migration decisions, and enterprise-grade compliance features<br>
+        <em>Built for Enterprise • Comprehensive • Secure • Scalable • Intelligent</em>
+    </div>
+    """, unsafe_allow_html=True)
+
+if __name__ == "__main__":
+    main()
