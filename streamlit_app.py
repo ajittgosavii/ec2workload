@@ -614,12 +614,7 @@ class EnterpriseEC2WorkloadSizingCalculator:
             "additional_cost_factor": 1.25
         }
     }
-    def calculate_network_costs(self, calculator_inputs):
-    # Copy the calculate_network_costs function from the artifact
-    def analyze_network_requirements(self, calculator_inputs, workload_profile):
-    # Copy the analyze_network_requirements function from the artifact
-    def optimize_network_costs(self, calculator_inputs, current_costs):
-    # Copy the optimize_network_costs function from the artifact
+    
     def __init__(self):
         """Initialize calculator with default settings."""
         self.inputs = {
@@ -764,6 +759,7 @@ class EnterpriseEC2WorkloadSizingCalculator:
             instance_options, total_storage, iops_required, throughput_required, env, az_multiplier
         )
         # Add network costs
+        def calculate_network_costs(self, calculator_inputs):
             network_costs = self.calculate_network_costs(self.inputs)
             cost_breakdown["network_costs"].update(network_costs)
         
@@ -1222,8 +1218,7 @@ class CloudMigrationDecisionEngine:
     """
     Enhanced decision engine to determine whether cloud migration is beneficial
     based on financial, technical, operational, and strategic factors.
-    """
-    
+    """    
     def __init__(self):
         # Decision thresholds and weights
         self.decision_weights = {
@@ -2343,13 +2338,10 @@ def render_enhanced_workload_configuration():
                 value=calculator.inputs.get("disaster_recovery", False),
                 help="Enable cross-region disaster recovery capabilities"
             )
-            
+        
+        
         with col3:
-            st.markdown("**🌐 Network & Performance**")
-            # Enhanced network options would go here
-            with col3:
-            st.markdown("**🌐 Network & Performance Configuration**")
-            
+            st.markdown("**🌐 Network & Performance Configuration**")            
             # VPC Configuration
             calculator.inputs["vpc_configuration"] = st.selectbox(
                 "VPC Configuration",
@@ -3579,7 +3571,7 @@ def main():
     
     with tab3:
         st.markdown("### 📁 Enterprise Bulk Analysis")
-        def render_bulk_upload_configuration():
+def render_bulk_upload_configuration():
     """Render bulk upload configuration interface."""
     st.markdown("### 📁 Enterprise Bulk Analysis")
     
