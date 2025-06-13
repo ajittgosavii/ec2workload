@@ -2293,7 +2293,7 @@ def render_enhanced_workload_configuration():
             )
     
     # Advanced Configuration
-    with st.expander("⚙️ Advanced Enterprise Settings"):
+with st.expander("⚙️ Advanced Enterprise Settings"):
         col1, col2, col3 = st.columns(3)
         
         with col1:
@@ -2338,7 +2338,6 @@ def render_enhanced_workload_configuration():
                 value=calculator.inputs.get("disaster_recovery", False),
                 help="Enable cross-region disaster recovery capabilities"
             )
-        
         
         with col3:
             st.markdown("**🌐 Network & Performance Configuration**")            
@@ -2392,7 +2391,7 @@ def render_enhanced_workload_configuration():
                 }.get(x, x),
                 help="Select network performance optimization"
             )
-            
+    
             # Security Groups
             calculator.inputs["security_group_rules"] = st.number_input(
                 "Estimated Security Group Rules",
@@ -2410,92 +2409,111 @@ def render_enhanced_workload_configuration():
             )
             calculator.inputs["vpc_endpoints"] = vpc_endpoints
             
-            # Advanced Network Features
-            with st.expander("🔧 Advanced Network Features"):
-                
-                # Transit Gateway
-                calculator.inputs["transit_gateway"] = st.checkbox(
-                    "Transit Gateway Integration",
-                    value=calculator.inputs.get("transit_gateway", False),
-                    help="Connect to Transit Gateway for multi-VPC connectivity"
+with st.expander("🔧 Advanced Network Features"):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            # Security Groups
+            calculator.inputs["security_group_rules"] = st.number_input(
+                "Estimated Security Group Rules",
+                min_value=5, max_value=100,
+                value=calculator.inputs.get("security_group_rules", 20),
+                help="Approximate number of security group rules needed"
+            )
+            
+            # VPC Endpoints
+            vpc_endpoints = st.multiselect(
+                "VPC Endpoints Required",
+                ["s3", "dynamodb", "ec2", "ssm", "kms", "cloudwatch", "sns", "sqs"],
+                default=calculator.inputs.get("vpc_endpoints", ["s3", "ec2"]),
+                help="Select AWS services requiring VPC endpoints"
+            )
+            calculator.inputs["vpc_endpoints"] = vpc_endpoints
+            
+            # Transit Gateway
+            calculator.inputs["transit_gateway"] = st.checkbox(
+                "Transit Gateway Integration",
+                value=calculator.inputs.get("transit_gateway", False),
+                help="Connect to Transit Gateway for multi-VPC connectivity"
+            )
+            
+            # Direct Connect
+            calculator.inputs["direct_connect"] = st.checkbox(
+                "AWS Direct Connect",
+                value=calculator.inputs.get("direct_connect", False),
+                help="Dedicated network connection to AWS"
+            )
+            
+            # VPN Connection
+            calculator.inputs["vpn_connection"] = st.checkbox(
+                "Site-to-Site VPN",
+                value=calculator.inputs.get("vpn_connection", False),
+                help="VPN connection to on-premises network"
+            )
+        
+        with col2:
+            # CloudFront
+            calculator.inputs["cloudfront_distribution"] = st.checkbox(
+                "CloudFront Distribution",
+                value=calculator.inputs.get("cloudfront_distribution", False),
+                help="Content delivery network for global performance"
+            )
+            
+            # Route 53
+            calculator.inputs["route53_hosted_zone"] = st.checkbox(
+                "Route 53 Hosted Zone",
+                value=calculator.inputs.get("route53_hosted_zone", False),
+                help="DNS management with Route 53"
+            )
+            
+            # Network Load Balancer Features
+            if calculator.inputs.get("load_balancer") in ["alb", "nlb"]:
+                calculator.inputs["lb_cross_zone"] = st.checkbox(
+                    "Cross-Zone Load Balancing",
+                    value=calculator.inputs.get("lb_cross_zone", True),
+                    help="Distribute traffic evenly across AZs"
                 )
                 
-                # Direct Connect
-                calculator.inputs["direct_connect"] = st.checkbox(
-                    "AWS Direct Connect",
-                    value=calculator.inputs.get("direct_connect", False),
-                    help="Dedicated network connection to AWS"
+                calculator.inputs["lb_deletion_protection"] = st.checkbox(
+                    "Load Balancer Deletion Protection",
+                    value=calculator.inputs.get("lb_deletion_protection", True),
+                    help="Prevent accidental load balancer deletion"
                 )
-                
-                # VPN Connection
-                calculator.inputs["vpn_connection"] = st.checkbox(
-                    "Site-to-Site VPN",
-                    value=calculator.inputs.get("vpn_connection", False),
-                    help="VPN connection to on-premises network"
-                )
-                
-                # CloudFront
-                calculator.inputs["cloudfront_distribution"] = st.checkbox(
-                    "CloudFront Distribution",
-                    value=calculator.inputs.get("cloudfront_distribution", False),
-                    help="Content delivery network for global performance"
-                )
-                
-                # Route 53
-                calculator.inputs["route53_hosted_zone"] = st.checkbox(
-                    "Route 53 Hosted Zone",
-                    value=calculator.inputs.get("route53_hosted_zone", False),
-                    help="DNS management with Route 53"
-                )
-                
-                # Network Load Balancer Features
-                if calculator.inputs.get("load_balancer") in ["alb", "nlb"]:
-                    calculator.inputs["lb_cross_zone"] = st.checkbox(
-                        "Cross-Zone Load Balancing",
-                        value=calculator.inputs.get("lb_cross_zone", True),
-                        help="Distribute traffic evenly across AZs"
-                    )
-                    
-                    calculator.inputs["lb_deletion_protection"] = st.checkbox(
-                        "Load Balancer Deletion Protection",
-                        value=calculator.inputs.get("lb_deletion_protection", True),
-                        help="Prevent accidental load balancer deletion"
-                    )
-                
-                # Network Monitoring
-                calculator.inputs["vpc_flow_logs"] = st.checkbox(
-                    "VPC Flow Logs",
-                    value=calculator.inputs.get("vpc_flow_logs", False),
-                    help="Enable VPC Flow Logs for network monitoring"
-                )
-                
-                # Bandwidth Requirements
-                calculator.inputs["bandwidth_requirements"] = st.selectbox(
-                    "Bandwidth Requirements",
-                    ["standard", "high", "very_high", "dedicated"],
-                    format_func=lambda x: {
-                        "standard": "Standard (Up to 5 Gbps)",
-                        "high": "High (5-10 Gbps)",
-                        "very_high": "Very High (10-25 Gbps)",
-                        "dedicated": "Dedicated Tenancy"
-                    }.get(x, x),
-                    help="Expected network bandwidth requirements"
-                )
-                
-                # Network Latency Requirements
-                calculator.inputs["latency_requirements"] = st.selectbox(
-                    "Latency Requirements",
-                    ["standard", "low", "ultra_low"],
-                    format_func=lambda x: {
-                        "standard": "Standard (< 100ms)",
-                        "low": "Low Latency (< 10ms)",
-                        "ultra_low": "Ultra Low (< 1ms)"
-                    }.get(x, x),
-                    help="Application latency requirements"
-                )
-
+            
+            # Network Monitoring
+            calculator.inputs["vpc_flow_logs"] = st.checkbox(
+                "VPC Flow Logs",
+                value=calculator.inputs.get("vpc_flow_logs", False),
+                help="Enable VPC Flow Logs for network monitoring"
+            )
+            
+            # Bandwidth Requirements
+            calculator.inputs["bandwidth_requirements"] = st.selectbox(
+                "Bandwidth Requirements",
+                ["standard", "high", "very_high", "dedicated"],
+                format_func=lambda x: {
+                    "standard": "Standard (Up to 5 Gbps)",
+                    "high": "High (5-10 Gbps)",
+                    "very_high": "Very High (10-25 Gbps)",
+                    "dedicated": "Dedicated Tenancy"
+                }.get(x, x),
+                help="Expected network bandwidth requirements"
+            )
+            
+            # Network Latency Requirements
+            calculator.inputs["latency_requirements"] = st.selectbox(
+                "Latency Requirements",
+                ["standard", "low", "ultra_low"],
+                format_func=lambda x: {
+                    "standard": "Standard (< 100ms)",
+                    "low": "Low Latency (< 10ms)",
+                    "ultra_low": "Ultra Low (< 1ms)"
+                }.get(x, x),
+                help="Application latency requirements"
+            )
+    
     # Network Cost Calculation Function (add this after the class definition)
-    def calculate_network_costs(self, calculator_inputs):
+def calculate_network_costs(self, calculator_inputs):
         """Calculate network-related costs based on configuration."""
         network_costs = {}
         
@@ -2572,7 +2590,7 @@ def render_enhanced_workload_configuration():
         return network_costs
 
     # Network Requirements Analysis Function
-    def analyze_network_requirements(self, calculator_inputs, workload_profile):
+def analyze_network_requirements(self, calculator_inputs, workload_profile):
         """Analyze and recommend network configuration based on workload."""
         recommendations = []
         
@@ -2618,7 +2636,7 @@ def render_enhanced_workload_configuration():
         return recommendations
 
     # Network Cost Optimization Function
-    def optimize_network_costs(self, calculator_inputs, current_costs):
+def optimize_network_costs(self, calculator_inputs, current_costs):
         """Provide network cost optimization recommendations."""
         optimizations = []
         
@@ -2657,14 +2675,14 @@ def render_enhanced_workload_configuration():
         
         return optimizations
     
-    # ADD MIGRATION DECISION INPUTS
-    st.markdown("---")
-    render_migration_decision_inputs()
+# ADD MIGRATION DECISION INPUTS
+st.markdown("---")
+render_migration_decision_inputs()
     
     # ENHANCED ANALYSIS BUTTON
-    col1, col2 = st.columns(2)
+col1, col2 = st.columns(2)
     
-    with col1:
+with col1:
         if st.button("🚀 Generate Enterprise Analysis", type="primary", key="generate_single"):
             with st.spinner("🔄 Analyzing workload with enterprise features..."):
                 try:
@@ -2684,7 +2702,7 @@ def render_enhanced_workload_configuration():
                     import traceback
                     st.text(traceback.format_exc())
     
-    with col2:
+with col2:
         if st.button("🎯 Complete Analysis with Migration Decision", type="primary", key="generate_with_decision"):
             with st.spinner("🔄 Analyzing workload and migration decision factors..."):
                 try:
@@ -2715,16 +2733,16 @@ def render_enhanced_workload_configuration():
 # END OF FUNCTION MODIFICATION
 
 def render_enhanced_analysis_results(results):
-    """Render enhanced analysis results with enterprise features."""
-    st.markdown('<div class="section-header"><h3>📊 Enterprise Analysis Results</h3></div>', unsafe_allow_html=True)
+        """Render enhanced analysis results with enterprise features."""
+st.markdown('<div class="section-header"><h3>📊 Enterprise Analysis Results</h3></div>', unsafe_allow_html=True)
     
     # Enterprise Summary Cards
-    prod_results = results['PROD']
-    tco_analysis = prod_results['tco_analysis']
+prod_results = results['PROD']
+tco_analysis = prod_results['tco_analysis']
     
-    col1, col2, col3, col4 = st.columns(4)
+col1, col2, col3, col4 = st.columns(4)
     
-    with col1:
+with col1:
         st.markdown(f"""
         <div class="metric-card">
             <div class="metric-title">Best Monthly Cost</div>
@@ -2733,7 +2751,7 @@ def render_enhanced_analysis_results(results):
         </div>
         """, unsafe_allow_html=True)
         
-    with col2:
+with col2:
         st.markdown(f"""
         <div class="metric-card">
             <div class="metric-title">Annual Savings</div>
@@ -2742,7 +2760,7 @@ def render_enhanced_analysis_results(results):
         </div>
         """, unsafe_allow_html=True)
         
-    with col3:
+with col3:
         roi_color = "green" if isinstance(tco_analysis['roi_3_years'], (int, float)) and tco_analysis['roi_3_years'] > 100 else "orange"
         st.markdown(f"""
         <div class="metric-card">
@@ -2752,7 +2770,7 @@ def render_enhanced_analysis_results(results):
         </div>
         """, unsafe_allow_html=True)
         
-    with col4:
+with col4:
         break_even = tco_analysis['break_even_months']
         st.markdown(f"""
         <div class="metric-card">
@@ -2763,7 +2781,7 @@ def render_enhanced_analysis_results(results):
         """, unsafe_allow_html=True)
     
     # TCO Savings Highlight
-    if tco_analysis['monthly_savings'] > 0:
+if tco_analysis['monthly_savings'] > 0:
         st.markdown(f"""
         <div class="savings-highlight">
             💰 <strong>Potential Savings:</strong> ${tco_analysis['monthly_savings']:,.2f}/month 
@@ -2772,15 +2790,15 @@ def render_enhanced_analysis_results(results):
         """, unsafe_allow_html=True)
     
     # Enhanced Cost Breakdown
-    st.subheader("💰 Comprehensive Cost Analysis")
+st.subheader("💰 Comprehensive Cost Analysis")
     
     # Cost comparison across pricing models
-    cost_breakdown = prod_results['cost_breakdown']
-    total_costs = cost_breakdown['total_costs']
+cost_breakdown = prod_results['cost_breakdown']
+total_costs = cost_breakdown['total_costs']
     
     # Create cost comparison chart
-    cost_data = []
-    for pricing_model, cost in total_costs.items():
+cost_data = []
+for pricing_model, cost in total_costs.items():
         model_name = pricing_model.replace('_', ' ').title()
         savings = ((total_costs.get('on_demand', cost) - cost) / total_costs.get('on_demand', cost) * 100) if total_costs.get('on_demand', 0) > 0 else 0
         cost_data.append({
@@ -2789,18 +2807,18 @@ def render_enhanced_analysis_results(results):
             'Savings %': round(savings, 1)
         })
     
-    df_costs = pd.DataFrame(cost_data)
+df_costs = pd.DataFrame(cost_data)
     
-    col1, col2 = st.columns(2)
+col1, col2 = st.columns(2)
     
-    with col1:
+with col1:
         fig_costs = px.bar(df_costs, x='Pricing Model', y='Monthly Cost',
                           title='Cost Comparison by Pricing Model',
                           color='Monthly Cost', color_continuous_scale='RdYlGn_r')
         fig_costs.update_layout(height=400, xaxis_tickangle=-45)
         st.plotly_chart(fig_costs, use_container_width=True)
     
-    with col2:
+with col2:
         fig_savings = px.bar(df_costs, x='Pricing Model', y='Savings %',
                            title='Savings Percentage vs On-Demand',
                            color='Savings %', color_continuous_scale='RdYlGn')
@@ -2808,11 +2826,11 @@ def render_enhanced_analysis_results(results):
         st.plotly_chart(fig_savings, use_container_width=True)
     
     # Detailed cost breakdown
-    st.subheader("🔍 Detailed Cost Breakdown")
+st.subheader("🔍 Detailed Cost Breakdown")
     
     # Create detailed breakdown table
-    breakdown_data = []
-    for cost_category, costs in cost_breakdown.items():
+breakdown_data = []
+for cost_category, costs in cost_breakdown.items():
         if cost_category == 'total_costs':
             continue
         if isinstance(costs, dict):
@@ -2824,15 +2842,15 @@ def render_enhanced_analysis_results(results):
                     'Annual Cost': f"${amount * 12:,.2f}"
                 })
     
-    if breakdown_data:
+if breakdown_data:
         df_breakdown = pd.DataFrame(breakdown_data)
         st.dataframe(df_breakdown, use_container_width=True, hide_index=True)
     
     # Environment comparison
-    st.subheader("🏢 Multi-Environment Analysis")
+st.subheader("🏢 Multi-Environment Analysis")
     
-    env_data = []
-    for env, env_results in results.items():
+env_data = []
+for env, env_results in results.items():
         instance_options = env_results['instance_options']
         primary_instance = instance_options.get('balanced', instance_options.get('cost_optimized', {}))
         
@@ -2846,15 +2864,15 @@ def render_enhanced_analysis_results(results):
             'Multi-AZ': '✅' if env_results['requirements']['multi_az'] else '❌'
         })
     
-    df_env = pd.DataFrame(env_data)
-    st.dataframe(df_env, use_container_width=True, hide_index=True)
+df_env = pd.DataFrame(env_data)
+st.dataframe(df_env, use_container_width=True, hide_index=True)
     
     # Instance recommendations
-    st.subheader("🖥️ Instance Recommendations")
+st.subheader("🖥️ Instance Recommendations")
     
-    instance_options = prod_results['instance_options']
+instance_options = prod_results['instance_options']
     
-    for scenario, instance in instance_options.items():
+for scenario, instance in instance_options.items():
         col1, col2 = st.columns([3, 1])
         
         with col1:
@@ -2882,21 +2900,21 @@ def render_enhanced_analysis_results(results):
             st.metric("Monthly Cost", f"${instance_cost:,.2f}")
     
     # Optimization Recommendations
-    st.subheader("🎯 Optimization Recommendations")
+st.subheader("🎯 Optimization Recommendations")
     
-    recommendations = prod_results['optimization_recommendations']
+recommendations = prod_results['optimization_recommendations']
     
-    for i, recommendation in enumerate(recommendations):
+for i, recommendation in enumerate(recommendations):
         st.markdown(f"**{i+1}.** {recommendation}")
     
     # Risk Assessment
-    risk_assessment = prod_results['risk_assessment']
+risk_assessment = prod_results['risk_assessment']
     
-    st.subheader("⚠️ Migration Risk Assessment")
+st.subheader("⚠️ Migration Risk Assessment")
     
-    col1, col2 = st.columns(2)
+col1, col2 = st.columns(2)
     
-    with col1:
+with col1:
         risk_level = risk_assessment['overall_risk']
         risk_class = f"risk-{risk_level.lower()}"
         
@@ -2911,15 +2929,15 @@ def render_enhanced_analysis_results(results):
             for factor in risk_assessment['risk_factors']:
                 st.markdown(f"• {factor}")
     
-    with col2:
+with col2:
         if risk_assessment['mitigation_strategies']:
             st.markdown("**Mitigation Strategies:**")
             for strategy in risk_assessment['mitigation_strategies']:
                 st.markdown(f"• {strategy}")
     
     # Compliance Information
-    compliance = prod_results['compliance']
-    if compliance['requirements']:
+compliance = prod_results['compliance']
+if compliance['requirements']:
         st.subheader("🛡️ Compliance Requirements")
         
         for req in compliance['requirements']:
