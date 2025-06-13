@@ -969,40 +969,145 @@ class EnhancedEnterpriseEC2Calculator:
             return self._get_fallback_requirements(env)
 
     def _calculate_basic_costs(self, vcpus: int, ram_gb: int, storage_gb: int, env: str) -> Dict[str, Any]:
-        """Calculate basic costs."""
+        """Calculate basic costs with realistic EC2 pricing."""
         try:
-            base_hourly_cost = 0.1 * vcpus + 0.02 * ram_gb + 0.0001 * storage_gb
-            monthly_cost = base_hourly_cost * 24 * 30
+            # Select appropriate instance type based on requirements
+            selected_instance = self._select_best_instance(vcpus, ram_gb)
+            instance_type = selected_instance['type']
+            
+            # Get pricing for selected instance
+            pricing = self.aws_integration._get_fallback_pricing(instance_type)
+            
+            # Calculate monthly costs (730 hours per month)
+            monthly_instance_cost = {
+                'on_demand': pricing['on_demand'] * 730,
+                'ri_1y_no_upfront': pricing['ri_1y_no_upfront'] * 730,
+                'ri_3y_no_upfront': pricing['ri_3y_no_upfront'] * 730,
+                'spot': pricing['spot'] * 730
+            }
+            
+            # Storage costs (EBS gp3)
+            storage_cost_per_gb = 0.08  # $0.08 per GB per month for gp3
+            monthly_storage_cost = storage_gb * storage_cost_per_gb
+            
+            # Network costs (estimated)
+            monthly_network_cost = 50  # Base network cost estimate
+            
+            # Total costs
+            total_costs = {}
+            for pricing_model, instance_cost in monthly_instance_cost.items():
+                total_costs[pricing_model] = instance_cost + monthly_storage_cost + monthly_network_cost
             
             return {
-                "total_costs": {
-                    "on_demand": monthly_cost,
-                    "ri_1y_no_upfront": monthly_cost * 0.7,
-                    "ri_3y_no_upfront": monthly_cost * 0.5,
-                    "spot": monthly_cost * 0.3
-                },
-                "instance_costs": {"on_demand": monthly_cost * 0.7},
-                "storage_costs": {"primary_storage": monthly_cost * 0.2},
-                "network_costs": {"data_transfer": monthly_cost * 0.1}
+                "total_costs": total_costs,
+                "instance_costs": monthly_instance_cost,
+                "storage_costs": {"primary_storage": monthly_storage_cost},
+                "network_costs": {"data_transfer": monthly_network_cost},
+                "selected_instance": selected_instance
             }
         except Exception as e:
             logger.error(f"Error calculating basic costs: {e}")
-            return {"total_costs": {"on_demand": 1000}}
+            return {
+                "total_costs": {"on_demand": 1000, "ri_1y_no_upfront": 700, "ri_3y_no_upfront": 500, "spot": 300},
+                "instance_costs": {"on_demand": 800},
+                "storage_costs": {"primary_storage": 150},
+                "network_costs": {"data_transfer": 50}
+            }
+
+    def _select_best_instance(self, required_vcpus: int, required_ram_gb: int) -> Dict[str, Any]:
+        """Select the best matching instance type."""
+        try:
+            best_instance = None
+            best_score = 0
+            
+            for instance in self.INSTANCE_TYPES:
+                # Check if instance meets requirements
+                if instance['vCPU'] >= required_vcpus and instance['RAM'] >= required_ram_gb:
+                    # Calculate efficiency score
+                    cpu_efficiency = required_vcpus / instance['vCPU']
+                    ram_efficiency = required_ram_gb / instance['RAM']
+                    overall_efficiency = (cpu_efficiency + ram_efficiency) / 2
+                    
+                    if overall_efficiency > best_score:
+                        best_score = overall_efficiency
+                        best_instance = instance.copy()
+                        best_instance['efficiency_score'] = overall_efficiency
+            
+            # If no instance meets requirements exactly, use the smallest general purpose
+            if best_instance is None:
+                best_instance = {
+                    'type': 'm6i.large',
+                    'vCPU': 2,
+                    'RAM': 8,
+                    'family': 'general',
+                    'efficiency_score': 0.5
+                }
+            
+            return best_instance
+        except Exception as e:
+            logger.error(f"Error selecting best instance: {e}")
+            return {'type': 'm6i.large', 'vCPU': 2, 'RAM': 8, 'family': 'general', 'efficiency_score': 0.5}
 
     def _calculate_tco(self, vcpus: int, ram_gb: int, env: str) -> Dict[str, Any]:
-        """Calculate TCO analysis."""
+        """Calculate TCO analysis with realistic savings."""
         try:
-            base_monthly = (vcpus * 50) + (ram_gb * 10)
+            # Get the selected instance pricing
+            selected_instance = self._select_best_instance(vcpus, ram_gb)
+            pricing = self.aws_integration._get_fallback_pricing(selected_instance['type'])
+            
+            # Calculate different pricing scenarios
+            on_demand_monthly = pricing['on_demand'] * 730
+            ri_1y_monthly = pricing['ri_1y_no_upfront'] * 730
+            ri_3y_monthly = pricing['ri_3y_no_upfront'] * 730
+            spot_monthly = pricing['spot'] * 730
+            
+            # Add storage and network costs
+            storage_gb = max(self.inputs.get('storage_current_gb', 500), 100)
+            storage_monthly = storage_gb * 0.08
+            network_monthly = 50
+            
+            # Total monthly costs
+            total_on_demand = on_demand_monthly + storage_monthly + network_monthly
+            total_ri_1y = ri_1y_monthly + storage_monthly + network_monthly
+            total_ri_3y = ri_3y_monthly + storage_monthly + network_monthly
+            total_spot = spot_monthly + storage_monthly + network_monthly
+            
+            # Determine best option
+            costs = {
+                'on_demand': total_on_demand,
+                'ri_1y_no_upfront': total_ri_1y,
+                'ri_3y_no_upfront': total_ri_3y,
+                'spot': total_spot
+            }
+            
+            # For production, exclude spot pricing
+            if env == 'PROD':
+                production_costs = {k: v for k, v in costs.items() if k != 'spot'}
+                best_option = min(production_costs.keys(), key=lambda k: production_costs[k])
+                best_cost = production_costs[best_option]
+            else:
+                best_option = min(costs.keys(), key=lambda k: costs[k])
+                best_cost = costs[best_option]
+            
+            savings = total_on_demand - best_cost
+            roi_3_years = (savings * 36 / total_on_demand) * 100 if total_on_demand > 0 else 0
             
             return {
-                "monthly_cost": base_monthly,
-                "monthly_savings": base_monthly * 0.3,
-                "best_pricing_option": "ri_1y_no_upfront",
-                "roi_3_years": 25
+                "monthly_cost": best_cost,
+                "monthly_savings": savings,
+                "best_pricing_option": best_option,
+                "roi_3_years": roi_3_years,
+                "all_options": costs,
+                "selected_instance_type": selected_instance['type']
             }
         except Exception as e:
             logger.error(f"Error calculating TCO: {e}")
-            return {"monthly_cost": 1000, "monthly_savings": 200}
+            return {
+                "monthly_cost": 1000,
+                "monthly_savings": 200,
+                "best_pricing_option": "ri_1y_no_upfront",
+                "roi_3_years": 25
+            }
 
     def _perform_aws_analysis(self, requirements: Dict, env: str) -> Dict[str, Any]:
         """Perform AWS-specific analysis."""
@@ -1426,6 +1531,14 @@ def render_enhanced_results():
             render_aws_analysis_section(aws_analysis)
         else:
             st.info("AWS analysis not available.")
+        
+        # Cost Breakdown Section
+        st.subheader("💰 Cost Analysis")
+        render_cost_breakdown_section(prod_results)
+        
+        # Instance Recommendations Section  
+        st.subheader("🖥️ Instance Recommendations")
+        render_instance_recommendations_section(prod_results)
             
     except Exception as e:
         st.error(f"❌ Error displaying results: {str(e)}")
@@ -1484,7 +1597,145 @@ def render_claude_analysis_section(claude_analysis):
         st.error(f"Error displaying Claude analysis: {str(e)}")
         logger.error(f"Error in render_claude_analysis_section: {e}")
 
-def render_aws_analysis_section(aws_analysis):
+def render_cost_breakdown_section(prod_results):
+    """Render detailed cost breakdown section."""
+    
+    try:
+        cost_breakdown = prod_results.get('cost_breakdown', {})
+        tco_analysis = prod_results.get('tco_analysis', {})
+        
+        if not cost_breakdown:
+            st.info("Cost breakdown data not available.")
+            return
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("**💰 Monthly Cost Breakdown**")
+            total_costs = cost_breakdown.get('total_costs', {})
+            
+            if total_costs:
+                cost_data = []
+                for pricing_model, cost in total_costs.items():
+                    cost_data.append({
+                        'Pricing Model': pricing_model.replace('_', ' ').title(),
+                        'Monthly Cost': f"${cost:,.2f}",
+                        'Annual Cost': f"${cost*12:,.2f}"
+                    })
+                
+                df_costs = pd.DataFrame(cost_data)
+                st.dataframe(df_costs, use_container_width=True, hide_index=True)
+        
+        with col2:
+            st.markdown("**📊 Cost Components**")
+            
+            instance_costs = cost_breakdown.get('instance_costs', {})
+            storage_costs = cost_breakdown.get('storage_costs', {})
+            network_costs = cost_breakdown.get('network_costs', {})
+            
+            if instance_costs or storage_costs or network_costs:
+                component_data = []
+                
+                for component, cost in instance_costs.items():
+                    component_data.append({'Component': f"Instance ({component})", 'Monthly Cost': f"${cost:,.2f}"})
+                
+                for component, cost in storage_costs.items():
+                    component_data.append({'Component': f"Storage ({component})", 'Monthly Cost': f"${cost:,.2f}"})
+                
+                for component, cost in network_costs.items():
+                    component_data.append({'Component': f"Network ({component})", 'Monthly Cost': f"${cost:,.2f}"})
+                
+                if component_data:
+                    df_components = pd.DataFrame(component_data)
+                    st.dataframe(df_components, use_container_width=True, hide_index=True)
+        
+        # TCO Summary
+        if tco_analysis:
+            st.markdown("**💡 Total Cost of Ownership (TCO) Summary**")
+            
+            col3, col4, col5 = st.columns(3)
+            
+            with col3:
+                monthly_cost = tco_analysis.get('monthly_cost', 0)
+                st.metric("Monthly Cost", f"${monthly_cost:,.2f}")
+            
+            with col4:
+                monthly_savings = tco_analysis.get('monthly_savings', 0)
+                st.metric("Monthly Savings", f"${monthly_savings:,.2f}")
+            
+            with col5:
+                best_option = tco_analysis.get('best_pricing_option', 'N/A')
+                st.metric("Best Option", best_option.replace('_', ' ').title())
+                
+    except Exception as e:
+        st.error(f"Error displaying cost breakdown: {str(e)}")
+        logger.error(f"Error in render_cost_breakdown_section: {e}")
+
+def render_instance_recommendations_section(prod_results):
+    """Render EC2 instance recommendations section."""
+    
+    try:
+        requirements = prod_results.get('requirements', {})
+        aws_analysis = prod_results.get('aws_analysis', {})
+        
+        if not requirements:
+            st.info("Instance requirements not available.")
+            return
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("**📋 Calculated Requirements**")
+            
+            req_data = [
+                {'Specification': 'vCPUs', 'Value': requirements.get('vCPUs', 'N/A')},
+                {'Specification': 'RAM (GB)', 'Value': requirements.get('RAM_GB', 'N/A')},
+                {'Specification': 'Storage (GB)', 'Value': requirements.get('storage_GB', 'N/A')},
+                {'Specification': 'Multi-AZ', 'Value': 'Yes' if requirements.get('multi_az', False) else 'No'}
+            ]
+            
+            df_requirements = pd.DataFrame(req_data)
+            st.dataframe(df_requirements, use_container_width=True, hide_index=True)
+        
+        with col2:
+            st.markdown("**🎯 Recommended Instance Types**")
+            
+            recommended_instances = aws_analysis.get('recommended_instances', [])
+            
+            if recommended_instances:
+                instance_data = []
+                for instance in recommended_instances[:3]:  # Top 3
+                    if isinstance(instance, dict):
+                        instance_data.append({
+                            'Instance Type': instance.get('type', 'N/A'),
+                            'vCPUs': instance.get('vCPU', 'N/A'),
+                            'RAM (GB)': instance.get('RAM', 'N/A'),
+                            'Family': instance.get('family', 'N/A').title(),
+                            'Fit Score': f"{instance.get('score', 0):.2f}"
+                        })
+                
+                if instance_data:
+                    df_instances = pd.DataFrame(instance_data)
+                    st.dataframe(df_instances, use_container_width=True, hide_index=True)
+            else:
+                st.info("No specific instance recommendations available.")
+        
+        # Additional Instance Details
+        st.markdown("**⚙️ Instance Family Comparison**")
+        
+        # Static instance comparison for demo
+        comparison_data = [
+            {'Family': 'General Purpose (M6i)', 'Use Case': 'Web applications, microservices', 'CPU:Memory Ratio': '1:4', 'Best For': 'Balanced workloads'},
+            {'Family': 'Memory Optimized (R6i)', 'Use Case': 'In-memory databases, real-time analytics', 'CPU:Memory Ratio': '1:8', 'Best For': 'Memory-intensive apps'},
+            {'Family': 'Compute Optimized (C6i)', 'Use Case': 'High-performance computing, gaming', 'CPU:Memory Ratio': '1:2', 'Best For': 'CPU-intensive apps'}
+        ]
+        
+        df_comparison = pd.DataFrame(comparison_data)
+        st.dataframe(df_comparison, use_container_width=True, hide_index=True)
+        
+    except Exception as e:
+        st.error(f"Error displaying instance recommendations: {str(e)}")
+        logger.error(f"Error in render_instance_recommendations_section: {e}")
     """Render AWS analysis section."""
     
     try:
@@ -1589,65 +1840,348 @@ def generate_enhanced_reports(report_type, sections, company_name, title):
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             
             if report_type == "pdf":
-                # Generate PDF placeholder
-                st.info("📄 PDF generation would require additional setup. Use Excel export instead.")
+                # Generate PDF report
+                generate_pdf_report(results, sections, company_name, title, timestamp)
                 
             elif report_type == "excel":
                 # Generate Excel report
-                output = BytesIO()
-                
-                with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                    # Summary sheet
-                    prod_results = results['recommendations']['PROD']
-                    summary_data = {
-                        'Metric': ['Workload Name', 'Complexity Score', 'Migration Timeline', 'Monthly Cost'],
-                        'Value': [
-                            results['inputs']['workload_name'],
-                            prod_results['claude_analysis']['complexity_score'],
-                            f"{prod_results['claude_analysis']['estimated_timeline']['max_weeks']} weeks",
-                            f"${prod_results['tco_analysis']['monthly_cost']:,.2f}"
-                        ]
-                    }
-                    pd.DataFrame(summary_data).to_excel(writer, sheet_name='Summary', index=False)
-                    
-                    # Heat map data
-                    if 'heat_map_data' in results and not results['heat_map_data'].empty:
-                        results['heat_map_data'].to_excel(writer, sheet_name='Environment_HeatMap', index=False)
-                
-                output.seek(0)
-                
-                filename = f"Enhanced_AWS_Analysis_{timestamp}.xlsx"
-                
-                st.download_button(
-                    label="⬇️ Download Enhanced Excel Report",
-                    data=output.getvalue(),
-                    file_name=filename,
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    key=f"download_enhanced_excel_{timestamp}"
-                )
+                generate_excel_report(results, sections, company_name, title, timestamp)
                 
             elif report_type == "heatmap":
                 # Generate heat map CSV
-                if 'heat_map_data' in results and not results['heat_map_data'].empty:
-                    heat_map_csv = results['heat_map_data'].to_csv(index=False)
-                    
-                    filename = f"Environment_HeatMap_Analysis_{timestamp}.csv"
-                    
-                    st.download_button(
-                        label="⬇️ Download Heat Map Data",
-                        data=heat_map_csv,
-                        file_name=filename,
-                        mime="text/csv",
-                        key=f"download_heat_map_{timestamp}"
-                    )
-                else:
-                    st.warning("No heat map data available.")
-            
-            st.success(f"✅ {report_type.upper()} report generated successfully!")
+                generate_heatmap_csv(results, timestamp)
             
         except Exception as e:
             st.error(f"❌ Error generating {report_type} report: {str(e)}")
             logger.error(f"Error generating {report_type} report: {e}")
+
+def generate_pdf_report(results, sections, company_name, title, timestamp):
+    """Generate PDF report using reportlab."""
+    
+    try:
+        if not REPORTLAB_AVAILABLE:
+            st.warning("📄 ReportLab not available. Please install with: `pip install reportlab`")
+            # Generate text-based report as fallback
+            generate_text_report(results, sections, company_name, title, timestamp)
+            return
+        
+        from reportlab.lib.pagesizes import letter
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+        from reportlab.lib.styles import getSampleStyleSheet
+        from reportlab.lib.units import inch
+        from reportlab.lib import colors
+        
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.75*inch)
+        
+        # Get styles
+        styles = getSampleStyleSheet()
+        story = []
+        
+        # Title
+        story.append(Paragraph(title, styles['Title']))
+        story.append(Paragraph(company_name, styles['Normal']))
+        story.append(Paragraph(f"Generated: {datetime.now().strftime('%B %d, %Y')}", styles['Normal']))
+        story.append(Spacer(1, 0.2*inch))
+        
+        # Executive Summary
+        story.append(Paragraph("Executive Summary", styles['Heading1']))
+        prod_results = results['recommendations']['PROD']
+        
+        summary_text = f"""
+        This comprehensive analysis provides AWS migration recommendations for {results['inputs']['workload_name']}.
+        
+        Key Findings:
+        • Migration Complexity: {prod_results['claude_analysis']['complexity_level']} ({prod_results['claude_analysis']['complexity_score']:.0f}/100)
+        • Estimated Timeline: {prod_results['claude_analysis']['estimated_timeline']['max_weeks']} weeks
+        • Monthly Cost: ${prod_results['tco_analysis']['monthly_cost']:,.2f}
+        • Recommended Approach: {prod_results['claude_analysis']['migration_strategy']['approach']}
+        """
+        
+        story.append(Paragraph(summary_text, styles['Normal']))
+        story.append(Spacer(1, 0.2*inch))
+        
+        # Cost Analysis
+        if "AWS Cost & Instance Analysis" in sections:
+            story.append(Paragraph("Cost Analysis", styles['Heading1']))
+            
+            cost_breakdown = prod_results.get('cost_breakdown', {})
+            total_costs = cost_breakdown.get('total_costs', {})
+            
+            if total_costs:
+                cost_data = [['Pricing Model', 'Monthly Cost', 'Annual Cost']]
+                for model, cost in total_costs.items():
+                    cost_data.append([
+                        model.replace('_', ' ').title(),
+                        f"${cost:,.2f}",
+                        f"${cost*12:,.2f}"
+                    ])
+                
+                cost_table = Table(cost_data)
+                cost_table.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0, 0), (-1, 0), 14),
+                    ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                    ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                    ('GRID', (0, 0), (-1, -1), 1, colors.black)
+                ]))
+                
+                story.append(cost_table)
+                story.append(Spacer(1, 0.2*inch))
+        
+        # Build PDF
+        doc.build(story)
+        buffer.seek(0)
+        
+        filename = f"AWS_Migration_Report_{timestamp}.pdf"
+        
+        st.download_button(
+            label="⬇️ Download PDF Report",
+            data=buffer.getvalue(),
+            file_name=filename,
+            mime="application/pdf",
+            key=f"download_pdf_{timestamp}"
+        )
+        
+        st.success("✅ PDF report generated successfully!")
+        
+    except Exception as e:
+        st.error(f"Error generating PDF: {str(e)}")
+        # Fallback to text report
+        generate_text_report(results, sections, company_name, title, timestamp)
+
+def generate_text_report(results, sections, company_name, title, timestamp):
+    """Generate text-based report as fallback."""
+    
+    try:
+        prod_results = results['recommendations']['PROD']
+        
+        report_content = f"""
+{title}
+{company_name}
+Generated: {datetime.now().strftime('%B %d, %Y')}
+
+====================================
+EXECUTIVE SUMMARY
+====================================
+
+Workload: {results['inputs']['workload_name']}
+Migration Complexity: {prod_results['claude_analysis']['complexity_level']} ({prod_results['claude_analysis']['complexity_score']:.0f}/100)
+Estimated Timeline: {prod_results['claude_analysis']['estimated_timeline']['max_weeks']} weeks
+Monthly Cost: ${prod_results['tco_analysis']['monthly_cost']:,.2f}
+
+====================================
+COST ANALYSIS
+====================================
+
+"""
+        
+        cost_breakdown = prod_results.get('cost_breakdown', {})
+        total_costs = cost_breakdown.get('total_costs', {})
+        
+        if total_costs:
+            report_content += "Pricing Options:\n"
+            for model, cost in total_costs.items():
+                report_content += f"• {model.replace('_', ' ').title()}: ${cost:,.2f}/month (${cost*12:,.2f}/year)\n"
+        
+        report_content += f"""
+
+====================================
+MIGRATION STRATEGY
+====================================
+
+Approach: {prod_results['claude_analysis']['migration_strategy']['approach']}
+Methodology: {prod_results['claude_analysis']['migration_strategy']['methodology']}
+Risk Level: {prod_results['claude_analysis']['migration_strategy']['risk_level']}
+
+====================================
+INSTANCE RECOMMENDATIONS
+====================================
+
+Required Resources:
+• vCPUs: {prod_results['requirements']['vCPUs']}
+• RAM: {prod_results['requirements']['RAM_GB']} GB
+• Storage: {prod_results['requirements']['storage_GB']} GB
+
+"""
+        
+        filename = f"AWS_Migration_Report_{timestamp}.txt"
+        
+        st.download_button(
+            label="⬇️ Download Text Report",
+            data=report_content,
+            file_name=filename,
+            mime="text/plain",
+            key=f"download_text_{timestamp}"
+        )
+        
+        st.success("✅ Text report generated successfully!")
+        
+    except Exception as e:
+        st.error(f"Error generating text report: {str(e)}")
+
+def generate_excel_report(results, sections, company_name, title, timestamp):
+    """Generate Excel report with fallback if openpyxl not available."""
+    
+    try:
+        # Try to import pandas with excel support
+        try:
+            import openpyxl
+            excel_available = True
+        except ImportError:
+            excel_available = False
+        
+        if not excel_available:
+            st.warning("📊 openpyxl not available. Please install with: `pip install openpyxl`")
+            # Generate CSV as fallback
+            generate_csv_report(results, sections, company_name, title, timestamp)
+            return
+        
+        # Generate Excel file
+        output = BytesIO()
+        
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            # Summary sheet
+            prod_results = results['recommendations']['PROD']
+            
+            summary_data = {
+                'Metric': [
+                    'Workload Name',
+                    'Complexity Score',
+                    'Complexity Level', 
+                    'Migration Timeline (weeks)',
+                    'Monthly Cost ($)',
+                    'Best Pricing Option'
+                ],
+                'Value': [
+                    results['inputs']['workload_name'],
+                    prod_results['claude_analysis']['complexity_score'],
+                    prod_results['claude_analysis']['complexity_level'],
+                    prod_results['claude_analysis']['estimated_timeline']['max_weeks'],
+                    prod_results['tco_analysis']['monthly_cost'],
+                    prod_results['tco_analysis']['best_pricing_option']
+                ]
+            }
+            
+            pd.DataFrame(summary_data).to_excel(writer, sheet_name='Summary', index=False)
+            
+            # Cost breakdown sheet
+            cost_breakdown = prod_results.get('cost_breakdown', {})
+            total_costs = cost_breakdown.get('total_costs', {})
+            
+            if total_costs:
+                cost_data = []
+                for model, cost in total_costs.items():
+                    cost_data.append({
+                        'Pricing Model': model.replace('_', ' ').title(),
+                        'Monthly Cost': cost,
+                        'Annual Cost': cost * 12
+                    })
+                
+                pd.DataFrame(cost_data).to_excel(writer, sheet_name='Cost_Analysis', index=False)
+            
+            # Requirements sheet
+            requirements = prod_results.get('requirements', {})
+            if requirements:
+                req_data = []
+                for key, value in requirements.items():
+                    req_data.append({'Specification': key, 'Value': value})
+                
+                pd.DataFrame(req_data).to_excel(writer, sheet_name='Requirements', index=False)
+            
+            # Heat map data
+            if 'heat_map_data' in results and not results['heat_map_data'].empty:
+                results['heat_map_data'].to_excel(writer, sheet_name='Environment_HeatMap', index=False)
+        
+        output.seek(0)
+        
+        filename = f"AWS_Migration_Analysis_{timestamp}.xlsx"
+        
+        st.download_button(
+            label="⬇️ Download Excel Report",
+            data=output.getvalue(),
+            file_name=filename,
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key=f"download_excel_{timestamp}"
+        )
+        
+        st.success("✅ Excel report generated successfully!")
+        
+    except Exception as e:
+        st.error(f"Error generating Excel report: {str(e)}")
+        # Fallback to CSV
+        generate_csv_report(results, sections, company_name, title, timestamp)
+
+def generate_csv_report(results, sections, company_name, title, timestamp):
+    """Generate CSV report as fallback."""
+    
+    try:
+        prod_results = results['recommendations']['PROD']
+        
+        # Create summary data
+        summary_data = {
+            'Metric': [
+                'Workload Name',
+                'Complexity Score',
+                'Complexity Level', 
+                'Migration Timeline (weeks)',
+                'Monthly Cost ($)',
+                'Best Pricing Option'
+            ],
+            'Value': [
+                results['inputs']['workload_name'],
+                prod_results['claude_analysis']['complexity_score'],
+                prod_results['claude_analysis']['complexity_level'],
+                prod_results['claude_analysis']['estimated_timeline']['max_weeks'],
+                prod_results['tco_analysis']['monthly_cost'],
+                prod_results['tco_analysis']['best_pricing_option']
+            ]
+        }
+        
+        df_summary = pd.DataFrame(summary_data)
+        csv_content = df_summary.to_csv(index=False)
+        
+        filename = f"AWS_Migration_Summary_{timestamp}.csv"
+        
+        st.download_button(
+            label="⬇️ Download CSV Report",
+            data=csv_content,
+            file_name=filename,
+            mime="text/csv",
+            key=f"download_csv_{timestamp}"
+        )
+        
+        st.success("✅ CSV report generated successfully!")
+        
+    except Exception as e:
+        st.error(f"Error generating CSV report: {str(e)}")
+
+def generate_heatmap_csv(results, timestamp):
+    """Generate heat map CSV report."""
+    
+    try:
+        if 'heat_map_data' in results and not results['heat_map_data'].empty:
+            heat_map_csv = results['heat_map_data'].to_csv(index=False)
+            
+            filename = f"Environment_HeatMap_{timestamp}.csv"
+            
+            st.download_button(
+                label="⬇️ Download Heat Map Data",
+                data=heat_map_csv,
+                file_name=filename,
+                mime="text/csv",
+                key=f"download_heatmap_{timestamp}"
+            )
+            
+            st.success("✅ Heat map data exported successfully!")
+        else:
+            st.warning("No heat map data available to export.")
+            
+    except Exception as e:
+        st.error(f"Error generating heat map CSV: {str(e)}")
 
 def initialize_enhanced_session_state():
     """Initialize enhanced session state with proper error handling."""
