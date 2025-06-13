@@ -1632,65 +1632,595 @@ class EnhancedPDFReportGenerator:
             textColor=colors.HexColor('#2d3748'),
         ))
     
-    def generate_comprehensive_report(self, all_results):
+    def generate_comprehensive_report(self, all_results, selected_sections, company_name, report_title, include_charts=True, include_raw_data=False):
         """Generate comprehensive PDF report with enterprise features."""
         buffer = io.BytesIO()
-        doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=1*inch)
+        doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=1*inch, leftMargin=0.75*inch, rightMargin=0.75*inch)
         story = []
         
-        # Title page
-        story.append(Paragraph("Enterprise AWS Migration Analysis Report", self.styles['CustomTitle']))
-        story.append(Paragraph(f"Generated: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}", self.styles['Normal']))
-        story.append(Spacer(1, 0.5 * inch))
-        
-        # Executive Summary
-        if isinstance(all_results, dict):
+        # Handle both single and bulk results
+        if isinstance(all_results, dict) and 'recommendations' in all_results:
             results_list = [all_results]
-        else:
+        elif isinstance(all_results, list):
             results_list = all_results
+        else:
+            results_list = [all_results] if all_results else []
         
-        if results_list:
-            story.append(Paragraph("Executive Summary", self.styles['SectionHeader']))
+        if not results_list:
+            story.append(Paragraph("No analysis data available", self.styles['Normal']))
+            doc.build(story)
+            buffer.seek(0)
+            return buffer.getvalue()
+        
+        # Title page
+        story.append(Paragraph(report_title, self.styles['CustomTitle']))
+        story.append(Spacer(1, 0.2 * inch))
+        story.append(Paragraph(company_name, ParagraphStyle(
+            name='CompanyStyle', parent=self.styles['Normal'], fontSize=18, alignment=TA_CENTER, textColor=colors.HexColor('#2d3748')
+        )))
+        story.append(Spacer(1, 0.2 * inch))
+        story.append(Paragraph(f"Generated: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}", 
+                              ParagraphStyle(name='DateStyle', parent=self.styles['Normal'], fontSize=12, alignment=TA_CENTER)))
+        story.append(Spacer(1, 0.3 * inch))
+        
+        # Add enterprise branding box
+        story.append(Paragraph("Enterprise Cloud Migration Analysis", ParagraphStyle(
+            name='BrandingStyle', parent=self.styles['Normal'], fontSize=14, alignment=TA_CENTER,
+            borderWidth=1, borderColor=colors.HexColor('#667eea'), borderPadding=10,
+            backColor=colors.HexColor('#f8fafc')
+        )))
+        story.append(PageBreak())
+        
+        # Table of Contents
+        story.append(Paragraph("Table of Contents", self.styles['SectionHeader']))
+        toc_data = []
+        page_num = 3
+        for section in selected_sections:
+            toc_data.append([section, f"Page {page_num}"])
+            page_num += 2
+        
+        if toc_data:
+            toc_table = Table(toc_data, colWidths=[4*inch, 1*inch])
+            toc_table.setStyle(TableStyle([
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 0), (-1, -1), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+            ]))
+            story.append(toc_table)
+        story.append(PageBreak())
+        
+        # Generate selected sections
+        for section in selected_sections:
+            if section == "Executive Summary":
+                story.extend(self._generate_executive_summary(results_list))
+            elif section == "Detailed Cost Analysis":
+                story.extend(self._generate_cost_analysis(results_list))
+            elif section == "Technical Specifications":
+                story.extend(self._generate_technical_specs(results_list))
+            elif section == "Migration Decision Analysis":
+                story.extend(self._generate_migration_decision_section(results_list))
+            elif section == "Risk Assessment":
+                story.extend(self._generate_risk_assessment(results_list))
+            elif section == "Migration Plan":
+                story.extend(self._generate_migration_plan(results_list))
+            elif section == "Portfolio Overview":
+                story.extend(self._generate_portfolio_overview(results_list))
             
-            total_workloads = len(results_list)
-            total_monthly_cost = sum(
-                result['recommendations']['PROD']['cost_breakdown']['total_costs'].get('on_demand', 0) 
-                for result in results_list
-            )
-            
-            # TCO Analysis
-            total_migration_cost = sum(
-                result['recommendations']['PROD']['tco_analysis'].get('migration_cost', 0)
-                for result in results_list
-            )
-            
-            total_annual_savings = sum(
-                result['recommendations']['PROD']['tco_analysis'].get('monthly_savings', 0) * 12
-                for result in results_list
-            )
-            
-            summary_text = f"""
-            This comprehensive analysis covers {total_workloads} enterprise workload(s) for AWS cloud migration.
-            
-            <b>Financial Summary:</b>
-            • Total Monthly Cost (On-Demand): ${total_monthly_cost:,.2f}
-            • Annual Cost Projection: ${total_monthly_cost * 12:,.2f}
-            • Estimated Migration Cost: ${total_migration_cost:,.2f}
-            • Potential Annual Savings: ${total_annual_savings:,.2f}
-            
-            <b>Key Recommendations:</b>
-            • Consider Reserved Instances or Savings Plans for significant cost optimization
-            • Implement comprehensive monitoring and auto-scaling strategies
-            • Evaluate Graviton processors for compatible workloads
-            • Plan migration in phases to minimize business disruption
-            """
-            
-            story.append(Paragraph(summary_text, self.styles['Normal']))
             story.append(PageBreak())
         
+        # Build PDF
         doc.build(story)
         buffer.seek(0)
         return buffer.getvalue()
+    
+    def _generate_executive_summary(self, results_list):
+        """Generate executive summary section."""
+        story = []
+        story.append(Paragraph("Executive Summary", self.styles['SectionHeader']))
+        
+        # Calculate key metrics
+        total_workloads = len(results_list)
+        total_monthly_cost = sum(
+            result.get('recommendations', {}).get('PROD', {}).get('cost_breakdown', {}).get('total_costs', {}).get('on_demand', 0) 
+            for result in results_list
+        )
+        
+        total_migration_cost = sum(
+            result.get('recommendations', {}).get('PROD', {}).get('tco_analysis', {}).get('migration_cost', 0)
+            for result in results_list
+        )
+        
+        total_monthly_savings = sum(
+            result.get('recommendations', {}).get('PROD', {}).get('tco_analysis', {}).get('monthly_savings', 0)
+            for result in results_list
+        )
+        
+        # Executive summary content
+        summary_text = f"""
+        <b>Analysis Overview:</b><br/>
+        This comprehensive enterprise analysis covers {total_workloads} critical workload(s) for AWS cloud migration, 
+        providing detailed cost analysis, risk assessment, and strategic recommendations.
+        
+        <br/><br/><b>Financial Highlights:</b><br/>
+        • Current Monthly Cost (On-Demand): <b>${total_monthly_cost:,.2f}</b><br/>
+        • Annual Cost Projection: <b>${total_monthly_cost * 12:,.2f}</b><br/>
+        • Estimated One-time Migration Cost: <b>${total_migration_cost:,.2f}</b><br/>
+        • Potential Monthly Savings: <b>${total_monthly_savings:,.2f}</b><br/>
+        • Annual Savings Opportunity: <b>${total_monthly_savings * 12:,.2f}</b><br/>
+        • 3-Year Total Savings: <b>${total_monthly_savings * 36:,.2f}</b>
+        
+        <br/><br/><b>Strategic Recommendations:</b><br/>
+        • Implement Reserved Instances or Savings Plans for up to 50% cost reduction<br/>
+        • Consider AWS Graviton processors for compatible workloads (15-20% better price-performance)<br/>
+        • Deploy multi-AZ architecture for high availability and disaster recovery<br/>
+        • Implement auto-scaling to optimize costs during variable demand periods<br/>
+        • Plan phased migration approach to minimize business disruption and risk
+        
+        <br/><br/><b>Migration Decision:</b><br/>
+        """
+        
+        # Add migration decision if available
+        if results_list and 'migration_decision' in results_list[0]:
+            decision = results_list[0]['migration_decision']
+            recommendation = decision.get('recommendation', 'NEUTRAL')
+            overall_score = decision.get('overall_score', 0)
+            
+            if recommendation == "STRONG_MIGRATE":
+                summary_text += f"<b>STRONG RECOMMENDATION to migrate to AWS</b> (Score: {overall_score:.0f}/100)<br/>"
+                summary_text += "Analysis shows significant financial, technical, and strategic benefits from cloud migration."
+            elif recommendation == "MODERATE_MIGRATE":
+                summary_text += f"<b>MODERATE RECOMMENDATION for AWS migration</b> (Score: {overall_score:.0f}/100)<br/>"
+                summary_text += "Cloud migration offers good benefits with manageable risks and considerations."
+            elif recommendation == "NEUTRAL":
+                summary_text += f"<b>NEUTRAL DECISION</b> (Score: {overall_score:.0f}/100)<br/>"
+                summary_text += "Migration benefits depend on specific business priorities and risk tolerance."
+            else:
+                summary_text += f"<b>RECOMMENDATION to stay on-premises</b> (Score: {overall_score:.0f}/100)<br/>"
+                summary_text += "Current analysis suggests optimizing existing infrastructure may be more beneficial."
+        else:
+            summary_text += "Based on cost analysis, cloud migration shows potential for significant operational and financial benefits."
+        
+        story.append(Paragraph(summary_text, self.styles['Normal']))
+        story.append(Spacer(1, 0.3 * inch))
+        
+        return story
+    
+    def _generate_cost_analysis(self, results_list):
+        """Generate detailed cost analysis section."""
+        story = []
+        story.append(Paragraph("Detailed Cost Analysis", self.styles['SectionHeader']))
+        
+        # Cost breakdown table for each workload
+        for i, result in enumerate(results_list):
+            workload_name = result.get('inputs', {}).get('workload_name', f'Workload {i+1}')
+            story.append(Paragraph(f"Workload: {workload_name}", 
+                                 ParagraphStyle(name='WorkloadHeader', parent=self.styles['Heading3'])))
+            
+            prod_results = result.get('recommendations', {}).get('PROD', {})
+            cost_breakdown = prod_results.get('cost_breakdown', {})
+            total_costs = cost_breakdown.get('total_costs', {})
+            
+            # Pricing comparison table
+            pricing_data = [['Pricing Model', 'Monthly Cost', 'Annual Cost', 'Savings vs On-Demand']]
+            on_demand_cost = total_costs.get('on_demand', 0)
+            
+            for pricing_model, monthly_cost in total_costs.items():
+                annual_cost = monthly_cost * 12
+                savings = ((on_demand_cost - monthly_cost) / on_demand_cost * 100) if on_demand_cost > 0 else 0
+                
+                pricing_data.append([
+                    pricing_model.replace('_', ' ').title(),
+                    f"${monthly_cost:,.2f}",
+                    f"${annual_cost:,.2f}",
+                    f"{savings:.1f}%"
+                ])
+            
+            pricing_table = Table(pricing_data, colWidths=[2*inch, 1.2*inch, 1.2*inch, 1.2*inch])
+            pricing_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#667eea')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 0), (-1, -1), 9),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black)
+            ]))
+            story.append(pricing_table)
+            story.append(Spacer(1, 0.2 * inch))
+            
+            # Cost breakdown by category
+            story.append(Paragraph("Cost Breakdown by Category", 
+                                 ParagraphStyle(name='SubHeader', parent=self.styles['Heading4'])))
+            
+            category_data = [['Category', 'Service', 'Monthly Cost']]
+            for category, costs in cost_breakdown.items():
+                if category != 'total_costs' and isinstance(costs, dict):
+                    for service, amount in costs.items():
+                        category_data.append([
+                            category.replace('_', ' ').title(),
+                            service.replace('_', ' ').title(),
+                            f"${amount:,.2f}"
+                        ])
+            
+            if len(category_data) > 1:
+                category_table = Table(category_data, colWidths=[2*inch, 2*inch, 1.5*inch])
+                category_table.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#e2e8f0')),
+                    ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                    ('FONTSIZE', (0, 0), (-1, -1), 9),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+                    ('GRID', (0, 0), (-1, -1), 1, colors.black)
+                ]))
+                story.append(category_table)
+            
+            story.append(Spacer(1, 0.3 * inch))
+        
+        return story
+    
+    def _generate_technical_specs(self, results_list):
+        """Generate technical specifications section."""
+        story = []
+        story.append(Paragraph("Technical Specifications", self.styles['SectionHeader']))
+        
+        for i, result in enumerate(results_list):
+            workload_name = result.get('inputs', {}).get('workload_name', f'Workload {i+1}')
+            story.append(Paragraph(f"Workload: {workload_name}", 
+                                 ParagraphStyle(name='WorkloadHeader', parent=self.styles['Heading3'])))
+            
+            # Current vs Recommended specs
+            inputs = result.get('inputs', {})
+            prod_results = result.get('recommendations', {}).get('PROD', {})
+            requirements = prod_results.get('requirements', {})
+            
+            specs_data = [
+                ['Specification', 'Current', 'Recommended AWS'],
+                ['CPU Cores/vCPUs', str(inputs.get('on_prem_cores', 'N/A')), str(requirements.get('vCPUs', 'N/A'))],
+                ['RAM (GB)', str(inputs.get('on_prem_ram_gb', 'N/A')), str(requirements.get('RAM_GB', 'N/A'))],
+                ['Storage (GB)', str(inputs.get('storage_current_gb', 'N/A')), str(requirements.get('storage_GB', 'N/A'))],
+                ['Peak IOPS', str(inputs.get('peak_iops', 'N/A')), str(requirements.get('iops_required', 'N/A'))],
+                ['Throughput', f"{inputs.get('peak_throughput_mbps', 'N/A')} MB/s", requirements.get('throughput_required', 'N/A')],
+                ['Availability Zones', '1 (Single datacenter)', str(requirements.get('availability_zones', 1))]
+            ]
+            
+            specs_table = Table(specs_data, colWidths=[2.5*inch, 1.5*inch, 1.5*inch])
+            specs_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#667eea')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 0), (-1, -1), 9),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black)
+            ]))
+            story.append(specs_table)
+            story.append(Spacer(1, 0.2 * inch))
+            
+            # Recommended instance options
+            instance_options = prod_results.get('instance_options', {})
+            if instance_options:
+                story.append(Paragraph("Recommended Instance Options", 
+                                     ParagraphStyle(name='SubHeader', parent=self.styles['Heading4'])))
+                
+                instance_data = [['Scenario', 'Instance Type', 'vCPUs', 'RAM (GB)', 'Processor', 'Family']]
+                for scenario, instance in instance_options.items():
+                    instance_data.append([
+                        scenario.replace('_', ' ').title(),
+                        instance.get('type', 'N/A'),
+                        str(instance.get('vCPU', 'N/A')),
+                        str(instance.get('RAM', 'N/A')),
+                        instance.get('processor', 'N/A'),
+                        instance.get('family', 'N/A').title()
+                    ])
+                
+                instance_table = Table(instance_data, colWidths=[1.3*inch, 1.3*inch, 0.8*inch, 0.8*inch, 1*inch, 1*inch])
+                instance_table.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#e2e8f0')),
+                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                    ('FONTSIZE', (0, 0), (-1, -1), 8),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+                    ('GRID', (0, 0), (-1, -1), 1, colors.black)
+                ]))
+                story.append(instance_table)
+            
+            story.append(Spacer(1, 0.3 * inch))
+        
+        return story
+    
+    def _generate_migration_decision_section(self, results_list):
+        """Generate migration decision analysis section."""
+        story = []
+        story.append(Paragraph("Migration Decision Analysis", self.styles['SectionHeader']))
+        
+        # Only show if migration decision data is available
+        if not results_list or 'migration_decision' not in results_list[0]:
+            story.append(Paragraph("Migration decision analysis not available for this workload.", self.styles['Normal']))
+            return story
+        
+        decision = results_list[0]['migration_decision']
+        recommendation = decision.get('recommendation', 'NEUTRAL')
+        overall_score = decision.get('overall_score', 0)
+        confidence = decision.get('confidence', 'Medium')
+        
+        # Decision summary
+        decision_text = f"""
+        <b>Overall Recommendation:</b> {decision.get('recommendation_text', 'Analysis Complete')}<br/>
+        <b>Decision Score:</b> {overall_score:.1f}/100<br/>
+        <b>Confidence Level:</b> {confidence}<br/>
+        """
+        
+        if recommendation == "STRONG_MIGRATE":
+            decision_text += "<br/><b>Recommendation:</b> Strong financial, technical, and strategic case for cloud migration. Proceed with detailed migration planning."
+        elif recommendation == "MODERATE_MIGRATE":
+            decision_text += "<br/><b>Recommendation:</b> Good benefits from cloud migration. Consider pilot program to validate assumptions."
+        elif recommendation == "NEUTRAL":
+            decision_text += "<br/><b>Recommendation:</b> Migration benefits depend on specific priorities. Evaluate based on most critical business factors."
+        else:
+            decision_text += "<br/><b>Recommendation:</b> Current analysis suggests optimizing existing infrastructure may be more cost-effective."
+        
+        story.append(Paragraph(decision_text, self.styles['Normal']))
+        story.append(Spacer(1, 0.2 * inch))
+        
+        # Decision factors breakdown
+        category_scores = decision.get('category_scores', {})
+        if category_scores:
+            story.append(Paragraph("Decision Factor Scores", 
+                                 ParagraphStyle(name='SubHeader', parent=self.styles['Heading4'])))
+            
+            factor_data = [['Category', 'Score', 'Weight', 'Impact']]
+            weights = {'financial': '35%', 'technical': '25%', 'operational': '20%', 'strategic': '20%'}
+            
+            for category, score in category_scores.items():
+                impact = 'Positive' if score >= 60 else 'Neutral' if score >= 40 else 'Negative'
+                factor_data.append([
+                    category.title(),
+                    f"{score:.1f}/100",
+                    weights.get(category, 'N/A'),
+                    impact
+                ])
+            
+            factor_table = Table(factor_data, colWidths=[1.5*inch, 1*inch, 1*inch, 1*inch])
+            factor_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#667eea')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 0), (-1, -1), 9),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black)
+            ]))
+            story.append(factor_table)
+            story.append(Spacer(1, 0.2 * inch))
+        
+        # Key factors
+        key_factors = decision.get('key_factors', {})
+        if key_factors:
+            top_drivers = key_factors.get('top_drivers', [])
+            top_concerns = key_factors.get('top_concerns', [])
+            
+            story.append(Paragraph("Key Decision Drivers", 
+                                 ParagraphStyle(name='SubHeader', parent=self.styles['Heading4'])))
+            
+            if top_drivers:
+                story.append(Paragraph("<b>Top Drivers (Pro-Cloud):</b>", self.styles['Normal']))
+                for category, factor, score in reversed(top_drivers):
+                    factor_name = factor.replace('_', ' ').title()
+                    story.append(Paragraph(f"• {category}: {factor_name} ({score:.0f}/100)", self.styles['Normal']))
+                story.append(Spacer(1, 0.1 * inch))
+            
+            if top_concerns:
+                story.append(Paragraph("<b>Key Concerns:</b>", self.styles['Normal']))
+                for category, factor, score in top_concerns:
+                    factor_name = factor.replace('_', ' ').title()
+                    story.append(Paragraph(f"• {category}: {factor_name} ({score:.0f}/100)", self.styles['Normal']))
+        
+        return story
+    
+    def _generate_risk_assessment(self, results_list):
+        """Generate risk assessment section."""
+        story = []
+        story.append(Paragraph("Risk Assessment", self.styles['SectionHeader']))
+        
+        for i, result in enumerate(results_list):
+            workload_name = result.get('inputs', {}).get('workload_name', f'Workload {i+1}')
+            story.append(Paragraph(f"Workload: {workload_name}", 
+                                 ParagraphStyle(name='WorkloadHeader', parent=self.styles['Heading3'])))
+            
+            prod_results = result.get('recommendations', {}).get('PROD', {})
+            risk_assessment = prod_results.get('risk_assessment', {})
+            
+            overall_risk = risk_assessment.get('overall_risk', 'Medium')
+            risk_factors = risk_assessment.get('risk_factors', [])
+            mitigation_strategies = risk_assessment.get('mitigation_strategies', [])
+            
+            story.append(Paragraph(f"<b>Overall Risk Level:</b> {overall_risk}", self.styles['Normal']))
+            story.append(Spacer(1, 0.1 * inch))
+            
+            if risk_factors:
+                story.append(Paragraph("<b>Identified Risk Factors:</b>", self.styles['Normal']))
+                for factor in risk_factors:
+                    story.append(Paragraph(f"• {factor}", self.styles['Normal']))
+                story.append(Spacer(1, 0.1 * inch))
+            
+            if mitigation_strategies:
+                story.append(Paragraph("<b>Mitigation Strategies:</b>", self.styles['Normal']))
+                for strategy in mitigation_strategies:
+                    story.append(Paragraph(f"• {strategy}", self.styles['Normal']))
+            
+            story.append(Spacer(1, 0.2 * inch))
+        
+        return story
+    
+    def _generate_migration_plan(self, results_list):
+        """Generate migration plan section."""
+        story = []
+        story.append(Paragraph("Migration Plan", self.styles['SectionHeader']))
+        
+        # Migration phases
+        phases = [
+            {
+                "name": "Assessment & Planning",
+                "duration": "2-4 weeks",
+                "description": "Infrastructure discovery, dependency mapping, and detailed migration planning",
+                "tasks": [
+                    "Complete infrastructure inventory and application dependency mapping",
+                    "Set up AWS accounts, VPCs, and basic networking infrastructure", 
+                    "Create detailed migration runbooks and rollback procedures",
+                    "Establish monitoring, logging, and security baselines"
+                ]
+            },
+            {
+                "name": "Pilot Migration",
+                "duration": "2-3 weeks",
+                "description": "Migrate non-critical workloads to validate approach and tooling",
+                "tasks": [
+                    "Migrate development/staging environment as proof of concept",
+                    "Test backup, restore, and disaster recovery procedures",
+                    "Validate performance, security, and compliance requirements",
+                    "Train operations team on AWS tools and processes"
+                ]
+            },
+            {
+                "name": "Production Migration",
+                "duration": "4-8 weeks",
+                "description": "Migrate production workloads with minimal downtime",
+                "tasks": [
+                    "Execute production migration during planned maintenance windows",
+                    "Implement real-time monitoring and alerting systems",
+                    "Validate all application functionality and integrations",
+                    "Optimize instance sizes and implement auto-scaling policies"
+                ]
+            },
+            {
+                "name": "Optimization & Closure",
+                "duration": "2-4 weeks",
+                "description": "Post-migration optimization and cost management",
+                "tasks": [
+                    "Right-size instances based on actual usage patterns",
+                    "Implement Reserved Instances or Savings Plans for cost optimization",
+                    "Final security audit and compliance validation",
+                    "Knowledge transfer and documentation completion"
+                ]
+            }
+        ]
+        
+        for i, phase in enumerate(phases):
+            story.append(Paragraph(f"Phase {i+1}: {phase['name']} ({phase['duration']})", 
+                                 ParagraphStyle(name='PhaseHeader', parent=self.styles['Heading4'])))
+            story.append(Paragraph(phase['description'], self.styles['Normal']))
+            story.append(Paragraph("<b>Key Tasks:</b>", self.styles['Normal']))
+            
+            for task in phase['tasks']:
+                story.append(Paragraph(f"• {task}", self.styles['Normal']))
+            
+            story.append(Spacer(1, 0.2 * inch))
+        
+        # Timeline and cost considerations
+        story.append(Paragraph("Timeline and Cost Considerations", 
+                             ParagraphStyle(name='SubHeader', parent=self.styles['Heading4'])))
+        
+        timeline_text = """
+        <b>Total Estimated Timeline:</b> 10-19 weeks (2.5-4.5 months)<br/>
+        <b>Resource Requirements:</b> 2-3 full-time engineers, 1 project manager, 1 AWS solutions architect<br/>
+        <b>Critical Success Factors:</b><br/>
+        • Executive sponsorship and change management support<br/>
+        • Comprehensive testing and validation at each phase<br/>
+        • Clear communication plan for all stakeholders<br/>
+        • Robust rollback procedures for each migration phase
+        """
+        
+        story.append(Paragraph(timeline_text, self.styles['Normal']))
+        
+        return story
+    
+    def _generate_portfolio_overview(self, results_list):
+        """Generate portfolio overview for multiple workloads."""
+        story = []
+        story.append(Paragraph("Portfolio Overview", self.styles['SectionHeader']))
+        
+        if len(results_list) == 1:
+            story.append(Paragraph("This analysis covers a single workload. For portfolio analysis, analyze multiple workloads.", self.styles['Normal']))
+            return story
+        
+        # Portfolio summary table
+        portfolio_data = [['Workload', 'Type', 'Monthly Cost', 'Annual Savings', 'Risk Level']]
+        
+        total_cost = 0
+        total_savings = 0
+        
+        for result in results_list:
+            workload_name = result.get('inputs', {}).get('workload_name', 'Unknown')
+            workload_type = result.get('inputs', {}).get('workload_type', 'unknown')
+            
+            prod_results = result.get('recommendations', {}).get('PROD', {})
+            monthly_cost = prod_results.get('cost_breakdown', {}).get('total_costs', {}).get('on_demand', 0)
+            monthly_savings = prod_results.get('tco_analysis', {}).get('monthly_savings', 0)
+            risk_level = prod_results.get('risk_assessment', {}).get('overall_risk', 'Medium')
+            
+            total_cost += monthly_cost
+            total_savings += monthly_savings
+            
+            portfolio_data.append([
+                workload_name,
+                workload_type.replace('_', ' ').title(),
+                f"${monthly_cost:,.2f}",
+                f"${monthly_savings * 12:,.2f}",
+                risk_level
+            ])
+        
+        # Add totals row
+        portfolio_data.append([
+            'TOTAL',
+            '',
+            f"${total_cost:,.2f}",
+            f"${total_savings * 12:,.2f}",
+            ''
+        ])
+        
+        portfolio_table = Table(portfolio_data, colWidths=[2*inch, 1.5*inch, 1*inch, 1*inch, 1*inch])
+        portfolio_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#667eea')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#e2e8f0')),
+            ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTNAME', (0, 1), (-1, -2), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ]))
+        story.append(portfolio_table)
+        story.append(Spacer(1, 0.3 * inch))
+        
+        # Portfolio insights
+        story.append(Paragraph("Portfolio Insights", 
+                             ParagraphStyle(name='SubHeader', parent=self.styles['Heading4'])))
+        
+        insights_text = f"""
+        <b>Total Portfolio Value:</b><br/>
+        • Combined monthly cost: ${total_cost:,.2f}<br/>
+        • Annual cost: ${total_cost * 12:,.2f}<br/>
+        • Total annual savings opportunity: ${total_savings * 12:,.2f}<br/>
+        • 3-year savings potential: ${total_savings * 36:,.2f}<br/>
+        
+        <br/><b>Recommendations:</b><br/>
+        • Prioritize high-savings, low-risk workloads for initial migration<br/>
+        • Implement enterprise-wide Reserved Instance strategy<br/>
+        • Consider centralized cloud center of excellence<br/>
+        • Plan phased approach based on workload dependencies
+        """
+        
+        story.append(Paragraph(insights_text, self.styles['Normal']))
+        
+        return story
 
 def render_enhanced_workload_configuration():
     """Render enhanced workload configuration with enterprise features."""
