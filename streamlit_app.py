@@ -1724,6 +1724,17 @@ def render_enhanced_workload_configuration():
     calculator = st.session_state.calculator
     st.markdown('<div class="section-header"><h3>🏗️ Enterprise Workload Configuration</h3></div>', unsafe_allow_html=True)
     
+    # Configuration mode selection
+    config_mode = st.radio(
+        "Configuration Mode:",
+        ["🎯 Single Workload Analysis", "📦 Bulk Workload Analysis"],
+        horizontal=True,
+        key="config_mode"
+    )
+    
+    if config_mode == "📦 Bulk Workload Analysis":
+        render_bulk_workload_configuration()
+        return
     # Basic Configuration
     with st.expander("📋 Basic Workload Information", expanded=True):
         col1, col2 = st.columns(2)
@@ -2201,6 +2212,550 @@ def render_migration_decision_inputs():
                 index=["poor", "medium", "excellent"].index(calculator.inputs.get("monitoring_quality", "medium")),
                 help="Quality of current infrastructure monitoring and alerting"
             )
+            
+def render_bulk_workload_configuration():
+    """Render bulk workload configuration interface."""
+    st.markdown('<div class="section-header"><h3>📦 Bulk Workload Configuration</h3></div>', unsafe_allow_html=True)
+    
+    # Initialize bulk workloads in session state
+    if 'bulk_workloads' not in st.session_state:
+        st.session_state.bulk_workloads = []
+    
+    # Bulk input options
+    bulk_method = st.radio(
+        "Choose bulk input method:",
+        ["📄 Upload CSV File", "✏️ Manual Entry", "📝 Review & Edit Current List"],
+        horizontal=True
+    )
+    
+    if bulk_method == "📄 Upload CSV File":
+        render_csv_upload_interface()
+    elif bulk_method == "✏️ Manual Entry":
+        render_manual_bulk_entry()
+    else:
+        render_bulk_workload_review()
+    
+    # Bulk analysis controls
+    if st.session_state.bulk_workloads:
+        st.markdown("---")
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            if st.button("🚀 Analyze All Workloads", type="primary", key="bulk_analyze"):
+                execute_bulk_analysis()
+        
+        with col2:
+            if st.button("🎯 Analyze with Migration Decisions", type="secondary", key="bulk_analyze_decision"):
+                execute_bulk_analysis(include_migration_decision=True)
+        
+        with col3:
+            if st.button("🗑️ Clear All Workloads", key="clear_bulk"):
+                st.session_state.bulk_workloads = []
+                st.session_state.bulk_results = []
+                st.rerun()
+
+def render_csv_upload_interface():
+    """Render CSV upload interface for bulk workloads."""
+    st.markdown("#### 📄 Upload Workload Configuration CSV")
+    
+    # Show CSV template
+    with st.expander("📋 Download CSV Template & Instructions", expanded=False):
+        st.markdown("""
+        **Required CSV Columns:**
+        - `workload_name`: Name of the workload
+        - `workload_type`: Type (web_application, application_server, database_server, file_server, compute_intensive, analytics_workload)
+        - `operating_system`: OS (linux, windows)
+        - `region`: AWS region (us-east-1, us-west-2, etc.)
+        - `on_prem_cores`: Number of CPU cores
+        - `peak_cpu_percent`: Peak CPU utilization %
+        - `avg_cpu_percent`: Average CPU utilization %
+        - `on_prem_ram_gb`: RAM in GB
+        - `peak_ram_percent`: Peak RAM utilization %
+        - `avg_ram_percent`: Average RAM utilization %
+        - `storage_current_gb`: Current storage in GB
+        - `peak_iops`: Peak IOPS
+        - `peak_throughput_mbps`: Peak throughput in MB/s
+        
+        **Optional Columns:**
+        - `storage_growth_rate`: Annual growth rate (0.15 = 15%)
+        - `pricing_model`: Preferred pricing model
+        - `multi_az`: Multi-AZ deployment (true/false)
+        - `compliance_requirements`: Comma-separated list
+        """)
+        
+        # Generate sample CSV
+        sample_data = {
+            'workload_name': ['Web Frontend', 'API Server', 'Database Server'],
+            'workload_type': ['web_application', 'application_server', 'database_server'],
+            'operating_system': ['linux', 'linux', 'linux'],
+            'region': ['us-east-1', 'us-east-1', 'us-east-1'],
+            'on_prem_cores': [4, 8, 16],
+            'peak_cpu_percent': [70, 85, 60],
+            'avg_cpu_percent': [45, 55, 40],
+            'on_prem_ram_gb': [16, 32, 128],
+            'peak_ram_percent': [80, 75, 85],
+            'avg_ram_percent': [55, 50, 60],
+            'storage_current_gb': [200, 500, 2000],
+            'peak_iops': [2000, 5000, 15000],
+            'peak_throughput_mbps': [100, 250, 800],
+            'storage_growth_rate': [0.15, 0.20, 0.25],
+            'pricing_model': ['ri_1y', 'savings_plan_compute_1y', 'ri_3y'],
+            'multi_az': [True, True, True],
+            'compliance_requirements': ['SOC2', 'SOC2', 'SOC2,PCI-DSS']
+        }
+        
+        sample_df = pd.DataFrame(sample_data)
+        csv_template = sample_df.to_csv(index=False)
+        
+        st.download_button(
+            label="⬇️ Download CSV Template",
+            data=csv_template,
+            file_name="workload_template.csv",
+            mime="text/csv",
+            key="download_template"
+        )
+    
+    # File upload
+    uploaded_file = st.file_uploader(
+        "Upload CSV file with workload configurations",
+        type=['csv'],
+        help="Upload a CSV file with your workload configurations"
+    )
+    
+    if uploaded_file is not None:
+        try:
+            df = pd.read_csv(uploaded_file)
+            
+            st.markdown("#### 📊 Uploaded Data Preview")
+            st.dataframe(df.head(), use_container_width=True)
+            
+            # Validate required columns
+            required_columns = [
+                'workload_name', 'workload_type', 'operating_system', 'region',
+                'on_prem_cores', 'peak_cpu_percent', 'avg_cpu_percent',
+                'on_prem_ram_gb', 'peak_ram_percent', 'avg_ram_percent',
+                'storage_current_gb', 'peak_iops', 'peak_throughput_mbps'
+            ]
+            
+            missing_columns = [col for col in required_columns if col not in df.columns]
+            
+            if missing_columns:
+                st.error(f"❌ Missing required columns: {', '.join(missing_columns)}")
+                return
+            
+            # Validate data types and values
+            validation_errors = []
+            
+            for idx, row in df.iterrows():
+                try:
+                    # Validate workload type
+                    if row['workload_type'] not in st.session_state.calculator.WORKLOAD_PROFILES:
+                        validation_errors.append(f"Row {idx+1}: Invalid workload_type '{row['workload_type']}'")
+                    
+                    # Validate numeric fields
+                    numeric_fields = ['on_prem_cores', 'peak_cpu_percent', 'avg_cpu_percent', 
+                                    'on_prem_ram_gb', 'peak_ram_percent', 'avg_ram_percent',
+                                    'storage_current_gb', 'peak_iops', 'peak_throughput_mbps']
+                    
+                    for field in numeric_fields:
+                        if pd.isna(row[field]) or row[field] <= 0:
+                            validation_errors.append(f"Row {idx+1}: Invalid {field} value")
+                
+                except Exception as e:
+                    validation_errors.append(f"Row {idx+1}: Data validation error - {str(e)}")
+            
+            if validation_errors:
+                st.error("❌ Data validation errors found:")
+                for error in validation_errors[:10]:  # Show first 10 errors
+                    st.markdown(f"• {error}")
+                if len(validation_errors) > 10:
+                    st.markdown(f"• ... and {len(validation_errors) - 10} more errors")
+                return
+            
+            # Convert to workload configurations
+            col1, col2 = st.columns(2)
+            with col1:
+                st.success(f"✅ Validated {len(df)} workload configurations")
+            
+            with col2:
+                if st.button("📥 Import Workloads", type="primary"):
+                    imported_workloads = []
+                    
+                    for idx, row in df.iterrows():
+                        workload_config = convert_csv_row_to_config(row)
+                        imported_workloads.append(workload_config)
+                    
+                    st.session_state.bulk_workloads.extend(imported_workloads)
+                    st.success(f"✅ Imported {len(imported_workloads)} workloads successfully!")
+                    st.rerun()
+        
+        except Exception as e:
+            st.error(f"❌ Error reading CSV file: {str(e)}")
+
+def convert_csv_row_to_config(row):
+    """Convert CSV row to workload configuration."""
+    config = {
+        'workload_name': str(row['workload_name']),
+        'workload_type': str(row['workload_type']),
+        'operating_system': str(row['operating_system']),
+        'region': str(row['region']),
+        'on_prem_cores': int(row['on_prem_cores']),
+        'peak_cpu_percent': int(row['peak_cpu_percent']),
+        'avg_cpu_percent': int(row['avg_cpu_percent']),
+        'on_prem_ram_gb': int(row['on_prem_ram_gb']),
+        'peak_ram_percent': int(row['peak_ram_percent']),
+        'avg_ram_percent': int(row['avg_ram_percent']),
+        'storage_current_gb': int(row['storage_current_gb']),
+        'peak_iops': int(row['peak_iops']),
+        'peak_throughput_mbps': int(row['peak_throughput_mbps']),
+        'years': 3,
+        'seasonality_factor': 1.2,
+        'prefer_amd': True,
+        'enable_graviton': True,
+        'pricing_model': 'on_demand',
+        'spot_percentage': 0,
+        'multi_az': True,
+        'compliance_requirements': [],
+        'backup_retention_days': 30,
+        'monitoring_level': 'basic',
+        'disaster_recovery': False,
+        'auto_scaling': True,
+        'load_balancer': 'alb',
+    }
+    
+    # Handle optional fields
+    optional_mappings = {
+        'storage_growth_rate': 'storage_growth_rate',
+        'pricing_model': 'pricing_model',
+        'multi_az': 'multi_az',
+        'compliance_requirements': 'compliance_requirements'
+    }
+    
+    for csv_field, config_field in optional_mappings.items():
+        if csv_field in row and not pd.isna(row[csv_field]):
+            if csv_field == 'compliance_requirements':
+                # Handle comma-separated compliance requirements
+                compliance_str = str(row[csv_field]).strip()
+                if compliance_str:
+                    config[config_field] = [req.strip() for req in compliance_str.split(',')]
+            elif csv_field == 'multi_az':
+                config[config_field] = bool(row[csv_field])
+            else:
+                config[config_field] = row[csv_field]
+    
+    return config
+
+def render_manual_bulk_entry():
+    """Render manual bulk entry interface."""
+    st.markdown("#### ✏️ Add Workload Manually")
+    
+    with st.form("bulk_workload_form"):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            workload_name = st.text_input("Workload Name", placeholder="e.g., Production Web Server")
+            
+            workload_options = list(st.session_state.calculator.WORKLOAD_PROFILES.keys())
+            workload_labels = [st.session_state.calculator.WORKLOAD_PROFILES[k]["name"] for k in workload_options]
+            workload_type = st.selectbox("Workload Type", workload_options, format_func=lambda x: st.session_state.calculator.WORKLOAD_PROFILES[x]["name"])
+            
+            operating_system = st.selectbox("Operating System", ["linux", "windows"])
+            
+            region_options = ["us-east-1", "us-west-1", "us-west-2", "eu-west-1", "eu-central-1", "ap-southeast-1"]
+            region = st.selectbox("AWS Region", region_options)
+            
+            on_prem_cores = st.number_input("CPU Cores", min_value=1, value=4)
+            peak_cpu_percent = st.slider("Peak CPU %", 0, 100, 70)
+            avg_cpu_percent = st.slider("Average CPU %", 0, 100, 45)
+        
+        with col2:
+            on_prem_ram_gb = st.number_input("RAM (GB)", min_value=1, value=16)
+            peak_ram_percent = st.slider("Peak RAM %", 0, 100, 80)
+            avg_ram_percent = st.slider("Average RAM %", 0, 100, 55)
+            
+            storage_current_gb = st.number_input("Storage (GB)", min_value=1, value=500)
+            peak_iops = st.number_input("Peak IOPS", min_value=1, value=5000)
+            peak_throughput_mbps = st.number_input("Peak Throughput (MB/s)", min_value=1, value=250)
+            
+            pricing_model = st.selectbox("Pricing Model", ["on_demand", "ri_1y", "ri_3y", "savings_plan_compute_1y"])
+            multi_az = st.checkbox("Multi-AZ Deployment", value=True)
+        
+        submitted = st.form_submit_button("➕ Add Workload")
+        
+        if submitted:
+            if not workload_name.strip():
+                st.error("❌ Please provide a workload name")
+            else:
+                new_workload = {
+                    'workload_name': workload_name,
+                    'workload_type': workload_type,
+                    'operating_system': operating_system,
+                    'region': region,
+                    'on_prem_cores': on_prem_cores,
+                    'peak_cpu_percent': peak_cpu_percent,
+                    'avg_cpu_percent': avg_cpu_percent,
+                    'on_prem_ram_gb': on_prem_ram_gb,
+                    'peak_ram_percent': peak_ram_percent,
+                    'avg_ram_percent': avg_ram_percent,
+                    'storage_current_gb': storage_current_gb,
+                    'peak_iops': peak_iops,
+                    'peak_throughput_mbps': peak_throughput_mbps,
+                    'years': 3,
+                    'seasonality_factor': 1.2,
+                    'prefer_amd': True,
+                    'enable_graviton': True,
+                    'pricing_model': pricing_model,
+                    'spot_percentage': 0,
+                    'multi_az': multi_az,
+                    'compliance_requirements': [],
+                    'backup_retention_days': 30,
+                    'monitoring_level': 'basic',
+                    'disaster_recovery': False,
+                    'auto_scaling': True,
+                    'load_balancer': 'alb',
+                }
+                
+                st.session_state.bulk_workloads.append(new_workload)
+                st.success(f"✅ Added '{workload_name}' to bulk analysis list!")
+                st.rerun()
+
+def render_bulk_workload_review():
+    """Render bulk workload review and edit interface."""
+    if not st.session_state.bulk_workloads:
+        st.info("📝 No workloads in the list. Use CSV upload or manual entry to add workloads.")
+        return
+    
+    st.markdown(f"#### 📝 Current Workload List ({len(st.session_state.bulk_workloads)} workloads)")
+    
+    # Summary table
+    summary_data = []
+    for i, workload in enumerate(st.session_state.bulk_workloads):
+        summary_data.append({
+            'Index': i,
+            'Name': workload['workload_name'],
+            'Type': st.session_state.calculator.WORKLOAD_PROFILES[workload['workload_type']]['name'],
+            'vCPUs': workload['on_prem_cores'],
+            'RAM (GB)': workload['on_prem_ram_gb'],
+            'Storage (GB)': workload['storage_current_gb'],
+            'Region': workload['region'],
+            'Pricing': workload['pricing_model']
+        })
+    
+    df_summary = pd.DataFrame(summary_data)
+    
+    # Edit functionality
+    st.markdown("**Actions:**")
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        if st.button("📊 Export Current List as CSV"):
+            csv_data = pd.DataFrame(st.session_state.bulk_workloads).to_csv(index=False)
+            st.download_button(
+                label="⬇️ Download Workload List",
+                data=csv_data,
+                file_name=f"bulk_workloads_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                mime="text/csv",
+                key="export_bulk_csv"
+            )
+    
+    with col2:
+        workload_to_remove = st.selectbox(
+            "Select workload to remove:",
+            range(len(st.session_state.bulk_workloads)),
+            format_func=lambda x: f"{x}: {st.session_state.bulk_workloads[x]['workload_name']}"
+        )
+        
+        if st.button("🗑️ Remove Selected"):
+            removed_workload = st.session_state.bulk_workloads.pop(workload_to_remove)
+            st.success(f"✅ Removed '{removed_workload['workload_name']}'")
+            st.rerun()
+    
+    with col3:
+        if st.button("🔄 Duplicate Selected"):
+            if st.session_state.bulk_workloads:
+                original = st.session_state.bulk_workloads[workload_to_remove].copy()
+                original['workload_name'] = f"{original['workload_name']} (Copy)"
+                st.session_state.bulk_workloads.append(original)
+                st.success("✅ Workload duplicated!")
+                st.rerun()
+    
+    # Display summary table
+    st.dataframe(df_summary.drop('Index', axis=1), use_container_width=True, hide_index=True)
+
+def execute_bulk_analysis(include_migration_decision=False):
+    """Execute bulk analysis on all workloads."""
+    if not st.session_state.bulk_workloads:
+        st.error("❌ No workloads to analyze")
+        return
+    
+    calculator = st.session_state.calculator
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+    
+    bulk_results = []
+    total_workloads = len(st.session_state.bulk_workloads)
+    
+    try:
+        for i, workload_config in enumerate(st.session_state.bulk_workloads):
+            status_text.text(f"Analyzing workload {i+1}/{total_workloads}: {workload_config['workload_name']}")
+            
+            # Temporarily set calculator inputs
+            original_inputs = calculator.inputs.copy()
+            calculator.inputs.update(workload_config)
+            
+            # Perform analysis
+            results = {}
+            for env in calculator.ENV_MULTIPLIERS.keys():
+                results[env] = calculator.calculate_comprehensive_requirements(env)
+            
+            workload_result = {
+                'inputs': workload_config.copy(),
+                'recommendations': results
+            }
+            
+            # Add migration decision if requested
+            if include_migration_decision:
+                try:
+                    decision_result = enhanced_migration_decision_analysis(workload_config, results['PROD'])
+                    workload_result['migration_decision'] = decision_result
+                except Exception as e:
+                    st.warning(f"⚠️ Migration decision analysis failed for {workload_config['workload_name']}: {str(e)}")
+            
+            bulk_results.append(workload_result)
+            
+            # Restore original inputs
+            calculator.inputs = original_inputs
+            
+            # Update progress
+            progress_bar.progress((i + 1) / total_workloads)
+        
+        # Store results
+        st.session_state.bulk_results = bulk_results
+        
+        progress_bar.empty()
+        status_text.empty()
+        
+        st.success(f"✅ Successfully analyzed {total_workloads} workloads!")
+        
+        # Show summary
+        render_bulk_analysis_summary()
+        
+    except Exception as e:
+        st.error(f"❌ Error during bulk analysis: {str(e)}")
+        progress_bar.empty()
+        status_text.empty()
+
+def render_bulk_analysis_summary():
+    """Render summary of bulk analysis results."""
+    if not st.session_state.bulk_results:
+        return
+    
+    st.markdown("---")
+    st.markdown("### 📊 Bulk Analysis Summary")
+    
+    # Calculate portfolio metrics
+    total_workloads = len(st.session_state.bulk_results)
+    total_monthly_cost = 0
+    total_monthly_savings = 0
+    total_migration_cost = 0
+    workload_summaries = []
+    
+    for result in st.session_state.bulk_results:
+        prod_results = result['recommendations']['PROD']
+        tco_analysis = prod_results['tco_analysis']
+        
+        total_monthly_cost += tco_analysis['monthly_cost']
+        total_monthly_savings += tco_analysis['monthly_savings']
+        total_migration_cost += tco_analysis['migration_cost']
+        
+        workload_summaries.append({
+            'Workload': result['inputs']['workload_name'],
+            'Type': st.session_state.calculator.WORKLOAD_PROFILES[result['inputs']['workload_type']]['name'],
+            'Monthly Cost': tco_analysis['monthly_cost'],
+            'Monthly Savings': tco_analysis['monthly_savings'],
+            'Best Pricing': tco_analysis['best_pricing_option'],
+            'ROI (3Y)': tco_analysis['roi_3_years'],
+            'Migration Decision': result.get('migration_decision', {}).get('recommendation', 'N/A')
+        })
+    
+    # Portfolio metrics
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric("Total Workloads", total_workloads)
+    
+    with col2:
+        st.metric("Portfolio Monthly Cost", f"${total_monthly_cost:,.2f}")
+    
+    with col3:
+        st.metric("Total Monthly Savings", f"${total_monthly_savings:,.2f}")
+    
+    with col4:
+        savings_percentage = (total_monthly_savings / (total_monthly_cost + total_monthly_savings) * 100) if (total_monthly_cost + total_monthly_savings) > 0 else 0
+        st.metric("Portfolio Savings", f"{savings_percentage:.1f}%")
+    
+    # Portfolio ROI
+    annual_savings = total_monthly_savings * 12
+    portfolio_roi = ((annual_savings * 3 - total_migration_cost) / total_migration_cost * 100) if total_migration_cost > 0 else 0
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric("Annual Savings", f"${annual_savings:,.2f}")
+    with col2:
+        st.metric("Portfolio ROI (3Y)", f"{portfolio_roi:.1f}%" if portfolio_roi != 0 else "N/A")
+    
+    # Workload summary table
+    st.markdown("#### 📋 Workload Summary")
+    df_summary = pd.DataFrame(workload_summaries)
+    
+    # Format currency columns
+    df_summary['Monthly Cost'] = df_summary['Monthly Cost'].apply(lambda x: f"${x:,.2f}")
+    df_summary['Monthly Savings'] = df_summary['Monthly Savings'].apply(lambda x: f"${x:,.2f}")
+    
+    st.dataframe(df_summary, use_container_width=True, hide_index=True)
+    
+    # Migration decision summary if available
+    migration_decisions = [r.get('migration_decision', {}).get('recommendation', 'N/A') for r in st.session_state.bulk_results]
+    decision_counts = pd.Series(migration_decisions).value_counts()
+    
+    if 'N/A' not in decision_counts.index or len(decision_counts) > 1:
+        st.markdown("#### 🎯 Migration Decision Summary")
+        
+        decision_labels = {
+            'STRONG_MIGRATE': '🚀 Strong Migrate',
+            'MODERATE_MIGRATE': '✅ Moderate Migrate', 
+            'NEUTRAL': '⚖️ Neutral',
+            'STAY_ON_PREMISES': '🏢 Stay On-Premises',
+            'N/A': '❓ Not Analyzed'
+        }
+        
+        decision_data = []
+        for decision, count in decision_counts.items():
+            decision_data.append({
+                'Decision': decision_labels.get(decision, decision),
+                'Count': count,
+                'Percentage': f"{count/total_workloads*100:.1f}%"
+            })
+        
+        df_decisions = pd.DataFrame(decision_data)
+        st.dataframe(df_decisions, use_container_width=True, hide_index=True)
+
+def render_enhanced_workload_configuration():
+    """Render enhanced workload configuration with enterprise features."""
+    calculator = st.session_state.calculator
+    st.markdown('<div class="section-header"><h3>🏗️ Enterprise Workload Configuration</h3></div>', unsafe_allow_html=True)
+    
+    # Configuration mode selection
+    config_mode = st.radio(
+        "Configuration Mode:",
+        ["🎯 Single Workload Analysis", "📦 Bulk Workload Analysis"],
+        horizontal=True,
+        key="config_mode"
+    )
+    
+    if config_mode == "📦 Bulk Workload Analysis":
+        render_bulk_workload_configuration()
+        return
 
 def enhanced_migration_decision_analysis(calculator_inputs, cloud_results):
     """Enhanced function to integrate decision engine with existing calculator."""
@@ -2876,8 +3431,8 @@ def initialize_session_state():
             st.session_state.pdf_generator = None
     if 'analysis_results' not in st.session_state:
         st.session_state.analysis_results = None
-    if 'bulk_results' not in st.session_state:
-        st.session_state.bulk_results = []
+    if 'bulk_workloads' not in st.session_state:
+        st.session_state.bulk_workloads = []
 
 def main():
     """Main application entry point with enhanced enterprise features."""
@@ -2998,19 +3553,26 @@ def main():
     
     # Enhanced tab structure
     tab1, tab2, tab3, tab4, tab5 = st.tabs([
-        "⚙️ Workload Configuration", 
-        "🎯 Migration Decision",
-        "🚀 Migration Planning",
-        "📋 Reports & Export",
-        "💰 Cost Optimization"
-    ])
+    "⚙️ Workload Configuration", 
+    "🎯 Migration Decision",
+    "🚀 Migration Planning",
+    "📋 Reports & Export",
+    "💰 Cost Optimization"
+])
+
+with tab1:
+    render_enhanced_workload_configuration()
     
-    with tab1:
-        render_enhanced_workload_configuration()
-        
-        if st.session_state.analysis_results:
-            st.markdown("---")
-            render_enhanced_analysis_results(st.session_state.analysis_results['recommendations'])
+    # Show results based on analysis type
+    if st.session_state.analysis_results:
+        st.markdown("---")
+        st.markdown("### 🎯 Single Workload Analysis Results")
+        render_enhanced_analysis_results(st.session_state.analysis_results['recommendations'])
+    
+    if st.session_state.bulk_results:
+        st.markdown("---")
+        st.markdown("### 📦 Bulk Analysis Results")
+        render_bulk_analysis_summary()
     
     with tab2:
         st.markdown("### 🎯 Migration Decision Analysis")
