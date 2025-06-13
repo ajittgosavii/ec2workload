@@ -3560,8 +3560,8 @@ def main():
     "💰 Cost Optimization"
 ])
 
-with tab1:
-    render_enhanced_workload_configuration()
+    with tab1:
+        render_enhanced_workload_configuration()
     
     # Show results based on analysis type
     if st.session_state.analysis_results:
