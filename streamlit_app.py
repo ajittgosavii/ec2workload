@@ -3527,7 +3527,7 @@ def main():
     ])
     
     with tab1:
-        render_enhanced_workload_configuration()        
+       render_enhanced_workload_configuration()        
     if st.session_state.analysis_results:
             st.markdown("---")
             render_enhanced_analysis_results(st.session_state.analysis_results['recommendations'])
