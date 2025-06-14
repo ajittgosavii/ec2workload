@@ -5329,22 +5329,22 @@ def main():
     # Main tabs - CORRECTED SECTION
     tabs = ["Single Workload"]
     
-    with tabs[0]:
+    st.header("Single Workload")
         render_enhanced_configuration()
     
-    with tabs[1]:
+    st.header("Single Workload")
         render_bulk_upload_tab()
     
-    with tabs[2]:
+    st.header("Single Workload")
         render_enhanced_results()
     
-    with tabs[3]:
+    st.header("Single Workload")
         render_enhanced_environment_heatmap_tab()
     
-    with tabs[4]:
+    st.header("Single Workload")
         render_technical_recommendations_tab()
     
-    with tabs[5]:
+    st.header("Single Workload")
         st.markdown("### 📋 Enhanced Reports")
         
         if st.session_state.enhanced_results:
