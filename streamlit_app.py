@@ -2419,7 +2419,170 @@ def render_enhanced_results():
         return
     
     try:
-        # ... (results rendering) ...
+        results = st.session_state.enhanced_results
+        st.markdown("### 📊 Enhanced Analysis Results")
+        
+        recommendations = results.get('recommendations', {})
+        if not recommendations or 'PROD' not in recommendations:
+            st.warning("⚠️ Analysis results incomplete. Please run the analysis again.")
+            return
+        
+        prod_results = recommendations['PROD']
+        claude_analysis = prod_results.get('claude_analysis', {})
+        tco_analysis = prod_results.get('tco_analysis', {})
+        
+        # Summary metrics
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            complexity_score = claude_analysis.get('complexity_score', 50)
+            complexity_level = claude_analysis.get('complexity_level', 'MEDIUM')
+            
+            st.markdown(f"""
+            <div class="metric-card">
+                <div style="font-size: 0.875rem; font-weight: 600; color: #6b7280; margin-bottom: 0.5rem;">🤖 Migration Complexity</div>
+                <div style="font-size: 2rem; font-weight: 700; color: #1f2937; margin-bottom: 0.25rem;">{complexity_score:.0f}/100</div>
+                <div style="font-size: 0.75rem; color: #9ca3af;">{complexity_level}</div>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col2:
+            monthly_cost = tco_analysis.get('monthly_cost', 0)
+            
+            st.markdown(f"""
+            <div class="metric-card">
+                <div style="font-size: 0.875rem; font-weight: 600; color: #6b7280; margin-bottom: 0.5rem;">☁️ AWS Monthly Cost</div>
+                <div style="font-size: 2rem; font-weight: 700; color: #1f2937; margin-bottom: 0.25rem;">${monthly_cost:,.0f}</div>
+                <div style="font-size: 0.75rem; color: #9ca3af;">Optimized Pricing</div>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col3:
+            timeline = claude_analysis.get('estimated_timeline', {})
+            max_weeks = timeline.get('max_weeks', 8)
+            
+            st.markdown(f"""
+            <div class="metric-card">
+                <div style="font-size: 0.875rem; font-weight: 600; color: #6b7280; margin-bottom: 0.5rem;">⏱️ Migration Timeline</div>
+                <div style="font-size: 2rem; font-weight: 700; color: #1f2937; margin-bottom: 0.25rem;">{max_weeks}</div>
+                <div style="font-size: 0.75rem; color: #9ca3af;">Weeks (Estimated)</div>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col4:
+            st.markdown(f"""
+            <div class="metric-card">
+                <div style="font-size: 0.875rem; font-weight: 600; color: #6b7280; margin-bottom: 0.5rem;">🖥️ Instance Type</div>
+                <div style="font-size: 1.5rem; font-weight: 700; color: #1f2937; margin-bottom: 0.25rem;">
+                    {prod_results.get('cost_breakdown', {}).get('selected_instance', {}).get('type', 'N/A')}
+                </div>
+                <div style="font-size: 0.75rem; color: #9ca3af;">Recommended</div>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        # Claude AI Analysis
+        st.markdown("### 🤖 Claude AI Migration Analysis")
+        
+        if claude_analysis:
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.markdown("**Migration Strategy**")
+                strategy = claude_analysis.get('migration_strategy', {})
+                if strategy:
+                    st.markdown(f"**Approach:** {strategy.get('approach', 'N/A')}")
+                    st.markdown(f"**Methodology:** {strategy.get('methodology', 'N/A')}")
+                    st.markdown(f"**Timeline:** {strategy.get('timeline', 'N/A')}")
+                    st.markdown(f"**Risk Level:** {strategy.get('risk_level', 'N/A')}")
+            
+            with col2:
+                st.markdown("**Migration Steps**")
+                migration_steps = claude_analysis.get('migration_steps', [])
+                
+                for i, step in enumerate(migration_steps[:3], 1):
+                    if isinstance(step, dict):
+                        with st.expander(f"Phase {i}: {step.get('phase', 'N/A')}", expanded=False):
+                            st.markdown(f"**Duration:** {step.get('duration', 'N/A')}")
+                            
+                            tasks = step.get('tasks', [])
+                            if tasks:
+                                st.markdown("**Key Tasks:**")
+                                for task in tasks[:3]:
+                                    st.markdown(f"• {task}")
+        
+        # Cost Analysis
+        st.markdown("### 💰 Cost Analysis")
+        
+        cost_breakdown = prod_results.get('cost_breakdown', {})
+        total_costs = cost_breakdown.get('total_costs', {})
+        
+        if total_costs:
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.markdown("**Instance Pricing Comparison**")
+                cost_data = []
+                for pricing_model, cost in total_costs.items():
+                    cost_data.append({
+                        'Pricing Model': pricing_model.replace('_', ' ').title(),
+                        'Monthly Cost': f"${cost:,.2f}",
+                        'Annual Cost': f"${cost*12:,.2f}"
+                    })
+                
+                df_costs = pd.DataFrame(cost_data)
+                st.dataframe(df_costs, use_container_width=True, hide_index=True)
+            
+            with col2:
+                st.markdown("**AWS Service Cost Breakdown (PROD)**")
+                
+                # Calculate detailed service costs if available
+                try:
+                    # Actual implementation added here
+                    analyzer = EnhancedEnvironmentAnalyzer()
+                    tech_recs = analyzer.get_technical_recommendations('PROD', prod_results)
+                    cost_calculator = AWSCostCalculator()
+                    service_costs = cost_calculator.calculate_service_costs(
+                        'PROD', tech_recs, prod_results.get('requirements', {}))
+                    
+                    service_cost_data = []
+                    categories = ['compute', 'network', 'storage', 'database', 'security', 'monitoring']
+                    for cat in categories:
+                        if cat in service_costs:
+                            service_cost_data.append({
+                                'Service Category': cat.title(),
+                                'Monthly Cost': f"${service_costs[cat]['total']:.2f}"
+                            })
+                    
+                    if service_cost_data:
+                        df_service_costs = pd.DataFrame(service_cost_data)
+                        st.dataframe(df_service_costs, use_container_width=True, hide_index=True)
+                        
+                        # Show total from service breakdown
+                        total_services = sum(service_costs[cat]['total'] for cat in categories if cat in service_costs)
+                        st.markdown(f"**Total Monthly AWS Services Cost: ${total_services:.2f}**")
+                    else:
+                        # Fallback to basic cost display
+                        basic_cost_data = [
+                            {'Cost Component': 'Instance Costs', 'Monthly Cost': f"${cost_breakdown.get('instance_costs', {}).get('on_demand', 0):.2f}"},
+                            {'Cost Component': 'Storage Costs', 'Monthly Cost': f"${cost_breakdown.get('storage_costs', {}).get('primary_storage', 0):.2f}"},
+                            {'Cost Component': 'Network Costs', 'Monthly Cost': f"${cost_breakdown.get('network_costs', {}).get('data_transfer', 0):.2f}"}
+                        ]
+                        
+                        df_basic_costs = pd.DataFrame(basic_cost_data)
+                        st.dataframe(df_basic_costs, use_container_width=True, hide_index=True)
+                
+                except Exception as e:
+                    logger.error(f"Error calculating detailed service costs: {e}")
+                    # Fallback to basic cost display
+                    basic_cost_data = [
+                        {'Cost Component': 'Instance Costs', 'Monthly Cost': f"${cost_breakdown.get('instance_costs', {}).get('on_demand', 0):.2f}"},
+                        {'Cost Component': 'Storage Costs', 'Monthly Cost': f"${cost_breakdown.get('storage_costs', {}).get('primary_storage', 0):.2f}"},
+                        {'Cost Component': 'Network Costs', 'Monthly Cost': f"${cost_breakdown.get('network_costs', {}).get('data_transfer', 0):.2f}"}
+                    ]
+                    
+                    df_basic_costs = pd.DataFrame(basic_cost_data)
+                    st.dataframe(df_basic_costs, use_container_width=True, hide_index=True)
+        
     except Exception as e:
         st.error(f"❌ Error displaying results: {str(e)}")
         logger.error(f"Error in render_enhanced_results: {e}")
