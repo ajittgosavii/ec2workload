@@ -3495,14 +3495,13 @@ def generate_enhanced_excel_report():
                 current_row += 1
                 
                 # Section data
-                if isinstance(section_data, dict):
+                if isinstance(value, (str, int, float, bool)): # ensure value is scalar
                     for key, value in section_data.items():
-                        if isinstance(value, (str, int, float, bool)):
-                            ws_tech[f'A{current_row}'] = key.replace('_', ' ').title()
-                            ws_tech[f'B{current_row}'] = str(value)
-                            ws_tech[f'A{current_row}'].font = data_font
-                            ws_tech[f'B{current_row}'].font = data_font
-                            current_row += 1
+                        ws_tech[f'A{current_row}'] = key.replace('_', ' ').title()
+                        ws_tech[f'B{current_row}'] = str(value)
+                        ws_tech[f'A{current_row}'].font = data_font
+                        ws_tech[f'B{current_row}'].font = data_font
+                        current_row += 1
                 
                 current_row += 1  # Add space between sections
             
@@ -4020,6 +4019,7 @@ def generate_bulk_template():
     df_template = pd.DataFrame(template_data)
     csv_template = df_template.to_csv(index=False)
     
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S") # Define timestamp here
     st.download_button(
         "⬇️ Download Template CSV",
         csv_template,
@@ -4037,7 +4037,6 @@ def export_bulk_results_to_pdf(results):
     """Export bulk results to PDF."""
     # Implementation for PDF export  
     st.info("📄 PDF export functionality - coming soon!")
-
 
 def get_env_characteristics(env: str) -> str:
     """Get key characteristics for each environment."""
