@@ -53,6 +53,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Custom CSS
+# Custom CSS - Enhanced for nested tabs
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
@@ -95,6 +96,68 @@ st.markdown("""
     .env-uat { border-left: 4px solid #f59e0b; }
     .env-preprod { border-left: 4px solid #ef4444; }
     .env-prod { border-left: 4px solid #10b981; }
+    
+    /* Enhanced styling for nested tabs */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+    }
+    
+    .stTabs [data-baseweb="tab"] {
+        height: 50px;
+        white-space: pre-wrap;
+        background-color: #f8fafc;
+        border-radius: 8px;
+        color: #64748b;
+        font-weight: 500;
+        padding: 0 20px;
+        border: 2px solid transparent;
+        transition: all 0.3s ease;
+    }
+    
+    .stTabs [aria-selected="true"] {
+        background-color: #2563eb !important;
+        color: white !important;
+        border: 2px solid #1d4ed8;
+        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+    }
+    
+    .stTabs [data-baseweb="tab"]:hover {
+        background-color: #e2e8f0;
+        color: #334155;
+        transform: translateY(-1px);
+    }
+    
+    .stTabs [aria-selected="true"]:hover {
+        background-color: #1d4ed8 !important;
+        color: white !important;
+    }
+    
+    /* Sub-tabs styling for Single Workload */
+    .stTabs .stTabs [data-baseweb="tab"] {
+        height: 40px;
+        background-color: #f1f5f9;
+        font-size: 14px;
+        color: #475569;
+        border: 1px solid #e2e8f0;
+        margin-right: 4px;
+    }
+    
+    .stTabs .stTabs [aria-selected="true"] {
+        background-color: #0f766e !important;
+        color: white !important;
+        border: 1px solid #0d9488;
+        box-shadow: 0 2px 8px rgba(15, 118, 110, 0.3);
+    }
+    
+    .stTabs .stTabs [data-baseweb="tab"]:hover {
+        background-color: #e2e8f0;
+        color: #334155;
+    }
+    
+    .stTabs .stTabs [aria-selected="true"]:hover {
+        background-color: #0d9488 !important;
+        color: white !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -2424,17 +2487,10 @@ def render_enhanced_configuration():
     if st.button("🚀 Run Enhanced Analysis", type="primary", key="main_enhanced_analysis_button"):
         run_enhanced_analysis()
         
-    # Report generation section
+    # Success message with navigation hint
     if st.session_state.enhanced_results:
-        st.markdown("---")
-        st.markdown("### 📋 Report Generation")
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("📄 Generate PDF Report", key="config_pdf_report"):
-                generate_enhanced_pdf_report()
-        with col2:
-            if st.button("📊 Export to Excel", key="config_excel_report"):
-                generate_enhanced_excel_report()
+        st.success("✅ Analysis completed! Check the 'Results', 'Heat Map', and 'Technical Reports' tabs above for detailed analysis.")
+        st.info("💡 Visit the 'Reports' tab to generate PDF and Excel reports.")
 
 def run_enhanced_analysis():
     """Run enhanced analysis."""
@@ -4310,7 +4366,7 @@ def get_env_characteristics(env: str) -> str:
     return characteristics.get(env, 'Standard environment characteristics')
 
 def main():
-    """Enhanced main application."""
+    """Enhanced main application with nested tab structure."""
     
     # Initialize session state
     initialize_enhanced_session_state()
@@ -4437,57 +4493,94 @@ def main():
             st.metric("Complexity Score", f"{complexity_score:.0f}/100")
             st.metric("Monthly Cost", f"${monthly_cost:,.0f}")
     
-    # Main tabs
-    tabs = st.tabs(["Single Workload", "Bulk Upload", "Results", "Heat Map", "Technical", "Reports"])
+    # MAIN TABS - Updated structure with nested tabs
+    main_tabs = st.tabs(["Single Workload", "Bulk Layout", "Reports"])
     
-    with tabs[0]:
-        render_enhanced_configuration()
+    # SINGLE WORKLOAD TAB with nested sub-tabs
+    with main_tabs[0]:
+        st.markdown("### 🖥️ Single Workload Analysis")
+        
+        # Create sub-tabs under Single Workload
+        single_workload_subtabs = st.tabs(["Configuration", "Results", "Heat Map", "Technical Reports"])
+        
+        # Configuration sub-tab
+        with single_workload_subtabs[0]:
+            render_enhanced_configuration()
+        
+        # Results sub-tab
+        with single_workload_subtabs[1]:
+            render_enhanced_results()
+        
+        # Heat Map sub-tab
+        with single_workload_subtabs[2]:
+            render_enhanced_environment_heatmap_tab()
+        
+        # Technical Reports sub-tab
+        with single_workload_subtabs[3]:
+            render_technical_recommendations_tab()
     
-    with tabs[1]:
+    # BULK LAYOUT TAB
+    with main_tabs[1]:
+        st.markdown("### 📁 Bulk Workload Analysis")
         render_bulk_upload_tab()
     
-    with tabs[2]:
-        render_enhanced_results()
-    
-    with tabs[3]:
-        render_enhanced_environment_heatmap_tab()
-    
-    with tabs[4]:
-        render_technical_recommendations_tab()
-    
-    with tabs[5]:
+    # REPORTS TAB (kept separate for global reports)
+    with main_tabs[2]:
         st.markdown("### 📋 Enhanced Reports")
         
-        if st.session_state.enhanced_results:
-            st.markdown("#### Available Reports")
+        # Add note about report context
+        st.info("💡 Reports will be generated based on your current analysis context (Single Workload or Bulk Analysis)")
+        
+        # Check which type of results we have
+        has_single_results = st.session_state.enhanced_results is not None
+        has_bulk_results = ('bulk_results' in st.session_state and 
+                           st.session_state.bulk_results is not None and 
+                           'error' not in st.session_state.bulk_results)
+        
+        if has_single_results or has_bulk_results:
+            # Show report type selector
+            if has_single_results and has_bulk_results:
+                report_type = st.radio(
+                    "Select Report Type:",
+                    ["Single Workload Reports", "Bulk Analysis Reports"],
+                    help="Choose which analysis results to include in your reports"
+                )
+            elif has_single_results:
+                report_type = "Single Workload Reports"
+                st.info("📊 Single workload analysis available for reporting")
+            else:
+                report_type = "Bulk Analysis Reports"
+                st.info("📊 Bulk workload analysis available for reporting")
             
-            col1, col2, col3 = st.columns(3)
-            
-            with col1:
-                if st.button("📄 Generate PDF Report", type="primary", key="reports_pdf_generate"):
-                    generate_enhanced_pdf_report()
-            
-            with col2:
-                if st.button("📊 Export to Excel", key="reports_tab_excel"):
-                    generate_enhanced_excel_report()
-            
-            with col3:
-                if st.button("📈 Generate Heat Map CSV", key="reports_heatmap_csv"):
-                    if 'heat_map_data' in st.session_state.enhanced_results:
-                        csv_data = st.session_state.enhanced_results['heat_map_data'].to_csv(index=False)
-                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                        st.download_button(
-                            "⬇️ Download Heat Map CSV",
-                            csv_data,
-                            f"environment_heatmap_{timestamp}.csv",
-                            "text/csv",
-                            key="heatmap_csv_download"
-                        )
-            
-            # Report preview
-            st.markdown("#### Report Preview")
-            
-            if st.session_state.enhanced_results:
+            # Single Workload Reports
+            if report_type == "Single Workload Reports" and has_single_results:
+                st.markdown("#### Single Workload Reports")
+                
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    if st.button("📄 Generate PDF Report", type="primary", key="reports_pdf_generate"):
+                        generate_enhanced_pdf_report()
+                
+                with col2:
+                    if st.button("📊 Export to Excel", key="reports_tab_excel"):
+                        generate_enhanced_excel_report()
+                
+                with col3:
+                    if st.button("📈 Generate Heat Map CSV", key="reports_heatmap_csv"):
+                        if 'heat_map_data' in st.session_state.enhanced_results:
+                            csv_data = st.session_state.enhanced_results['heat_map_data'].to_csv(index=False)
+                            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                            st.download_button(
+                                "⬇️ Download Heat Map CSV",
+                                csv_data,
+                                f"environment_heatmap_{timestamp}.csv",
+                                "text/csv",
+                                key="heatmap_csv_download"
+                            )
+                
+                # Report preview for single workload
+                st.markdown("#### Report Preview")
                 prod_results = st.session_state.enhanced_results['recommendations']['PROD']
                 claude_analysis = prod_results.get('claude_analysis', {})
                 
@@ -4513,8 +4606,41 @@ def main():
                 
                 if len(recommendations) > 3:
                     st.markdown(f"... and {len(recommendations) - 3} more recommendations in the full report")
+            
+            # Bulk Analysis Reports
+            elif report_type == "Bulk Analysis Reports" and has_bulk_results:
+                st.markdown("#### Bulk Analysis Reports")
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.button("📊 Export to Excel", key="bulk_excel_export_reports"):
+                        export_bulk_results_to_excel(st.session_state.bulk_results)
+                with col2:
+                    if st.button("📄 Generate PDF Report", key="bulk_pdf_export_reports"):
+                        export_bulk_results_to_pdf(st.session_state.bulk_results)
+                
+                # Show bulk summary
+                bulk_results = st.session_state.bulk_results
+                summary = bulk_results.get('summary', {})
+                
+                if 'error' not in summary:
+                    st.markdown("#### Bulk Analysis Summary")
+                    
+                    col1, col2, col3, col4 = st.columns(4)
+                    
+                    with col1:
+                        st.metric("Total Workloads", summary.get('total_workloads_analyzed', 0))
+                    
+                    with col2:
+                        st.metric("Total Monthly Cost", f"${summary.get('total_monthly_cost', 0):,.0f}")
+                    
+                    with col3:
+                        st.metric("Average Complexity", f"{summary.get('average_complexity_score', 0):.1f}/100")
+                    
+                    with col4:
+                        st.metric("Most Common Instance", summary.get('most_common_instance_type', 'N/A'))
         else:
-            st.info("💡 Run an enhanced analysis to generate comprehensive reports.")
+            st.info("💡 Run an analysis (Single Workload or Bulk Upload) to generate comprehensive reports.")
     
     # Enhanced footer
     st.markdown("---")
