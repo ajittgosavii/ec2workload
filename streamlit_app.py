@@ -52,89 +52,271 @@ except ImportError:
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Custom CSS
-# Custom CSS - Enhanced for nested tabs
+# Enhanced Modern CSS with Frame Structure - REPLACE YOUR EXISTING CSS SECTION
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
     
+    /* Global Styles */
     html, body, [class*="css"] {
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
     }
     
-    .main-header {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        padding: 2rem;
-        border-radius: 12px;
-        margin-bottom: 2rem;
-        box-shadow: 0 8px 32px rgba(0,0,0,0.1);
-    }
+    /* Hide Streamlit Default Elements */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
     
-    .metric-card {
+    /* Main Application Frame */
+    .main-app-frame {
         background: white;
-        border: 2px solid #e2e8f0;
-        border-radius: 12px;
-        padding: 1.5rem;
-        text-align: center;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-    }
-    
-    .env-card {
-        background: white;
+        border-radius: 20px;
+        box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        margin: 1rem;
+        overflow: hidden;
         border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        padding: 1rem;
-        margin: 0.5rem;
-        text-align: center;
-        transition: all 0.3s ease;
-        min-height: 120px;
     }
     
-    .env-dev { border-left: 4px solid #3b82f6; }
-    .env-qa { border-left: 4px solid #8b5cf6; }
-    .env-uat { border-left: 4px solid #f59e0b; }
-    .env-preprod { border-left: 4px solid #ef4444; }
-    .env-prod { border-left: 4px solid #10b981; }
+    /* Enhanced Header Frame */
+    .header-frame {
+        background: linear-gradient(135deg, #1e3a8a 0%, #3730a3 50%, #1e40af 100%);
+        color: white;
+        padding: 2rem 3rem;
+        position: relative;
+        overflow: hidden;
+    }
     
-    /* Enhanced styling for nested tabs */
+    .header-frame::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000"><polygon fill="%23ffffff08" points="0,1000 1000,0 1000,1000"/></svg>');
+        background-size: cover;
+        pointer-events: none;
+    }
+    
+    .header-content {
+        position: relative;
+        z-index: 2;
+    }
+    
+    .header-title {
+        font-size: 2.5rem;
+        font-weight: 800;
+        margin-bottom: 0.5rem;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+    
+    .header-subtitle {
+        font-size: 1.2rem;
+        opacity: 0.9;
+        margin-bottom: 1rem;
+        font-weight: 400;
+    }
+    
+    .header-version {
+        display: inline-block;
+        background: rgba(255,255,255,0.2);
+        padding: 0.5rem 1rem;
+        border-radius: 50px;
+        font-size: 0.9rem;
+        font-weight: 500;
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255,255,255,0.3);
+    }
+    
+    /* Content Frame */
+    .content-frame {
+        padding: 2rem 3rem;
+        min-height: 60vh;
+        background: white;
+    }
+    
+    /* Navigation Frame */
+    .nav-frame {
+        background: #f8fafc;
+        border-bottom: 1px solid #e2e8f0;
+        padding: 0;
+        margin: 0;
+    }
+    
+    /* Sidebar Frame */
+    .sidebar-frame {
+        background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+        border-right: 1px solid #e2e8f0;
+        padding: 1.5rem;
+        height: 100vh;
+        overflow-y: auto;
+    }
+    
+    /* Enhanced Cards */
+    .modern-card {
+        background: white;
+        border-radius: 16px;
+        padding: 2rem;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        border: 1px solid #f1f5f9;
+        margin-bottom: 1.5rem;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .modern-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+    }
+    
+    .modern-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: linear-gradient(90deg, #3b82f6, #8b5cf6, #06b6d4);
+    }
+    
+    /* Metric Cards */
+    .metric-card-enhanced {
+        background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+        border: 2px solid transparent;
+        border-radius: 20px;
+        padding: 2rem;
+        text-align: center;
+        position: relative;
+        overflow: hidden;
+        transition: all 0.3s ease;
+    }
+    
+    .metric-card-enhanced::before {
+        content: '';
+        position: absolute;
+        top: -2px;
+        left: -2px;
+        right: -2px;
+        bottom: -2px;
+        background: linear-gradient(45deg, #3b82f6, #8b5cf6, #06b6d4, #10b981);
+        border-radius: 20px;
+        z-index: -1;
+        animation: gradient-border 3s ease infinite;
+        background-size: 400% 400%;
+    }
+    
+    @keyframes gradient-border {
+        0%, 100% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+    }
+    
+    .metric-card-enhanced:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 15px 35px rgba(0,0,0,0.15);
+    }
+    
+    .metric-value {
+        font-size: 2.5rem;
+        font-weight: 800;
+        color: #1e293b;
+        margin: 0.5rem 0;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .metric-label {
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 0.5rem;
+    }
+    
+    .metric-description {
+        font-size: 0.8rem;
+        color: #94a3b8;
+        font-weight: 500;
+    }
+    
+    /* Status Indicators */
+    .status-indicator {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.5rem 1rem;
+        border-radius: 50px;
+        font-weight: 600;
+        font-size: 0.85rem;
+        margin: 0.25rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    
+    .status-connected {
+        background: linear-gradient(135deg, #10b981, #059669);
+        color: white;
+    }
+    
+    .status-warning {
+        background: linear-gradient(135deg, #f59e0b, #d97706);
+        color: white;
+    }
+    
+    .status-error {
+        background: linear-gradient(135deg, #ef4444, #dc2626);
+        color: white;
+    }
+    
+    /* Enhanced Tabs */
     .stTabs [data-baseweb="tab-list"] {
         gap: 8px;
+        background: #f8fafc;
+        padding: 0.5rem;
+        border-radius: 16px;
+        border: 1px solid #e2e8f0;
     }
     
     .stTabs [data-baseweb="tab"] {
-        height: 50px;
-        white-space: pre-wrap;
-        background-color: #f8fafc;
-        border-radius: 8px;
+        height: 60px;
+        background: white;
+        border-radius: 12px;
         color: #64748b;
-        font-weight: 500;
-        padding: 0 20px;
+        font-weight: 600;
+        padding: 0 24px;
         border: 2px solid transparent;
         transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .stTabs [data-baseweb="tab"]::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+        opacity: 0;
+        transition: opacity 0.3s ease;
     }
     
     .stTabs [aria-selected="true"] {
-        background-color: #2563eb !important;
+        background: linear-gradient(135deg, #3b82f6, #8b5cf6) !important;
         color: white !important;
-        border: 2px solid #1d4ed8;
-        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(59, 130, 246, 0.4);
     }
     
     .stTabs [data-baseweb="tab"]:hover {
-        background-color: #e2e8f0;
-        color: #334155;
-        transform: translateY(-1px);
-    }
-    
-    .stTabs [aria-selected="true"]:hover {
-        background-color: #1d4ed8 !important;
-        color: white !important;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        border-color: #e2e8f0;
     }
     
     /* Sub-tabs styling for Single Workload */
     .stTabs .stTabs [data-baseweb="tab"] {
-        height: 40px;
+        height: 50px;
         background-color: #f1f5f9;
         font-size: 14px;
         color: #475569;
@@ -157,6 +339,144 @@ st.markdown("""
     .stTabs .stTabs [aria-selected="true"]:hover {
         background-color: #0d9488 !important;
         color: white !important;
+    }
+    
+    /* Form Elements */
+    .stSelectbox > div > div {
+        border-radius: 12px;
+        border: 2px solid #e2e8f0;
+        transition: all 0.3s ease;
+    }
+    
+    .stSelectbox > div > div:focus-within {
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+    
+    .stNumberInput > div > div {
+        border-radius: 12px;
+        border: 2px solid #e2e8f0;
+        transition: all 0.3s ease;
+    }
+    
+    .stNumberInput > div > div:focus-within {
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+    
+    /* Buttons */
+    .stButton > button {
+        border-radius: 12px;
+        font-weight: 600;
+        padding: 0.75rem 2rem;
+        border: none;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .stButton > button[data-testid="baseButton-primary"] {
+        background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+        color: white;
+        box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+    }
+    
+    .stButton > button[data-testid="baseButton-primary"]:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(59, 130, 246, 0.4);
+    }
+    
+    /* Expandable Sections */
+    .streamlit-expanderHeader {
+        background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+        font-weight: 600;
+        color: #374151;
+    }
+    
+    /* Progress Indicators */
+    .progress-ring {
+        display: inline-block;
+        width: 80px;
+        height: 80px;
+        margin: 1rem;
+    }
+    
+    /* Alert Boxes */
+    .stAlert {
+        border-radius: 12px;
+        border: none;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+    }
+    
+    /* Footer Frame */
+    .footer-frame {
+        background: linear-gradient(135deg, #1e293b, #374151);
+        color: #e2e8f0;
+        padding: 2rem 3rem;
+        text-align: center;
+        border-top: 1px solid #374151;
+    }
+    
+    /* Animation Classes */
+    .fade-in {
+        animation: fadeIn 0.6s ease-in;
+    }
+    
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .slide-in-left {
+        animation: slideInLeft 0.6s ease-out;
+    }
+    
+    @keyframes slideInLeft {
+        from { opacity: 0; transform: translateX(-30px); }
+        to { opacity: 1; transform: translateX(0); }
+    }
+    
+    /* Loading States */
+    .loading-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 3rem;
+    }
+    
+    .loading-spinner {
+        width: 50px;
+        height: 50px;
+        border: 4px solid #f3f4f6;
+        border-top: 4px solid #3b82f6;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    
+    /* Responsive Design */
+    @media (max-width: 768px) {
+        .header-frame {
+            padding: 1.5rem 2rem;
+        }
+        
+        .header-title {
+            font-size: 2rem;
+        }
+        
+        .content-frame {
+            padding: 1.5rem 2rem;
+        }
+        
+        .modern-card {
+            padding: 1.5rem;
+        }
     }
 </style>
 """, unsafe_allow_html=True)
@@ -2398,11 +2718,164 @@ def initialize_enhanced_session_state():
         logger.error(f"Error initializing session state: {e}")
         st.session_state.enhanced_calculator = None
         st.session_state.enhanced_results = None
+# ADD THESE NEW FUNCTIONS TO YOUR CODE
+
+def render_modern_header():
+    """Render the modern header frame."""
+    st.markdown("""
+    <div class="header-frame">
+        <div class="header-content">
+            <div class="header-title">🏢 AWS Migration Platform</div>
+            <div class="header-subtitle">Comprehensive Enterprise Migration Analysis with AI-Powered Insights</div>
+            <div class="header-version">
+                🤖 v7.0 Enhanced • Powered by Claude AI • Real-time AWS Integration
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+def render_modern_sidebar():
+    """Render enhanced sidebar with modern frame."""
+    with st.sidebar:
+        st.markdown("""
+        <div class="modern-card">
+            <h3 style="margin-top: 0; color: #1e293b;">🔑 AI Configuration</h3>
+        """, unsafe_allow_html=True)
+        
+        # Claude API Status
+        analyzer = ClaudeAIMigrationAnalyzer()
+        api_key = analyzer._get_claude_api_key()
+        
+        if api_key:
+            status_class = "status-connected"
+            status_text = "🟢 Claude AI Connected"
+            status_description = "Real-time AI analysis available"
+        else:
+            status_class = "status-warning" 
+            status_text = "🔴 Claude AI Fallback Mode"
+            status_description = "Using default analysis patterns"
+        
+        st.markdown(f"""
+            <div class="{status_class} status-indicator" style="width: 100%; justify-content: center; margin-bottom: 1rem;">
+                {status_text}
+            </div>
+            <p style="text-align: center; color: #64748b; margin-bottom: 1rem;">{status_description}</p>
+        """, unsafe_allow_html=True)
+        
+        if not api_key:
+            with st.expander("🔧 Configure Claude API", expanded=False):
+                st.markdown("""
+                **Add to Streamlit Secrets:**
+                ```toml
+                ANTHROPIC_API_KEY = "your-api-key"
+                ```
+                
+                **Or set environment variable:**
+                ```bash
+                export ANTHROPIC_API_KEY="your-api-key"
+                ```
+                
+                Get your API key at [console.anthropic.com](https://console.anthropic.com/)
+                """)
+        
+        st.markdown("</div>", unsafe_allow_html=True)
+        
+        # Integration Status
+        st.markdown("""
+        <div class="modern-card">
+            <h3 style="margin-top: 0; color: #1e293b;">🔗 Integration Status</h3>
+        """, unsafe_allow_html=True)
+        
+        # Claude AI Status
+        claude_status = "Connected" if api_key else "Fallback Mode"
+        claude_color = "#10b981" if api_key else "#f59e0b"
+        
+        st.markdown(f"""
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding: 1rem; background: linear-gradient(135deg, #fee2e2, #fecaca); border-radius: 12px;">
+            <div>
+                <div style="font-weight: 600; color: #dc2626;">🤖 Claude AI</div>
+                <div style="font-size: 0.85rem; color: #7f1d1d;">Migration Analysis</div>
+            </div>
+            <div style="background: {claude_color}; color: white; padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.75rem; font-weight: 600;">
+                {claude_status}
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown(f"""
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding: 1rem; background: linear-gradient(135deg, #fff7ed, #fed7aa); border-radius: 12px;">
+            <div>
+                <div style="font-weight: 600; color: #ea580c;">☁️ AWS Services</div>
+                <div style="font-size: 0.85rem; color: #9a3412;">Cost & Instance Data</div>
+            </div>
+            <div style="background: #10b981; color: white; padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.75rem; font-weight: 600;">
+                Connected
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown("</div>", unsafe_allow_html=True)
+        
+        # Features Overview
+        st.markdown("""
+        <div class="modern-card">
+            <h3 style="margin-top: 0; color: #1e293b;">🚀 Platform Features</h3>
+            <div style="font-size: 0.9rem; line-height: 1.6; color: #475569;">
+                <strong>🤖 AI-Powered Analysis</strong><br>
+                • Migration complexity scoring<br>
+                • Risk assessment & mitigation<br>
+                • Intelligent timeline estimation<br><br>
+                
+                <strong>☁️ AWS Integration</strong><br>
+                • Real-time pricing data<br>
+                • Instance recommendations<br>
+                • Cost optimization insights<br><br>
+                
+                <strong>📊 Multi-Environment</strong><br>
+                • Development lifecycle analysis<br>
+                • Environment heat maps<br>
+                • Technical specifications<br><br>
+                
+                <strong>📋 Enterprise Reports</strong><br>
+                • PDF & Excel exports<br>
+                • Bulk workload analysis<br>
+                • Executive summaries
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Quick Stats
+        if st.session_state.get('enhanced_results'):
+            st.markdown("""
+            <div class="modern-card">
+                <h3 style="margin-top: 0; color: #1e293b;">📈 Current Analysis</h3>
+            """, unsafe_allow_html=True)
+            
+            prod_results = st.session_state.enhanced_results['recommendations'].get('PROD', {})
+            claude_analysis = prod_results.get('claude_analysis', {})
+            tco_analysis = prod_results.get('tco_analysis', {})
+            
+            complexity_score = claude_analysis.get('complexity_score', 0)
+            monthly_cost = tco_analysis.get('monthly_cost', 0)
+            
+            st.metric("Complexity Score", f"{complexity_score:.0f}/100", delta=None)
+            st.metric("Monthly Cost", f"${monthly_cost:,.0f}", delta=None)
+            
+            st.markdown("</div>", unsafe_allow_html=True)
+
+
+# REPLACE YOUR EXISTING render_enhanced_configuration() FUNCTION WITH THIS
 
 def render_enhanced_configuration():
-    """Render enhanced configuration."""
-    
-    st.markdown("### ⚙️ Enhanced Enterprise Workload Configuration")
+    """Render enhanced configuration with modern cards."""
+    st.markdown("""
+    <div class="modern-card fade-in">
+        <h3 style="margin-top: 0; color: #1e293b; display: flex; align-items: center;">
+            ⚙️ Workload Configuration
+            <span style="margin-left: auto; font-size: 0.8rem; background: linear-gradient(135deg, #3b82f6, #8b5cf6); color: white; padding: 0.25rem 0.75rem; border-radius: 20px;">Step 1</span>
+        </h3>
+    </div>
+    """, unsafe_allow_html=True)
     
     # Check if calculator exists
     if 'enhanced_calculator' not in st.session_state or st.session_state.enhanced_calculator is None:
@@ -2423,12 +2896,12 @@ def render_enhanced_configuration():
             )
             
             workload_types = {
-                'web_application': 'Web Application (Frontend, CDN)',
-                'application_server': 'Application Server (APIs, Middleware)',
-                'database_server': 'Database Server (RDBMS, NoSQL)',
-                'file_server': 'File Server (Storage, Backup)',
-                'compute_intensive': 'Compute Intensive (HPC, Analytics)',
-                'analytics_workload': 'Analytics Workload (BI, Data Processing)'
+                'web_application': '🌐 Web Application (Frontend, CDN)',
+                'application_server': '⚙️ Application Server (APIs, Middleware)',
+                'database_server': '🗄️ Database Server (RDBMS, NoSQL)',
+                'file_server': '📁 File Server (Storage, Backup)',
+                'compute_intensive': '🔥 Compute Intensive (HPC, Analytics)',
+                'analytics_workload': '📊 Analytics Workload (BI, Data Processing)'
             }
             
             calculator.inputs["workload_type"] = st.selectbox(
@@ -2448,7 +2921,7 @@ def render_enhanced_configuration():
             calculator.inputs["operating_system"] = st.selectbox(
                 "Operating System",
                 ["linux", "windows"],
-                format_func=lambda x: "Linux (Amazon Linux, Ubuntu, RHEL)" if x == "linux" else "Windows Server"
+                format_func=lambda x: "🐧 Linux (Amazon Linux, Ubuntu, RHEL)" if x == "linux" else "🪟 Windows Server"
             )
     
     # Infrastructure metrics
@@ -2456,7 +2929,7 @@ def render_enhanced_configuration():
         col1, col2, col3 = st.columns(3)
         
         with col1:
-            st.markdown("**Compute Resources**")
+            st.markdown("**💻 Compute Resources**")
             calculator.inputs["on_prem_cores"] = st.number_input(
                 "CPU Cores", min_value=1, max_value=128, value=calculator.inputs["on_prem_cores"]
             )
@@ -2465,7 +2938,7 @@ def render_enhanced_configuration():
             )
         
         with col2:
-            st.markdown("**Memory Resources**")
+            st.markdown("**🧠 Memory Resources**")
             calculator.inputs["on_prem_ram_gb"] = st.number_input(
                 "RAM (GB)", min_value=1, max_value=1024, value=calculator.inputs["on_prem_ram_gb"]
             )
@@ -2474,7 +2947,7 @@ def render_enhanced_configuration():
             )
         
         with col3:
-            st.markdown("**Storage & I/O**")
+            st.markdown("**💾 Storage & I/O**")
             calculator.inputs["storage_current_gb"] = st.number_input(
                 "Storage (GB)", min_value=1, value=calculator.inputs["storage_current_gb"]
             )
@@ -2482,15 +2955,22 @@ def render_enhanced_configuration():
                 "Peak IOPS", min_value=1, value=calculator.inputs["peak_iops"]
             )
     
-    # Analysis buttons
+    # Analysis button with enhanced styling
     st.markdown("---")
-    if st.button("🚀 Run Enhanced Analysis", type="primary", key="main_enhanced_analysis_button"):
-        run_enhanced_analysis()
-        
-    # Success message with navigation hint
-    if st.session_state.enhanced_results:
-        st.success("✅ Analysis completed! Check the 'Results', 'Heat Map', and 'Technical Reports' tabs above for detailed analysis.")
-        st.info("💡 Visit the 'Reports' tab to generate PDF and Excel reports.")
+    
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        if st.button("🚀 Run Enhanced AI Analysis", type="primary", key="main_enhanced_analysis_button", use_container_width=True):
+            run_enhanced_analysis()
+    
+    # Success message
+    if st.session_state.get('enhanced_results'):
+        st.markdown("""
+        <div style="background: linear-gradient(135deg, #d1fae5, #a7f3d0); border: 2px solid #10b981; border-radius: 12px; padding: 1.5rem; margin-top: 1rem; text-align: center;">
+            <h4 style="color: #065f46; margin: 0 0 0.5rem 0;">✅ Analysis Completed Successfully!</h4>
+            <p style="color: #047857; margin: 0;">Check the Results, Heat Map, and Technical Reports tabs for detailed analysis.</p>
+        </div>
+        """, unsafe_allow_html=True)
 
 def run_enhanced_analysis():
     """Run enhanced analysis."""
@@ -2527,16 +3007,30 @@ def run_enhanced_analysis():
             st.error(f"❌ Error during enhanced analysis: {str(e)}")
             logger.error(f"Error in enhanced analysis: {e}")
 
+# REPLACE YOUR EXISTING render_enhanced_results() FUNCTION WITH THIS
+
 def render_enhanced_results():
-    """Render enhanced analysis results."""
-    
+    """Render enhanced results with modern metric cards."""
     if 'enhanced_results' not in st.session_state or st.session_state.enhanced_results is None:
-        st.info("💡 Run an enhanced analysis to see results here.")
+        st.markdown("""
+        <div class="modern-card" style="text-align: center; padding: 3rem;">
+            <h3 style="color: #64748b; margin-bottom: 1rem;">📊 Analysis Results</h3>
+            <p style="color: #94a3b8;">Run an enhanced analysis to see comprehensive results here.</p>
+            <div style="font-size: 4rem; margin: 2rem 0; opacity: 0.3;">📈</div>
+        </div>
+        """, unsafe_allow_html=True)
         return
     
     try:
         results = st.session_state.enhanced_results
-        st.markdown("### 📊 Enhanced Analysis Results")
+        st.markdown("""
+        <div class="modern-card fade-in">
+            <h3 style="margin-top: 0; color: #1e293b; display: flex; align-items: center;">
+                📊 Analysis Results
+                <span style="margin-left: auto; font-size: 0.8rem; background: linear-gradient(135deg, #10b981, #059669); color: white; padding: 0.25rem 0.75rem; border-radius: 20px;">Completed</span>
+            </h3>
+        </div>
+        """, unsafe_allow_html=True)
         
         recommendations = results.get('recommendations', {})
         if not recommendations or 'PROD' not in recommendations:
@@ -2547,7 +3041,7 @@ def render_enhanced_results():
         claude_analysis = prod_results.get('claude_analysis', {})
         tco_analysis = prod_results.get('tco_analysis', {})
         
-        # Summary metrics
+        # Enhanced Metric Cards
         col1, col2, col3, col4 = st.columns(4)
         
         with col1:
@@ -2555,10 +3049,10 @@ def render_enhanced_results():
             complexity_level = claude_analysis.get('complexity_level', 'MEDIUM')
             
             st.markdown(f"""
-            <div class="metric-card">
-                <div style="font-size: 0.875rem; font-weight: 600; color: #6b7280; margin-bottom: 0.5rem;">🤖 Migration Complexity</div>
-                <div style="font-size: 2rem; font-weight: 700; color: #1f2937; margin-bottom: 0.25rem;">{complexity_score:.0f}/100</div>
-                <div style="font-size: 0.75rem; color: #9ca3af;">{complexity_level}</div>
+            <div class="metric-card-enhanced">
+                <div class="metric-label">🤖 Migration Complexity</div>
+                <div class="metric-value">{complexity_score:.0f}/100</div>
+                <div class="metric-description">{complexity_level} Complexity</div>
             </div>
             """, unsafe_allow_html=True)
         
@@ -2566,10 +3060,10 @@ def render_enhanced_results():
             monthly_cost = tco_analysis.get('monthly_cost', 0)
             
             st.markdown(f"""
-            <div class="metric-card">
-                <div style="font-size: 0.875rem; font-weight: 600; color: #6b7280; margin-bottom: 0.5rem;">☁️ AWS Monthly Cost</div>
-                <div style="font-size: 2rem; font-weight: 700; color: #1f2937; margin-bottom: 0.25rem;">${monthly_cost:,.0f}</div>
-                <div style="font-size: 0.75rem; color: #9ca3af;">Optimized Pricing</div>
+            <div class="metric-card-enhanced">
+                <div class="metric-label">☁️ AWS Monthly Cost</div>
+                <div class="metric-value">${monthly_cost:,.0f}</div>
+                <div class="metric-description">Optimized Pricing</div>
             </div>
             """, unsafe_allow_html=True)
         
@@ -2578,32 +3072,35 @@ def render_enhanced_results():
             max_weeks = timeline.get('max_weeks', 8)
             
             st.markdown(f"""
-            <div class="metric-card">
-                <div style="font-size: 0.875rem; font-weight: 600; color: #6b7280; margin-bottom: 0.5rem;">⏱️ Migration Timeline</div>
-                <div style="font-size: 2rem; font-weight: 700; color: #1f2937; margin-bottom: 0.25rem;">{max_weeks}</div>
-                <div style="font-size: 0.75rem; color: #9ca3af;">Weeks (Estimated)</div>
+            <div class="metric-card-enhanced">
+                <div class="metric-label">⏱️ Migration Timeline</div>
+                <div class="metric-value">{max_weeks}</div>
+                <div class="metric-description">Weeks (Estimated)</div>
             </div>
             """, unsafe_allow_html=True)
         
         with col4:
+            instance_type = prod_results.get('cost_breakdown', {}).get('selected_instance', {}).get('type', 'N/A')
+            
             st.markdown(f"""
-            <div class="metric-card">
-                <div style="font-size: 0.875rem; font-weight: 600; color: #6b7280; margin-bottom: 0.5rem;">🖥️ Instance Type</div>
-                <div style="font-size: 1.5rem; font-weight: 700; color: #1f2937; margin-bottom: 0.25rem;">
-                    {prod_results.get('cost_breakdown', {}).get('selected_instance', {}).get('type', 'N/A')}
-                </div>
-                <div style="font-size: 0.75rem; color: #9ca3af;">Recommended</div>
+            <div class="metric-card-enhanced">
+                <div class="metric-label">🖥️ Instance Type</div>
+                <div class="metric-value" style="font-size: 1.8rem;">{instance_type}</div>
+                <div class="metric-description">Recommended</div>
             </div>
             """, unsafe_allow_html=True)
         
-        # Claude AI Analysis
-        st.markdown("### 🤖 Claude AI Migration Analysis")
+        # Claude AI Analysis Section
+        st.markdown("""
+        <div class="modern-card slide-in-left">
+            <h3 style="margin-top: 0; color: #1e293b;">🤖 Claude AI Migration Analysis</h3>
+        """, unsafe_allow_html=True)
         
         if claude_analysis:
             col1, col2 = st.columns(2)
             
             with col1:
-                st.markdown("**Migration Strategy**")
+                st.markdown("**🎯 Migration Strategy**")
                 strategy = claude_analysis.get('migration_strategy', {})
                 if strategy:
                     st.markdown(f"**Approach:** {strategy.get('approach', 'N/A')}")
@@ -2612,7 +3109,7 @@ def render_enhanced_results():
                     st.markdown(f"**Risk Level:** {strategy.get('risk_level', 'N/A')}")
             
             with col2:
-                st.markdown("**Migration Steps**")
+                st.markdown("**📋 Migration Implementation**")
                 migration_steps = claude_analysis.get('migration_steps', [])
                 
                 for i, step in enumerate(migration_steps[:3], 1):
@@ -2626,8 +3123,14 @@ def render_enhanced_results():
                                 for task in tasks[:3]:
                                     st.markdown(f"• {task}")
         
-        # Cost Analysis
-        st.markdown("### 💰 Cost Analysis")
+        st.markdown("</div>", unsafe_allow_html=True)
+        
+        # Cost Analysis Section with Chart
+        st.markdown("""
+        <div class="modern-card fade-in">
+            <h3 style="margin-top: 0; color: #1e293b;">💰 Cost Analysis & Breakdown</h3>
+        </div>
+        """, unsafe_allow_html=True)
         
         cost_breakdown = prod_results.get('cost_breakdown', {})
         total_costs = cost_breakdown.get('total_costs', {})
@@ -2636,7 +3139,7 @@ def render_enhanced_results():
             col1, col2 = st.columns(2)
             
             with col1:
-                st.markdown("**Instance Pricing Comparison**")
+                st.markdown("**💳 Instance Pricing Comparison**")
                 cost_data = []
                 for pricing_model, cost in total_costs.items():
                     cost_data.append({
@@ -2649,9 +3152,9 @@ def render_enhanced_results():
                 st.dataframe(df_costs, use_container_width=True, hide_index=True)
             
             with col2:
-                st.markdown("**AWS Service Cost Breakdown (PROD)**")
+                st.markdown("**🔧 Service Cost Distribution**")
                 
-                # Calculate detailed service costs if available
+                # Create a simple pie chart for cost visualization
                 try:
                     analyzer = EnhancedEnvironmentAnalyzer()
                     tech_recs = analyzer.get_technical_recommendations('PROD', prod_results)
@@ -2659,48 +3162,47 @@ def render_enhanced_results():
                     service_costs = cost_calculator.calculate_service_costs(
                         'PROD', tech_recs, prod_results.get('requirements', {}))
                     
-                    service_cost_data = []
                     categories = ['compute', 'network', 'storage', 'database', 'security', 'monitoring']
-                    for cat in categories:
-                        if cat in service_costs:
-                            service_cost_data.append({
-                                'Service Category': cat.title(),
-                                'Monthly Cost': f"${service_costs[cat]['total']:.2f}"
-                            })
+                    costs = [service_costs[cat]['total'] for cat in categories if cat in service_costs]
+                    labels = [cat.title() for cat in categories if cat in service_costs]
                     
-                    if service_cost_data:
-                        df_service_costs = pd.DataFrame(service_cost_data)
-                        st.dataframe(df_service_costs, use_container_width=True, hide_index=True)
+                    if costs and labels:
+                        fig = go.Figure(data=[go.Pie(
+                            labels=labels,
+                            values=costs,
+                            hole=.3,
+                            marker_colors=['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4']
+                        )])
                         
-                        # Show total from service breakdown
-                        total_services = sum(service_costs[cat]['total'] for cat in categories if cat in service_costs)
-                        st.markdown(f"**Total Monthly AWS Services Cost: ${total_services:.2f}**")
-                    else:
-                        # Fallback to basic cost display
-                        basic_cost_data = [
-                            {'Cost Component': 'Instance Costs', 'Monthly Cost': f"${cost_breakdown.get('instance_costs', {}).get('on_demand', 0):.2f}"},
-                            {'Cost Component': 'Storage Costs', 'Monthly Cost': f"${cost_breakdown.get('storage_costs', {}).get('primary_storage', 0):.2f}"},
-                            {'Cost Component': 'Network Costs', 'Monthly Cost': f"${cost_breakdown.get('network_costs', {}).get('data_transfer', 0):.2f}"}
-                        ]
+                        fig.update_layout(
+                            height=300,
+                            margin=dict(t=20, b=20, l=20, r=20),
+                            showlegend=True,
+                            legend=dict(orientation="v", yanchor="middle", y=0.5)
+                        )
                         
-                        df_basic_costs = pd.DataFrame(basic_cost_data)
-                        st.dataframe(df_basic_costs, use_container_width=True, hide_index=True)
-                
+                        st.plotly_chart(fig, use_container_width=True)
+                        
+                        # Show total
+                        total_services = sum(costs)
+                        st.markdown(f"**Total Monthly AWS Services: ${total_services:.2f}**")
+                    
                 except Exception as e:
-                    logger.error(f"Error calculating detailed service costs: {e}")
-                    # Fallback to basic cost display
+                    # Fallback display
                     basic_cost_data = [
-                        {'Cost Component': 'Instance Costs', 'Monthly Cost': f"${cost_breakdown.get('instance_costs', {}).get('on_demand', 0):.2f}"},
-                        {'Cost Component': 'Storage Costs', 'Monthly Cost': f"${cost_breakdown.get('storage_costs', {}).get('primary_storage', 0):.2f}"},
-                        {'Cost Component': 'Network Costs', 'Monthly Cost': f"${cost_breakdown.get('network_costs', {}).get('data_transfer', 0):.2f}"}
+                        {'Component': 'Compute', 'Cost': f"${cost_breakdown.get('instance_costs', {}).get('on_demand', 0):.2f}"},
+                        {'Component': 'Storage', 'Cost': f"${cost_breakdown.get('storage_costs', {}).get('primary_storage', 0):.2f}"},
+                        {'Component': 'Network', 'Cost': f"${cost_breakdown.get('network_costs', {}).get('data_transfer', 0):.2f}"}
                     ]
                     
-                    df_basic_costs = pd.DataFrame(basic_cost_data)
-                    st.dataframe(df_basic_costs, use_container_width=True, hide_index=True)
+                    df_basic = pd.DataFrame(basic_cost_data)
+                    st.dataframe(df_basic, use_container_width=True, hide_index=True)
         
     except Exception as e:
         st.error(f"❌ Error displaying results: {str(e)}")
         logger.error(f"Error in render_enhanced_results: {e}")
+        
+
 
 def render_enhanced_environment_heatmap_tab():
     """Render enhanced environment heat map tab with detailed explanations."""
@@ -4612,8 +5114,10 @@ def get_env_characteristics(env: str) -> str:
     }
     return characteristics.get(env, 'Standard environment characteristics')
 
+# REPLACE YOUR EXISTING main() FUNCTION WITH THIS
+
 def main():
-    """Enhanced main application with nested tab structure."""
+    """Main application with modern frame layout."""
     
     # Initialize session state
     initialize_enhanced_session_state()
@@ -4625,125 +5129,25 @@ def main():
             st.rerun()
         st.stop()
     
-    # Enhanced header
-    st.markdown("""
-    <div class="main-header">
-        <h1>🏢 Enhanced AWS Migration Platform v7.0</h1>
-        <p>Comprehensive environment analysis with real Claude AI integration, detailed technical recommendations, and AI-powered migration insights</p>
-        <p style="font-size: 0.9rem; opacity: 0.9;">🤖 Now featuring real Anthropic Claude API integration for intelligent migration analysis</p>
-    </div>
-    """, unsafe_allow_html=True)
+    # Main Application Frame
+    st.markdown('<div class="main-app-frame">', unsafe_allow_html=True)
     
-    # Enhanced sidebar
-    with st.sidebar:
-        st.markdown("### 🔑 Claude AI Configuration")
-        
-        # Claude API Key configuration
-        api_key_placeholder = st.empty()
-        
-        # Check if API key is available
-        analyzer = ClaudeAIMigrationAnalyzer()
-        api_key = analyzer._get_claude_api_key()
-        
-        if api_key:
-            api_status = "🟢 Connected"
-            api_help = "Claude AI is connected and ready for analysis"
-        else:
-            api_status = "🔴 Not Connected"
-            api_help = "Add ANTHROPIC_API_KEY to Streamlit secrets or environment variables"
-        
-        with api_key_placeholder.container():
-            st.markdown(f"**Status:** {api_status}")
-            st.markdown(f"*{api_help}*")
-            
-            if not api_key:
-                with st.expander("🔧 How to configure Claude API", expanded=False):
-                    st.markdown("""
-                    **Option 1: Streamlit Secrets (Recommended)**
-                    1. Create `.streamlit/secrets.toml` file
-                    2. Add: `ANTHROPIC_API_KEY = "your-api-key-here"`
-                    
-                    **Option 2: Environment Variable**
-                    1. Set environment variable: `ANTHROPIC_API_KEY=your-api-key-here`
-                    
-                    **Get API Key:**
-                    1. Visit [Anthropic Console](https://console.anthropic.com/)
-                    2. Create account and get API key
-                    3. Add to your configuration
-                    """)
-        
-        st.markdown("---")
-        
-        st.markdown("### 🤖 AI + AWS Integration Status")
-        
-        # Integration status indicators
-        claude_status = "🟢 Active" if api_key else "🟡 Fallback Mode"
-        
-        st.markdown(f"""
-        <div style="padding: 1rem; border-radius: 8px; background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%); margin-bottom: 1rem;">
-            <h4 style="margin: 0; color: #dc2626;">🤖 Claude AI</h4>
-            <p style="margin: 0; font-size: 0.875rem;">Migration Complexity Analysis</p>
-            <span style="background: {'#10b981' if api_key else '#f59e0b'}; color: white; padding: 0.25rem 0.5rem; border-radius: 12px; font-size: 0.75rem;">{claude_status}</span>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        st.markdown("""
-        <div style="padding: 1rem; border-radius: 8px; background: linear-gradient(135deg, #fff7ed 0%, #fed7aa 100%); margin-bottom: 1rem;">
-            <h4 style="margin: 0; color: #ea580c;">☁️ AWS Integration</h4>
-            <p style="margin: 0; font-size: 0.875rem;">Real-time Cost & Instance Analysis</p>
-            <span style="background: #10b981; color: white; padding: 0.25rem 0.5rem; border-radius: 12px; font-size: 0.75rem;">Connected</span>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        st.markdown("---")
-        
-        # Enhanced features list
-        st.markdown("""
-        ### 🚀 Enhanced Features
-        
-        **🤖 Claude AI Analysis:**
-        - Migration complexity scoring
-        - Risk assessment & mitigation
-        - Intelligent migration strategies
-        - Timeline estimation
-        
-        **☁️ AWS Integration:**
-        - Real-time pricing data
-        - Instance recommendations
-        - Cost optimization insights
-        - Rightsizing analysis
-        
-        **📊 Environment Analysis:**
-        - Multi-environment heat maps
-        - Impact assessment across dev lifecycle
-        - Environment-specific recommendations
-        
-        **🔧 Technical Specifications:**
-        - Compute, Network, Storage configs
-        - Database recommendations
-        - Security & monitoring setup
-        - Auto-scaling strategies
-        """)
-        
-        # Quick stats if results available
-        if st.session_state.enhanced_results:
-            st.markdown("---")
-            st.markdown("### 📈 Quick Stats")
-            
-            prod_results = st.session_state.enhanced_results['recommendations'].get('PROD', {})
-            claude_analysis = prod_results.get('claude_analysis', {})
-            tco_analysis = prod_results.get('tco_analysis', {})
-            
-            complexity_score = claude_analysis.get('complexity_score', 0)
-            monthly_cost = tco_analysis.get('monthly_cost', 0)
-            
-            st.metric("Complexity Score", f"{complexity_score:.0f}/100")
-            st.metric("Monthly Cost", f"${monthly_cost:,.0f}")
+    # Render modern header
+    render_modern_header()
     
-    # MAIN TABS - Updated structure with nested tabs
-    main_tabs = st.tabs(["Single Workload", "Bulk Layout", "Reports"])
+    # Navigation frame (tabs)
+    st.markdown('<div class="nav-frame">', unsafe_allow_html=True)
     
-    # SINGLE WORKLOAD TAB with nested sub-tabs
+    # Main content area
+    st.markdown('<div class="content-frame">', unsafe_allow_html=True)
+    
+    # Render sidebar
+    render_modern_sidebar()
+    
+    # Main tabs
+    main_tabs = st.tabs(["🖥️ Single Workload", "📁 Bulk Analysis", "📋 Reports"])
+    
+    # Single Workload Tab with full functionality
     with main_tabs[0]:
         st.markdown("### 🖥️ Single Workload Analysis")
         
@@ -4760,18 +5164,21 @@ def main():
         
         # Heat Map sub-tab
         with single_workload_subtabs[2]:
+            # KEEP YOUR ORIGINAL FUNCTION HERE
             render_enhanced_environment_heatmap_tab()
         
         # Technical Reports sub-tab
         with single_workload_subtabs[3]:
+            # KEEP YOUR ORIGINAL FUNCTION HERE
             render_technical_recommendations_tab()
     
-    # BULK LAYOUT TAB
+    # Bulk Analysis Tab with full functionality
     with main_tabs[1]:
         st.markdown("### 📁 Bulk Workload Analysis")
+        # KEEP YOUR ORIGINAL FUNCTION HERE
         render_bulk_upload_tab()
     
-    # REPORTS TAB (kept separate for global reports)
+    # Reports Tab with full functionality
     with main_tabs[2]:
         st.markdown("### 📋 Enhanced Reports")
         
@@ -4807,10 +5214,12 @@ def main():
                 
                 with col1:
                     if st.button("📄 Generate PDF Report", type="primary", key="reports_pdf_generate"):
+                        # KEEP YOUR ORIGINAL FUNCTION HERE
                         generate_enhanced_pdf_report()
                 
                 with col2:
                     if st.button("📊 Export to Excel", key="reports_tab_excel"):
+                        # KEEP YOUR ORIGINAL FUNCTION HERE
                         generate_enhanced_excel_report()
                 
                 with col3:
@@ -4861,9 +5270,11 @@ def main():
                 col1, col2 = st.columns(2)
                 with col1:
                     if st.button("📊 Export to Excel", key="bulk_excel_export_reports"):
+                        # KEEP YOUR ORIGINAL FUNCTION HERE
                         export_bulk_results_to_excel(st.session_state.bulk_results)
                 with col2:
                     if st.button("📄 Generate PDF Report", key="bulk_pdf_export_reports"):
+                        # KEEP YOUR ORIGINAL FUNCTION HERE
                         export_bulk_results_to_pdf(st.session_state.bulk_results)
                 
                 # Show bulk summary
@@ -4889,17 +5300,26 @@ def main():
         else:
             st.info("💡 Run an analysis (Single Workload or Bulk Upload) to generate comprehensive reports.")
     
-    # Enhanced footer
-    st.markdown("---")
+    st.markdown('</div>', unsafe_allow_html=True)  # Close content-frame
+    st.markdown('</div>', unsafe_allow_html=True)  # Close nav-frame
+    
+    # Enhanced Footer
     st.markdown("""
-    <div style="text-align: center; color: #6b7280; font-size: 0.875rem; padding: 2rem 0;">
-        <strong>Enhanced AWS Migration Platform v7.0</strong><br>
-        Now powered by <strong>Real Anthropic Claude AI API</strong> for intelligent migration analysis and comprehensive technical recommendations<br>
-        <em>🤖 Real AI-Enhanced • ☁️ AWS-Native • 📊 Data-Driven • 🔧 Technical-Complete • 📋 Excel/PDF Reports</em>
+    <div class="footer-frame">
+        <div style="font-weight: 600; font-size: 1.1rem; margin-bottom: 0.5rem;">
+            Enhanced AWS Migration Platform v7.0
+        </div>
+        <div style="opacity: 0.8;">
+            Powered by Real Anthropic Claude AI • AWS Integration • Enterprise-Grade Analysis
+        </div>
+        <div style="margin-top: 1rem; font-size: 0.9rem; opacity: 0.7;">
+            🤖 AI-Enhanced • ☁️ AWS-Native • 📊 Data-Driven • 🔧 Technical-Complete
+        </div>
     </div>
     """, unsafe_allow_html=True)
+    
+    st.markdown('</div>', unsafe_allow_html=True)  # Close main-app-frame
 
 if __name__ == "__main__":
     main()
-        
       
