@@ -16,6 +16,8 @@ from typing import Dict, List, Tuple, Optional, Any
 import numpy as np
 import anthropic
 import requests
+import csv
+from io import StringIO
 
 # Configure page - MUST be first Streamlit command
 st.set_page_config(
@@ -2039,6 +2041,246 @@ class EnvironmentHeatMapGenerator:
                              xref="paper", yref="paper", x=0.5, y=0.5, showarrow=False)
             return fig
 
+class BulkWorkloadAnalyzer:
+    """Handle bulk workload analysis from uploaded files."""
+    
+    def __init__(self):
+        self.claude_analyzer = ClaudeAIMigrationAnalyzer()
+        self.calculator = EnhancedEnterpriseEC2Calculator()
+        
+    def process_bulk_upload(self, uploaded_file, file_type: str) -> Dict[str, Any]:
+        """Process bulk upload file and return analysis results."""
+        try:
+            if file_type == 'csv':
+                return self._process_csv_file(uploaded_file)
+            elif file_type == 'excel':
+                return self._process_excel_file(uploaded_file)
+            else:
+                raise ValueError(f"Unsupported file type: {file_type}")
+                
+        except Exception as e:
+            logger.error(f"Error processing bulk upload: {e}")
+            return {'error': str(e), 'workloads': []}
+    
+    def _process_csv_file(self, uploaded_file) -> Dict[str, Any]:
+        """Process CSV file."""
+        try:
+            # Read CSV content
+            content = uploaded_file.read().decode('utf-8')
+            csv_data = list(csv.DictReader(StringIO(content)))
+            
+            return self._analyze_workloads(csv_data)
+            
+        except Exception as e:
+            return {'error': f"CSV processing error: {str(e)}", 'workloads': []}
+    
+    def _process_excel_file(self, uploaded_file) -> Dict[str, Any]:
+        """Process Excel file."""
+        try:
+            if not OPENPYXL_AVAILABLE:
+                return {'error': 'openpyxl not available for Excel processing', 'workloads': []}
+                
+            # Read Excel content
+            df = pd.read_excel(uploaded_file, engine='openpyxl')
+            workloads_data = df.to_dict('records')
+            
+            return self._analyze_workloads(workloads_data)
+            
+        except Exception as e:
+            return {'error': f"Excel processing error: {str(e)}", 'workloads': []}
+    
+    def _analyze_workloads(self, workloads_data: List[Dict]) -> Dict[str, Any]:
+        """Analyze multiple workloads."""
+        results = {
+            'total_workloads': len(workloads_data),
+            'successful_analyses': 0,
+            'failed_analyses': 0,
+            'workloads': [],
+            'summary': {}
+        }
+        
+        for i, workload_data in enumerate(workloads_data):
+            try:
+                # Validate and normalize workload data
+                normalized_workload = self._normalize_workload_data(workload_data)
+                
+                # Analyze for all environments
+                workload_results = {}
+                for env in ['DEV', 'QA', 'UAT', 'PREPROD', 'PROD']:
+                    env_analysis = self._analyze_single_workload(normalized_workload, env)
+                    workload_results[env] = env_analysis
+                
+                results['workloads'].append({
+                    'index': i + 1,
+                    'workload_name': normalized_workload.get('workload_name', f'Workload {i+1}'),
+                    'status': 'success',
+                    'analysis': workload_results
+                })
+                
+                results['successful_analyses'] += 1
+                
+            except Exception as e:
+                results['workloads'].append({
+                    'index': i + 1,
+                    'workload_name': workload_data.get('workload_name', f'Workload {i+1}'),
+                    'status': 'failed',
+                    'error': str(e)
+                })
+                results['failed_analyses'] += 1
+        
+        # Generate summary
+        results['summary'] = self._generate_bulk_summary(results['workloads'])
+        
+        return results
+    
+    def _normalize_workload_data(self, workload_data: Dict) -> Dict:
+        """Normalize and validate workload data."""
+        # Define field mappings (CSV column -> internal field)
+        field_mappings = {
+            'workload_name': 'workload_name',
+            'name': 'workload_name',
+            'application_name': 'workload_name',
+            'workload_type': 'workload_type',
+            'type': 'workload_type',
+            'application_type': 'workload_type',
+            'operating_system': 'operating_system',
+            'os': 'operating_system',
+            'cpu_cores': 'on_prem_cores',
+            'cores': 'on_prem_cores',
+            'on_prem_cores': 'on_prem_cores',
+            'peak_cpu_percent': 'peak_cpu_percent',
+            'peak_cpu': 'peak_cpu_percent',
+            'cpu_utilization': 'peak_cpu_percent',
+            'ram_gb': 'on_prem_ram_gb',
+            'memory_gb': 'on_prem_ram_gb',
+            'on_prem_ram_gb': 'on_prem_ram_gb',
+            'peak_ram_percent': 'peak_ram_percent',
+            'peak_ram': 'peak_ram_percent',
+            'memory_utilization': 'peak_ram_percent',
+            'storage_gb': 'storage_current_gb',
+            'storage_current_gb': 'storage_current_gb',
+            'disk_gb': 'storage_current_gb',
+            'peak_iops': 'peak_iops',
+            'iops': 'peak_iops',
+            'peak_throughput_mbps': 'peak_throughput_mbps',
+            'throughput_mbps': 'peak_throughput_mbps',
+            'infrastructure_age_years': 'infrastructure_age_years',
+            'age_years': 'infrastructure_age_years',
+            'business_criticality': 'business_criticality',
+            'criticality': 'business_criticality',
+            'region': 'region'
+        }
+        
+        normalized = {}
+        
+        # Normalize field names (case-insensitive)
+        for csv_field, value in workload_data.items():
+            csv_field_lower = csv_field.lower().strip()
+            
+            if csv_field_lower in field_mappings:
+                internal_field = field_mappings[csv_field_lower]
+                normalized[internal_field] = value
+        
+        # Set defaults for missing fields
+        defaults = {
+            'workload_name': 'Unknown Workload',
+            'workload_type': 'web_application',
+            'operating_system': 'linux',
+            'region': 'us-east-1',
+            'on_prem_cores': 2,
+            'peak_cpu_percent': 70,
+            'on_prem_ram_gb': 8,
+            'peak_ram_percent': 80,
+            'storage_current_gb': 100,
+            'peak_iops': 3000,
+            'peak_throughput_mbps': 100,
+            'infrastructure_age_years': 3,
+            'business_criticality': 'medium'
+        }
+        
+        for field, default_value in defaults.items():
+            if field not in normalized or normalized[field] is None or normalized[field] == '':
+                normalized[field] = default_value
+            else:
+                # Convert numeric fields
+                if field in ['on_prem_cores', 'peak_cpu_percent', 'on_prem_ram_gb', 
+                           'peak_ram_percent', 'storage_current_gb', 'peak_iops', 
+                           'peak_throughput_mbps', 'infrastructure_age_years']:
+                    try:
+                        normalized[field] = float(normalized[field])
+                    except (ValueError, TypeError):
+                        normalized[field] = default_value
+        
+        return normalized
+    
+    def _analyze_single_workload(self, workload_inputs: Dict, environment: str) -> Dict[str, Any]:
+        """Analyze a single workload for a specific environment."""
+        
+        # Update calculator inputs
+        self.calculator.inputs.update(workload_inputs)
+        
+        # Calculate enhanced requirements
+        return self.calculator.calculate_enhanced_requirements(environment)
+    
+    def _generate_bulk_summary(self, workloads: List[Dict]) -> Dict[str, Any]:
+        """Generate summary statistics from bulk analysis."""
+        successful_workloads = [w for w in workloads if w['status'] == 'success']
+        
+        if not successful_workloads:
+            return {'error': 'No successful analyses to summarize'}
+        
+        # Aggregate statistics
+        total_monthly_costs = []
+        complexity_scores = []
+        instance_types = {}
+        
+        for workload in successful_workloads:
+            try:
+                prod_analysis = workload['analysis']['PROD']
+                
+                # Cost data
+                tco = prod_analysis.get('tco_analysis', {})
+                monthly_cost = tco.get('monthly_cost', 0)
+                if monthly_cost > 0:
+                    total_monthly_costs.append(monthly_cost)
+                
+                # Complexity data
+                claude_analysis = prod_analysis.get('claude_analysis', {})
+                complexity = claude_analysis.get('complexity_score', 0)
+                if complexity > 0:
+                    complexity_scores.append(complexity)
+                
+                # Instance types
+                cost_breakdown = prod_analysis.get('cost_breakdown', {})
+                selected_instance = cost_breakdown.get('selected_instance', {})
+                instance_type = selected_instance.get('type', 'Unknown')
+                instance_types[instance_type] = instance_types.get(instance_type, 0) + 1
+                
+            except Exception as e:
+                logger.warning(f"Error processing workload summary: {e}")
+                continue
+        
+        # Calculate summary statistics
+        summary = {
+            'total_workloads_analyzed': len(successful_workloads),
+            'total_monthly_cost': sum(total_monthly_costs),
+            'total_annual_cost': sum(total_monthly_costs) * 12,
+            'average_monthly_cost': sum(total_monthly_costs) / len(total_monthly_costs) if total_monthly_costs else 0,
+            'average_complexity_score': sum(complexity_scores) / len(complexity_scores) if complexity_scores else 0,
+            'most_common_instance_type': max(instance_types.items(), key=lambda x: x[1])[0] if instance_types else 'N/A',
+            'instance_type_distribution': instance_types,
+            'cost_range': {
+                'min': min(total_monthly_costs) if total_monthly_costs else 0,
+                'max': max(total_monthly_costs) if total_monthly_costs else 0
+            },
+            'complexity_range': {
+                'min': min(complexity_scores) if complexity_scores else 0,
+                'max': max(complexity_scores) if complexity_scores else 0
+            }
+        }
+        
+        return summary
+
 # Enhanced Streamlit Functions
 def initialize_enhanced_session_state():
     """Initialize enhanced session state."""
@@ -3503,6 +3745,296 @@ def generate_enhanced_pdf_report():
         
     except Exception as e:
         st.error(f"Error generating PDF: {str(e)}")
+# Add these functions AFTER generate_enhanced_pdf_report() and BEFORE get_env_characteristics()
+
+def render_bulk_upload_tab():
+    """Render bulk upload tab."""
+    st.markdown("### 📁 Bulk Workload Upload & Analysis")
+    
+    st.markdown("""
+    Upload multiple workloads at once using CSV or Excel files. This feature allows you to:
+    - Analyze dozens of workloads simultaneously
+    - Get comprehensive cost and complexity analysis for all environments
+    - Export consolidated reports
+    - Compare workloads side-by-side
+    """)
+    
+    # File upload section
+    st.markdown("#### 📤 Upload Workloads File")
+    
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        uploaded_file = st.file_uploader(
+            "Choose a CSV or Excel file",
+            type=['csv', 'xlsx', 'xls'],
+            help="Upload a file containing multiple workloads to analyze"
+        )
+    
+    with col2:
+        if st.button("📋 Download Template"):
+            generate_bulk_template()
+    
+    # Show file format requirements
+    with st.expander("📋 File Format Requirements", expanded=False):
+        st.markdown("""
+        **Required Columns** (case-insensitive):
+        - `workload_name` or `name` - Name of the workload
+        - `cpu_cores` or `cores` - Number of CPU cores
+        - `ram_gb` or `memory_gb` - RAM in GB
+        - `storage_gb` or `disk_gb` - Storage in GB
+        
+        **Optional Columns:**
+        - `workload_type` - web_application, database_server, etc.
+        - `operating_system` - linux, windows
+        - `peak_cpu_percent` - Peak CPU utilization %
+        - `peak_ram_percent` - Peak RAM utilization %
+        - `peak_iops` - Peak IOPS
+        - `business_criticality` - low, medium, high, critical
+        - `region` - AWS region (default: us-east-1)
+        
+        **Example CSV:**
+        ```
+        workload_name,cpu_cores,ram_gb,storage_gb,workload_type,peak_cpu_percent
+        Web App 1,4,16,200,web_application,75
+        Database 1,8,32,500,database_server,85
+        API Service,2,8,100,application_server,60
+        ```
+        """)
+    
+    # Process uploaded file
+    if uploaded_file is not None:
+        file_type = 'csv' if uploaded_file.name.endswith('.csv') else 'excel'
+        
+        if st.button("🚀 Analyze All Workloads", type="primary"):
+            with st.spinner("🔄 Processing bulk workload analysis..."):
+                bulk_analyzer = BulkWorkloadAnalyzer()
+                results = bulk_analyzer.process_bulk_upload(uploaded_file, file_type)
+                
+                # Store results in session state
+                st.session_state.bulk_results = results
+                
+                if 'error' in results:
+                    st.error(f"❌ Error processing file: {results['error']}")
+                else:
+                    st.success(f"✅ Successfully analyzed {results['successful_analyses']} out of {results['total_workloads']} workloads!")
+    
+    # Display results
+    if 'bulk_results' in st.session_state and st.session_state.bulk_results:
+        render_bulk_results()
+
+def render_bulk_results():
+    """Render bulk analysis results."""
+    results = st.session_state.bulk_results
+    
+    if 'error' in results:
+        st.error(f"Error: {results['error']}")
+        return
+    
+    st.markdown("---")
+    st.markdown("### 📊 Bulk Analysis Results")
+    
+    # Summary statistics
+    summary = results.get('summary', {})
+    if summary and 'error' not in summary:
+        st.markdown("#### 💰 Cost Summary")
+        
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            st.metric("Total Workloads", f"{summary['total_workloads_analyzed']}")
+        
+        with col2:
+            st.metric("Total Monthly Cost", f"${summary['total_monthly_cost']:,.2f}")
+        
+        with col3:
+            st.metric("Total Annual Cost", f"${summary['total_annual_cost']:,.2f}")
+        
+        with col4:
+            st.metric("Avg Monthly Cost", f"${summary['average_monthly_cost']:,.2f}")
+        
+        # Additional metrics
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            st.metric("Avg Complexity", f"{summary['average_complexity_score']:.0f}/100")
+        
+        with col2:
+            st.metric("Most Common Instance", summary['most_common_instance_type'])
+        
+        with col3:
+            cost_range = summary['cost_range']
+            st.metric("Cost Range", f"${cost_range['min']:,.0f} - ${cost_range['max']:,.0f}")
+    
+    # Workload comparison table
+    st.markdown("#### 📋 Workload Comparison")
+    
+    workload_comparison_data = []
+    for workload in results['workloads']:
+        if workload['status'] == 'success':
+            prod_analysis = workload['analysis']['PROD']
+            claude_analysis = prod_analysis.get('claude_analysis', {})
+            tco_analysis = prod_analysis.get('tco_analysis', {})
+            cost_breakdown = prod_analysis.get('cost_breakdown', {})
+            selected_instance = cost_breakdown.get('selected_instance', {})
+            
+            workload_comparison_data.append({
+                'Workload': workload['workload_name'],
+                'Complexity Score': f"{claude_analysis.get('complexity_score', 0):.0f}/100",
+                'Complexity Level': claude_analysis.get('complexity_level', 'N/A'),
+                'Monthly Cost': f"${tco_analysis.get('monthly_cost', 0):,.2f}",
+                'Instance Type': selected_instance.get('type', 'N/A'),
+                'Timeline (weeks)': claude_analysis.get('estimated_timeline', {}).get('max_weeks', 'N/A'),
+                'Migration Strategy': claude_analysis.get('migration_strategy', {}).get('approach', 'N/A')[:30] + '...'
+            })
+        else:
+            workload_comparison_data.append({
+                'Workload': workload['workload_name'],
+                'Complexity Score': 'FAILED',
+                'Complexity Level': 'ERROR',
+                'Monthly Cost': 'N/A',
+                'Instance Type': 'N/A',
+                'Timeline (weeks)': 'N/A',
+                'Migration Strategy': workload.get('error', 'Analysis failed')[:30] + '...'
+            })
+    
+    if workload_comparison_data:
+        df_comparison = pd.DataFrame(workload_comparison_data)
+        st.dataframe(df_comparison, use_container_width=True, hide_index=True)
+    
+    # Visualizations
+    if summary and 'error' not in summary:
+        st.markdown("#### 📈 Analysis Visualizations")
+        
+        # Cost distribution chart
+        successful_workloads = [w for w in results['workloads'] if w['status'] == 'success']
+        
+        if len(successful_workloads) > 1:
+            # Create cost vs complexity scatter plot
+            workload_names = []
+            costs = []
+            complexities = []
+            
+            for workload in successful_workloads:
+                prod_analysis = workload['analysis']['PROD']
+                claude_analysis = prod_analysis.get('claude_analysis', {})
+                tco_analysis = prod_analysis.get('tco_analysis', {})
+                
+                workload_names.append(workload['workload_name'])
+                costs.append(tco_analysis.get('monthly_cost', 0))
+                complexities.append(claude_analysis.get('complexity_score', 0))
+            
+            fig_scatter = go.Figure(data=go.Scatter(
+                x=complexities,
+                y=costs,
+                mode='markers+text',
+                text=workload_names,
+                textposition="top center",
+                marker=dict(
+                    size=12,
+                    color=complexities,
+                    colorscale='RdYlBu_r',
+                    showscale=True,
+                    colorbar=dict(title="Complexity Score")
+                ),
+                hovertemplate='<b>%{text}</b><br>Complexity: %{x}/100<br>Monthly Cost: $%{y:,.2f}<extra></extra>'
+            ))
+            
+            fig_scatter.update_layout(
+                title="Workload Cost vs Complexity Analysis",
+                xaxis_title="Migration Complexity Score",
+                yaxis_title="Monthly Cost ($)",
+                height=500
+            )
+            
+            st.plotly_chart(fig_scatter, use_container_width=True)
+    
+    # Export options
+    st.markdown("#### 📥 Export Options")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        if st.button("📊 Export to Excel"):
+            export_bulk_results_to_excel(results)
+    
+    with col2:
+        if st.button("📄 Generate PDF Report"):
+            export_bulk_results_to_pdf(results)
+    
+    with col3:
+        # CSV export
+        csv_data = pd.DataFrame(workload_comparison_data).to_csv(index=False)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        st.download_button(
+            "📋 Download CSV",
+            csv_data,
+            f"bulk_workload_analysis_{timestamp}.csv",
+            "text/csv"
+        )
+
+def generate_bulk_template():
+    """Generate and download bulk upload template."""
+    template_data = [
+        {
+            'workload_name': 'Web Application 1',
+            'workload_type': 'web_application',
+            'cpu_cores': 4,
+            'ram_gb': 16,
+            'storage_gb': 200,
+            'peak_cpu_percent': 75,
+            'peak_ram_percent': 80,
+            'peak_iops': 3000,
+            'business_criticality': 'high',
+            'operating_system': 'linux'
+        },
+        {
+            'workload_name': 'Database Server 1',
+            'workload_type': 'database_server',
+            'cpu_cores': 8,
+            'ram_gb': 32,
+            'storage_gb': 500,
+            'peak_cpu_percent': 85,
+            'peak_ram_percent': 90,
+            'peak_iops': 8000,
+            'business_criticality': 'critical',
+            'operating_system': 'linux'
+        },
+        {
+            'workload_name': 'API Service 1',
+            'workload_type': 'application_server',
+            'cpu_cores': 2,
+            'ram_gb': 8,
+            'storage_gb': 100,
+            'peak_cpu_percent': 60,
+            'peak_ram_percent': 70,
+            'peak_iops': 2000,
+            'business_criticality': 'medium',
+            'operating_system': 'linux'
+        }
+    ]
+    
+    df_template = pd.DataFrame(template_data)
+    csv_template = df_template.to_csv(index=False)
+    
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    st.download_button(
+        "⬇️ Download Template CSV",
+        csv_template,
+        f"workload_bulk_upload_template_{timestamp}.csv",
+        "text/csv"
+    )
+
+def export_bulk_results_to_excel(results):
+    """Export bulk results to Excel."""
+    # Implementation for Excel export
+    st.info("📊 Excel export functionality - coming soon!")
+
+def export_bulk_results_to_pdf(results):
+    """Export bulk results to PDF."""
+    # Implementation for PDF export  
+    st.info("📄 PDF export functionality - coming soon!")
+
 
 def get_env_characteristics(env: str) -> str:
     """Get key characteristics for each environment."""
@@ -3681,8 +4213,12 @@ def main():
             st.metric("Monthly Cost", f"${monthly_cost:,.0f}")
     
     # Main tabs
-    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    # REPLACE the existing tab section in main() with this:
+
+    # Main tabs
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
         "⚙️ Configuration",
+        "📁 Bulk Upload",
         "📊 Analysis Results", 
         "🌡️ Environment Heat Maps",
         "🔧 Technical Recommendations",
@@ -3693,15 +4229,18 @@ def main():
         render_enhanced_configuration()
     
     with tab2:
-        render_enhanced_results()
+        render_bulk_upload_tab()
     
     with tab3:
-        render_enhanced_environment_heatmap_tab()
+        render_enhanced_results()
     
     with tab4:
-        render_technical_recommendations_tab()
+        render_enhanced_environment_heatmap_tab()
     
     with tab5:
+        render_technical_recommendations_tab()
+    
+    with tab6:
         st.markdown("### 📋 Enhanced Reports")
         
         if st.session_state.enhanced_results:
