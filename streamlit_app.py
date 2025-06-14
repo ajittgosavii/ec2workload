@@ -3816,18 +3816,6 @@ def generate_enhanced_pdf_report():
     except Exception as e:
         st.error(f"Error generating PDF: {str(e)}")
 # Add these functions AFTER generate_enhanced_pdf_report() and BEFORE get_env_characteristics()
-         
-def render_bulk_upload_tab():
-    """Render bulk upload tab."""
-    st.markdown("### 📁 Bulk Workload Upload & Analysis")
-    
-    st.markdown("""
-    Upload multiple workloads at once using CSV or Excel files. This feature allows you to:
-    - Analyze dozens of workloads simultaneously
-    - Get comprehensive cost and complexity analysis for all environments
-    - Export consolidated reports
-    - Compare workloads side-by-side
-    """)
 def generate_bulk_template():
     """Downloadable CSV template for bulk upload."""
     import io
@@ -3857,7 +3845,20 @@ def generate_bulk_template():
         file_name="bulk_upload_template.csv",
         mime="text/csv"
     )
- 
+
+        
+def render_bulk_upload_tab():
+    """Render bulk upload tab."""
+    st.markdown("### 📁 Bulk Workload Upload & Analysis")
+    
+    st.markdown("""
+    Upload multiple workloads at once using CSV or Excel files. This feature allows you to:
+    - Analyze dozens of workloads simultaneously
+    - Get comprehensive cost and complexity analysis for all environments
+    - Export consolidated reports
+    - Compare workloads side-by-side
+    """)
+    
     # File upload section
     st.markdown("#### 📤 Upload Workloads File")
     
