@@ -361,13 +361,81 @@ class ClaudeAIMigrationAnalyzer:
             ]
         }
 
-class AWSCostCalculator:
+cclass AWSCostCalculator:
     """AWS service cost calculator with detailed pricing breakdown."""
     
-    def __init__(self):
+    def __init__(self, region='us-east-1'):
         # Initialize AWS Pricing client
         self.pricing_client = boto3.client('pricing', region_name='us-east-1')
+        self.region = region
         
+        # Initialize pricing data structure
+        self.pricing = {
+            'compute': {
+                'ec2_instances': {},
+                'elastic_ip': 0.005  # per hour
+            },
+            'network': {
+                'alb': 0.0225,  # per ALB per hour
+                'nlb': 0.0225,  # per NLB per hour
+                'nat_gateway': 0.045,  # per NAT per hour
+                'cloudfront': {'per_gb': 0.085},
+                'route53': {'hosted_zone': 0.50},
+                'data_transfer': {'out_to_internet_up_to_10tb': 0.09},
+                'vpn_gateway': 0.05  # per hour
+            },
+            'storage': {
+                'ebs': {
+                    'gp3': 0.08,  # per GB-month
+                    'io2': 0.125,  # per GB-month
+                    'io2_iops': 0.065,  # per provisioned IOPS
+                    'snapshots': 0.05  # per GB-month
+                },
+                's3': {
+                    'standard': 0.023,  # per GB-month
+                    'standard_ia': 0.0125,  # per GB-month
+                    'glacier': 0.004  # per GB-month
+                }
+            },
+            'database': {
+                'aurora_mysql': {
+                    'db.r6g.large': 0.274,  # per hour
+                    'db.r6g.xlarge': 0.548
+                },
+                'rds_mysql': {
+                    'db.r6g.large': 0.252,  # per hour
+                    'db.r6g.xlarge': 0.504
+                },
+                'storage': {
+                    'aurora_storage': 0.10,  # per GB-month
+                    'aurora_io': 0.20,  # per million requests
+                    'rds_gp2': 0.115  # per GB-month
+                },
+                'backup_storage': 0.095,  # per GB-month
+                'rds_proxy': 0.015  # per vCPU-hour
+            },
+            'security': {
+                'secrets_manager': 0.40,  # per secret per month
+                'kms': 1.00,  # per key per month
+                'config': 0.003,  # per configuration item
+                'cloudtrail': 0.10,  # per 100,000 events
+                'guardduty': 0.10,  # per GB analyzed
+                'security_hub': 0.0010,  # per security check
+                'waf': 0.60  # per web ACL per month
+            },
+            'monitoring': {
+                'cloudwatch': {
+                    'metrics': 0.30,  # per custom metric
+                    'dashboards': 3.00,  # per dashboard
+                    'alarms': 0.10,  # per alarm
+                    'logs_ingestion': 0.50,  # per GB
+                    'logs_storage': 0.03  # per GB-month
+                },
+                'xray': 0.000005,  # per trace
+                'synthetics': 0.0012  # per canary run
+            }
+        }
+
     def get_real_pricing(self, service_code: str, filters: list) -> list:
         """Get real pricing from AWS Pricing API."""
         try:
@@ -381,11 +449,11 @@ class AWSCostCalculator:
             logger.error(f"Error getting real pricing: {e}")
             return []
         
-    def _get_ec2_pricing(self, instance_type: str, region: str) -> dict:
+    def _get_ec2_pricing(self, instance_type: str) -> dict:
         """Get EC2 pricing from AWS Pricing API."""
         filters = [
             {'Type': 'TERM_MATCH', 'Field': 'instanceType', 'Value': instance_type},
-            {'Type': 'TERM_MATCH', 'Field': 'location', 'Value': self._get_region_name(region)},
+            {'Type': 'TERM_MATCH', 'Field': 'location', 'Value': self._get_region_name(self.region)},
             {'Type': 'TERM_MATCH', 'Field': 'operatingSystem', 'Value': 'Linux'},
             {'Type': 'TERM_MATCH', 'Field': 'preInstalledSw', 'Value': 'NA'},
             {'Type': 'TERM_MATCH', 'Field': 'tenancy', 'Value': 'Shared'},
@@ -423,6 +491,8 @@ class AWSCostCalculator:
             return fallback_prices.get(instance_type, {'on_demand': 0.1, 'ri_1y': 0.07, 'ri_3y': 0.05, 'spot': 0.03})
         
         return pricing
+
+    # ... rest of the class remains the same ...
     
     def _get_region_name(self, region_code: str) -> str:
         """Map AWS region code to full name."""
@@ -3749,7 +3819,6 @@ def render_bulk_upload_tab():
     """Render bulk upload tab."""
     st.markdown("### 📁 Bulk Workload Upload & Analysis")
     
-    # ... (bulk upload UI) ...
     st.markdown("""
     Upload multiple workloads at once using CSV or Excel files. This feature allows you to:
     - Analyze dozens of workloads simultaneously
@@ -3771,7 +3840,9 @@ def render_bulk_upload_tab():
         )
     
     with col2:
+        # Create a button to trigger template download
         if st.button("📋 Download Template", key="bulk_template_download"):
+            # Call the template generation function
             generate_bulk_template()
     
     # Show file format requirements
@@ -3820,9 +3891,9 @@ def render_bulk_upload_tab():
     
     # Display results
     if 'bulk_results' in st.session_state and st.session_state.bulk_results:
-        render_bulk_results()    
+        render_bulk_results()
     
-    # Report generation section
+    # Add report generation section
     if 'bulk_results' in st.session_state and st.session_state.bulk_results:
         st.markdown("---")
         st.markdown("### 📋 Bulk Report Generation")
