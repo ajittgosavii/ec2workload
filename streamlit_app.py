@@ -5114,6 +5114,13 @@ def main():
     # Initialize session state
     initialize_enhanced_session_state()
     
+    # Check if calculator is properly initialized
+    if st.session_state.enhanced_calculator is None:
+        st.error("⚠️ Application initialization failed. Please refresh the page.")
+        if st.button("🔄 Retry Initialization", key="retry_init_button"):
+            st.rerun()
+        st.stop()
+    
     # Enhanced header
     st.markdown("""
     <div class="main-header">
@@ -5125,31 +5132,195 @@ def main():
     
     # Enhanced sidebar
     with st.sidebar:
-        # ... (sidebar content) ...
+        st.markdown("### 🔑 Claude AI Configuration")
+        
+        # Claude API Key configuration
+        api_key_placeholder = st.empty()
+        
+        # Check if API key is available
+        analyzer = ClaudeAIMigrationAnalyzer()
+        api_key = analyzer._get_claude_api_key()
+        
+        if api_key:
+            api_status = "🟢 Connected"
+            api_help = "Claude AI is connected and ready for analysis"
+        else:
+            api_status = "🔴 Not Connected"
+            api_help = "Add ANTHROPIC_API_KEY to Streamlit secrets or environment variables"
+        
+        with api_key_placeholder.container():
+            st.markdown(f"**Status:** {api_status}")
+            st.markdown(f"*{api_help}*")
+            
+            if not api_key:
+                with st.expander("🔧 How to configure Claude API", expanded=False):
+                    st.markdown("""
+                    **Option 1: Streamlit Secrets (Recommended)**
+                    1. Create `.streamlit/secrets.toml` file
+                    2. Add: `ANTHROPIC_API_KEY = "your-api-key-here"`
+                    
+                    **Option 2: Environment Variable**
+                    1. Set environment variable: `ANTHROPIC_API_KEY=your-api-key-here`
+                    
+                    **Get API Key:**
+                    1. Visit [Anthropic Console](https://console.anthropic.com/)
+                    2. Create account and get API key
+                    3. Add to your configuration
+                    """)
+        
+        st.markdown("---")
+        
+        st.markdown("### 🤖 AI + AWS Integration Status")
+        
+        # Integration status indicators
+        claude_status = "🟢 Active" if api_key else "🟡 Fallback Mode"
+        
+        st.markdown(f"""
+        <div style="padding: 1rem; border-radius: 8px; background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%); margin-bottom: 1rem;">
+            <h4 style="margin: 0; color: #dc2626;">🤖 Claude AI</h4>
+            <p style="margin: 0; font-size: 0.875rem;">Migration Complexity Analysis</p>
+            <span style="background: {'#10b981' if api_key else '#f59e0b'}; color: white; padding: 0.25rem 0.5rem; border-radius: 12px; font-size: 0.75rem;">{claude_status}</span>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown("""
+        <div style="padding: 1rem; border-radius: 8px; background: linear-gradient(135deg, #fff7ed 0%, #fed7aa 100%); margin-bottom: 1rem;">
+            <h4 style="margin: 0; color: #ea580c;">☁️ AWS Integration</h4>
+            <p style="margin: 0; font-size: 0.875rem;">Real-time Cost & Instance Analysis</p>
+            <span style="background: #10b981; color: white; padding: 0.25rem 0.5rem; border-radius: 12px; font-size: 0.75rem;">Connected</span>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown("---")
+        
+        # Enhanced features list
+        st.markdown("""
+        ### 🚀 Enhanced Features
+        
+        **🤖 Claude AI Analysis:**
+        - Migration complexity scoring
+        - Risk assessment & mitigation
+        - Intelligent migration strategies
+        - Timeline estimation
+        
+        **☁️ AWS Integration:**
+        - Real-time pricing data
+        - Instance recommendations
+        - Cost optimization insights
+        - Rightsizing analysis
+        
+        **📊 Environment Analysis:**
+        - Multi-environment heat maps
+        - Impact assessment across dev lifecycle
+        - Environment-specific recommendations
+        
+        **🔧 Technical Specifications:**
+        - Compute, Network, Storage configs
+        - Database recommendations
+        - Security & monitoring setup
+        - Auto-scaling strategies
+        """)
+        
+        # Quick stats if results available
+        if st.session_state.enhanced_results:
+            st.markdown("---")
+            st.markdown("### 📈 Quick Stats")
+            
+            prod_results = st.session_state.enhanced_results['recommendations'].get('PROD', {})
+            claude_analysis = prod_results.get('claude_analysis', {})
+            tco_analysis = prod_results.get('tco_analysis', {})
+            
+            complexity_score = claude_analysis.get('complexity_score', 0)
+            monthly_cost = tco_analysis.get('monthly_cost', 0)
+            
+            st.metric("Complexity Score", f"{complexity_score:.0f}/100")
+            st.metric("Monthly Cost", f"${monthly_cost:,.0f}")
     
-    # Main tabs - REMOVED REPORTS TAB
-    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    # Main tabs - CORRECTED SECTION
+    tabs = st.tabs([
         "⚙️ Configuration",
         "📁 Bulk Upload",
         "📊 Analysis Results", 
         "🌡️ Environment Heat Maps",
-        "🔧 Technical Recommendations"
+        "🔧 Technical Recommendations",
+        "📋 Enhanced Reports"
     ])
     
-    with tab1:
+    with tabs[0]:
         render_enhanced_configuration()
     
-    with tab2:
+    with tabs[1]:
         render_bulk_upload_tab()
     
-    with tab3:
+    with tabs[2]:
         render_enhanced_results()
     
-    with tab4:
+    with tabs[3]:
         render_enhanced_environment_heatmap_tab()
     
-    with tab5:
+    with tabs[4]:
         render_technical_recommendations_tab()
+    
+    with tabs[5]:
+        st.markdown("### 📋 Enhanced Reports")
+        
+        if st.session_state.enhanced_results:
+            st.markdown("#### Available Reports")
+            
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                if st.button("📄 Generate PDF Report", type="primary", key="reports_pdf_generate"):
+                    generate_enhanced_pdf_report()
+            
+            with col2:
+                if st.button("📊 Export to Excel", key="reports_tab_excel"):
+                    generate_enhanced_excel_report()
+            
+            with col3:
+                if st.button("📈 Generate Heat Map CSV", key="reports_heatmap_csv"):
+                    if 'heat_map_data' in st.session_state.enhanced_results:
+                        csv_data = st.session_state.enhanced_results['heat_map_data'].to_csv(index=False)
+                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                        st.download_button(
+                            "⬇️ Download Heat Map CSV",
+                            csv_data,
+                            f"environment_heatmap_{timestamp}.csv",
+                            "text/csv",
+                            key="heatmap_csv_download"
+                        )
+            
+            # Report preview
+            st.markdown("#### Report Preview")
+            
+            if st.session_state.enhanced_results:
+                prod_results = st.session_state.enhanced_results['recommendations']['PROD']
+                claude_analysis = prod_results.get('claude_analysis', {})
+                
+                st.markdown("**Executive Summary Preview:**")
+                
+                summary_preview = f"""
+                **Workload:** {st.session_state.enhanced_results['inputs']['workload_name']}
+                
+                **Migration Complexity:** {claude_analysis.get('complexity_level', 'MEDIUM')} ({claude_analysis.get('complexity_score', 50):.0f}/100)
+                
+                **Recommended Strategy:** {claude_analysis.get('migration_strategy', {}).get('approach', 'Standard Migration')}
+                
+                **Estimated Timeline:** {claude_analysis.get('estimated_timeline', {}).get('max_weeks', 8)} weeks
+                
+                **Key Recommendations:**
+                """
+                
+                st.markdown(summary_preview)
+                
+                recommendations = claude_analysis.get('recommendations', [])
+                for i, rec in enumerate(recommendations[:3], 1):
+                    st.markdown(f"{i}. {rec}")
+                
+                if len(recommendations) > 3:
+                    st.markdown(f"... and {len(recommendations) - 3} more recommendations in the full report")
+        else:
+            st.info("💡 Run an enhanced analysis to generate comprehensive reports.")
     
     # Enhanced footer
     st.markdown("---")
@@ -5157,9 +5328,8 @@ def main():
     <div style="text-align: center; color: #6b7280; font-size: 0.875rem; padding: 2rem 0;">
         <strong>Enhanced AWS Migration Platform v7.0</strong><br>
         Now powered by <strong>Real Anthropic Claude AI API</strong> for intelligent migration analysis and comprehensive technical recommendations<br>
-        <em>🤖 Real AI-Enhanced • ☁️ AWS-Native • 📊 Data-Driven • 🔧 Technical-Complete</em>
+        <em>🤖 Real AI-Enhanced • ☁️ AWS-Native • 📊 Data-Driven • 🔧 Technical-Complete • 📋 Excel/PDF Reports</em>
     </div>
     """, unsafe_allow_html=True)
-
 if __name__ == "__main__":
     main()
