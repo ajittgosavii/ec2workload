@@ -2383,7 +2383,7 @@ def render_enhanced_configuration():
     
     # Analysis buttons
     st.markdown("---")
-    if st.button("🚀 Run Enhanced Analysis", type="primary", key="enhanced_analysis_button"):
+    if st.button("🚀 Run Enhanced Analysis", type="primary", key="main_enhanced_analysis_button"):
         run_enhanced_analysis()
 
 def run_enhanced_analysis():
@@ -3521,7 +3521,8 @@ def generate_enhanced_excel_report():
             label="⬇️ Download Excel Report",
             data=buffer.getvalue(),
             file_name=filename,
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key="excel_report_download"
         )
         
         st.success("✅ Enhanced Excel report generated successfully!")
@@ -3738,7 +3739,8 @@ def generate_enhanced_pdf_report():
             label="⬇️ Download Enhanced PDF Report",
             data=buffer.getvalue(),
             file_name=filename,
-            mime="application/pdf"
+            mime="application/pdf",
+            key="pdf_report_download"
         )
         
         st.success("✅ Enhanced PDF report generated successfully!")
@@ -3772,7 +3774,7 @@ def render_bulk_upload_tab():
         )
     
     with col2:
-        if st.button("📋 Download Template"):
+        if st.button("📋 Download Template", key="bulk_template_download"):
             generate_bulk_template()
     
     # Show file format requirements
@@ -3806,7 +3808,7 @@ def render_bulk_upload_tab():
     if uploaded_file is not None:
         file_type = 'csv' if uploaded_file.name.endswith('.csv') else 'excel'
         
-        if st.button("🚀 Analyze All Workloads", type="primary"):
+        if st.button("🚀 Analyze All Workloads", type="primary", key="bulk_analyze_button"):
             with st.spinner("🔄 Processing bulk workload analysis..."):
                 bulk_analyzer = BulkWorkloadAnalyzer()
                 results = bulk_analyzer.process_bulk_upload(uploaded_file, file_type)
@@ -3955,11 +3957,11 @@ def render_bulk_results():
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        if st.button("📊 Export to Excel"):
+        if st.button("📊 Export to Excel", key="bulk_excel_export"):
             export_bulk_results_to_excel(results)
     
     with col2:
-        if st.button("📄 Generate PDF Report"):
+        if st.button("📄 Generate PDF Report", key="bulk_pdf_export"):
             export_bulk_results_to_pdf(results)
     
     with col3:
@@ -3970,7 +3972,8 @@ def render_bulk_results():
             "📋 Download CSV",
             csv_data,
             f"bulk_workload_analysis_{timestamp}.csv",
-            "text/csv"
+            "text/csv",
+            key="bulk_csv_download"
         )
 
 def generate_bulk_template():
@@ -4017,12 +4020,12 @@ def generate_bulk_template():
     df_template = pd.DataFrame(template_data)
     csv_template = df_template.to_csv(index=False)
     
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     st.download_button(
         "⬇️ Download Template CSV",
         csv_template,
         f"workload_bulk_upload_template_{timestamp}.csv",
-        "text/csv"
+        "text/csv",
+        key="template_csv_download"
     )
 
 def export_bulk_results_to_excel(results):
@@ -4093,7 +4096,7 @@ def main():
     # Check if calculator is properly initialized
     if st.session_state.enhanced_calculator is None:
         st.error("⚠️ Application initialization failed. Please refresh the page.")
-        if st.button("🔄 Retry Initialization"):
+        if st.button("🔄 Retry Initialization", key="retry_init_button"):
             st.rerun()
         st.stop()
     
@@ -4249,15 +4252,15 @@ def main():
             col1, col2, col3 = st.columns(3)
             
             with col1:
-                if st.button("📄 Generate PDF Report", type="primary"):
+                if st.button("📄 Generate PDF Report", type="primary", key="reports_pdf_generate"):
                     generate_enhanced_pdf_report()
             
             with col2:
-                if st.button("📊 Export to Excel"):
+                if st.button("📊 Export to Excel", key="reports_tab_excel"):
                     generate_enhanced_excel_report()
             
             with col3:
-                if st.button("📈 Generate Heat Map CSV"):
+                if st.button("📈 Generate Heat Map CSV", key="reports_heatmap_csv"):
                     if 'heat_map_data' in st.session_state.enhanced_results:
                         csv_data = st.session_state.enhanced_results['heat_map_data'].to_csv(index=False)
                         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -4265,7 +4268,8 @@ def main():
                             "⬇️ Download Heat Map CSV",
                             csv_data,
                             f"environment_heatmap_{timestamp}.csv",
-                            "text/csv"
+                            "text/csv",
+                            key="heatmap_csv_download"
                         )
             
             # Report preview
