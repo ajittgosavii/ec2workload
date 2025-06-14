@@ -1,5 +1,5 @@
-# Complete Enhanced AWS Migration Analysis Platform
-# Requirements: streamlit>=1.28.0, pandas>=1.5.0, plotly>=5.0.0, reportlab>=3.6.0
+# Complete Enhanced AWS Migration Analysis Platform v7.0
+# Requirements: streamlit>=1.28.0, pandas>=1.5.0, plotly>=5.0.0, reportlab>=3.6.0, anthropic>=0.8.0, openpyxl>=3.1.0
 
 import streamlit as st
 import pandas as pd
@@ -14,10 +14,12 @@ from datetime import datetime, timedelta
 import io
 from typing import Dict, List, Tuple, Optional, Any
 import numpy as np
+import anthropic
+import requests
 
 # Configure page - MUST be first Streamlit command
 st.set_page_config(
-    page_title="Enhanced AWS Migration Platform v6.0",
+    page_title="Enhanced AWS Migration Platform v7.0",
     layout="wide",
     page_icon="🏢",
     initial_sidebar_state="expanded"
@@ -34,6 +36,15 @@ try:
     REPORTLAB_AVAILABLE = True
 except ImportError:
     REPORTLAB_AVAILABLE = False
+
+# Try to import openpyxl for Excel generation
+try:
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils.dataframe import dataframe_to_rows
+    OPENPYXL_AVAILABLE = True
+except ImportError:
+    OPENPYXL_AVAILABLE = False
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -86,7 +97,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 class ClaudeAIMigrationAnalyzer:
-    """Claude AI powered migration complexity analyzer."""
+    """Real Claude AI powered migration complexity analyzer using Anthropic API."""
     
     def __init__(self):
         self.complexity_factors = {
@@ -98,240 +109,254 @@ class ClaudeAIMigrationAnalyzer:
         }
 
     def analyze_workload_complexity(self, workload_inputs: Dict, environment: str) -> Dict[str, Any]:
-        """Analyze migration complexity using Claude AI-like intelligence."""
+        """Analyze migration complexity using real Claude AI API."""
         
         try:
-            # Calculate complexity scores
-            complexity_score = self._calculate_complexity_score(workload_inputs, environment)
+            # Get Claude API key from Streamlit secrets or environment
+            api_key = self._get_claude_api_key()
             
-            # Determine complexity level
-            if complexity_score >= 80:
-                complexity_level = "CRITICAL"
-                complexity_color = "critical"
-            elif complexity_score >= 65:
-                complexity_level = "HIGH"
-                complexity_color = "high"
-            elif complexity_score >= 45:
-                complexity_level = "MEDIUM"
-                complexity_color = "medium"
-            else:
-                complexity_level = "LOW"
-                complexity_color = "low"
+            if not api_key:
+                logger.warning("Claude API key not found, using fallback analysis")
+                return self._get_fallback_analysis()
             
-            # Generate migration strategy
-            migration_strategy = self._generate_migration_strategy(complexity_level, environment)
+            # Initialize Claude client
+            client = anthropic.Anthropic(api_key=api_key)
             
-            # Generate migration steps
-            migration_steps = self._generate_migration_steps(complexity_level, environment)
+            # Prepare the prompt for Claude
+            analysis_prompt = self._create_analysis_prompt(workload_inputs, environment)
             
-            # Risk assessment
-            risk_factors = self._assess_migration_risks(complexity_level, environment)
+            # Make API call to Claude
+            response = client.messages.create(
+                model="claude-3-5-sonnet-20241022",
+                max_tokens=3000,
+                temperature=0.1,
+                system="You are an expert AWS migration architect. Analyze the provided workload information and provide detailed migration recommendations in JSON format.",
+                messages=[
+                    {
+                        "role": "user",
+                        "content": analysis_prompt
+                    }
+                ]
+            )
             
-            # Timeline estimation
-            timeline = self._estimate_migration_timeline(complexity_level, environment)
+            # Parse Claude's response
+            analysis_result = self._parse_claude_response(response.content[0].text)
             
-            return {
-                'complexity_score': complexity_score,
-                'complexity_level': complexity_level,
-                'complexity_color': complexity_color,
-                'migration_strategy': migration_strategy,
-                'migration_steps': migration_steps,
-                'risk_factors': risk_factors,
-                'estimated_timeline': timeline,
-                'recommendations': self._generate_recommendations(complexity_level),
-                'success_factors': self._identify_success_factors(complexity_level)
-            }
+            return analysis_result
+            
         except Exception as e:
             logger.error(f"Error in Claude AI analysis: {e}")
             return self._get_fallback_analysis()
 
-    def _calculate_complexity_score(self, workload_inputs: Dict, environment: str) -> float:
-        """Calculate overall complexity score."""
+    def _get_claude_api_key(self) -> Optional[str]:
+        """Get Claude API key from Streamlit secrets or environment variables."""
         try:
-            # Base complexity by workload type
-            workload_complexity = {
-                'web_application': 30,
-                'application_server': 50,
-                'database_server': 70,
-                'file_server': 25,
-                'compute_intensive': 45,
-                'analytics_workload': 55
-            }
+            # Try Streamlit secrets first
+            if hasattr(st, 'secrets') and 'ANTHROPIC_API_KEY' in st.secrets:
+                return st.secrets['ANTHROPIC_API_KEY']
             
-            base_score = workload_complexity.get(workload_inputs.get('workload_type', 'web_application'), 40)
+            # Try environment variable
+            import os
+            return os.getenv('ANTHROPIC_API_KEY')
             
-            # Environment factor
-            env_multipliers = {'DEV': 0.7, 'QA': 0.8, 'UAT': 0.9, 'PREPROD': 1.0, 'PROD': 1.2}
-            env_factor = env_multipliers.get(environment, 1.0)
-            
-            # Infrastructure age factor
-            infra_age = workload_inputs.get('infrastructure_age_years', 3)
-            age_factor = min(infra_age * 5, 25)
-            
-            total_score = (base_score * env_factor) + age_factor
-            return min(total_score, 100)
         except Exception:
-            return 50
+            return None
 
-    def _generate_migration_strategy(self, complexity_level: str, environment: str) -> Dict[str, Any]:
-        """Generate migration strategy based on complexity."""
-        strategies = {
-            'LOW': {
-                'approach': 'Lift and Shift with Optimization',
-                'methodology': 'Direct migration with minimal changes',
-                'timeline': 'Fast track (2-4 weeks)',
-                'risk_level': 'Low'
-            },
-            'MEDIUM': {
-                'approach': 'Hybrid Migration with Re-architecting',
-                'methodology': 'Phased migration with selective modernization',
-                'timeline': 'Standard track (6-10 weeks)',
-                'risk_level': 'Medium'
-            },
-            'HIGH': {
-                'approach': 'Comprehensive Re-architecting',
-                'methodology': 'Full application modernization',
-                'timeline': 'Extended track (12-16 weeks)',
-                'risk_level': 'High'
-            },
-            'CRITICAL': {
-                'approach': 'Strategic Rebuild',
-                'methodology': 'Complete re-design and rebuild',
-                'timeline': 'Long-term project (20+ weeks)',
-                'risk_level': 'Very High'
-            }
-        }
-        return strategies.get(complexity_level, strategies['MEDIUM'])
-
-    def _generate_migration_steps(self, complexity_level: str, environment: str) -> List[Dict[str, Any]]:
-        """Generate detailed migration steps."""
-        return [
-            {
-                'phase': 'Discovery & Assessment',
-                'duration': '1-2 weeks',
-                'tasks': [
-                    'Complete infrastructure inventory',
-                    'Application dependency mapping',
-                    'Performance baseline establishment',
-                    'Security and compliance assessment'
-                ],
-                'deliverables': ['Migration plan', 'Risk assessment', 'Architecture design']
-            },
-            {
-                'phase': 'Environment Preparation',
-                'duration': '1-2 weeks',
-                'tasks': [
-                    'AWS account setup and configuration',
-                    'Network architecture implementation',
-                    'Security groups and IAM configuration',
-                    'Monitoring and logging setup'
-                ],
-                'deliverables': ['AWS environment', 'Security baseline', 'Monitoring dashboard']
-            },
-            {
-                'phase': 'Migration Execution',
-                'duration': '2-8 weeks',
-                'tasks': [
-                    'Data migration (if applicable)',
-                    'Application deployment',
-                    'Configuration and testing',
-                    'Performance optimization'
-                ],
-                'deliverables': ['Migrated workload', 'Test results', 'Performance report']
-            },
-            {
-                'phase': 'Validation & Go-Live',
-                'duration': '1-2 weeks',
-                'tasks': [
-                    'End-to-end testing',
-                    'User acceptance testing',
-                    'Production cutover',
-                    'Post-migration optimization'
-                ],
-                'deliverables': ['Production workload', 'Handover documentation', 'Support procedures']
-            }
-        ]
-
-    def _assess_migration_risks(self, complexity_level: str, environment: str) -> List[Dict[str, Any]]:
-        """Assess migration risks."""
-        return [
-            {
-                'category': 'Technical',
-                'risk': 'Application compatibility issues',
-                'probability': 'Medium',
-                'impact': 'High',
-                'mitigation': 'Comprehensive testing in staging environment'
-            },
-            {
-                'category': 'Operational',
-                'risk': 'Extended downtime during cutover',
-                'probability': 'Low',
-                'impact': 'High',
-                'mitigation': 'Blue-green deployment strategy'
-            },
-            {
-                'category': 'Security',
-                'risk': 'Data exposure during migration',
-                'probability': 'Low',
-                'impact': 'Critical',
-                'mitigation': 'Encryption in transit and at rest'
-            }
-        ]
-
-    def _estimate_migration_timeline(self, complexity_level: str, environment: str) -> Dict[str, Any]:
-        """Estimate migration timeline."""
-        timelines = {
-            'LOW': {'min_weeks': 3, 'max_weeks': 6, 'confidence': 'High'},
-            'MEDIUM': {'min_weeks': 6, 'max_weeks': 12, 'confidence': 'Medium'},
-            'HIGH': {'min_weeks': 12, 'max_weeks': 20, 'confidence': 'Medium'},
-            'CRITICAL': {'min_weeks': 20, 'max_weeks': 32, 'confidence': 'Low'}
-        }
-        return timelines.get(complexity_level, timelines['MEDIUM'])
-
-    def _generate_recommendations(self, complexity_level: str) -> List[str]:
-        """Generate recommendations."""
-        recommendations = [
-            "Establish clear success criteria and KPIs",
-            "Implement comprehensive backup and rollback procedures",
-            "Conduct thorough security and compliance validation",
-            "Plan for adequate testing and validation phases"
-        ]
+    def _create_analysis_prompt(self, workload_inputs: Dict, environment: str) -> str:
+        """Create a detailed prompt for Claude to analyze the workload."""
         
-        if complexity_level in ['HIGH', 'CRITICAL']:
-            recommendations.extend([
-                "Consider engaging AWS Professional Services",
-                "Implement extensive monitoring and alerting",
-                "Plan for multiple migration phases"
-            ])
-        
-        return recommendations
+        prompt = f"""
+        Please analyze the following workload for AWS migration and provide a comprehensive assessment in JSON format.
 
-    def _identify_success_factors(self, complexity_level: str) -> List[str]:
-        """Identify success factors."""
-        return [
-            "Strong project leadership and governance",
-            "Clear communication with all stakeholders",
-            "Adequate resource allocation and timeline",
-            "Comprehensive testing strategy"
-        ]
+        **Workload Information:**
+        - Name: {workload_inputs.get('workload_name', 'Unknown')}
+        - Type: {workload_inputs.get('workload_type', 'web_application')}
+        - Operating System: {workload_inputs.get('operating_system', 'linux')}
+        - Environment: {environment}
+        - Region: {workload_inputs.get('region', 'us-east-1')}
+
+        **Current Infrastructure:**
+        - CPU Cores: {workload_inputs.get('on_prem_cores', 8)}
+        - Peak CPU Usage: {workload_inputs.get('peak_cpu_percent', 70)}%
+        - RAM: {workload_inputs.get('on_prem_ram_gb', 32)} GB
+        - Peak RAM Usage: {workload_inputs.get('peak_ram_percent', 80)}%
+        - Storage: {workload_inputs.get('storage_current_gb', 500)} GB
+        - Peak IOPS: {workload_inputs.get('peak_iops', 5000)}
+        - Peak Throughput: {workload_inputs.get('peak_throughput_mbps', 250)} MB/s
+        - Infrastructure Age: {workload_inputs.get('infrastructure_age_years', 3)} years
+        - Business Criticality: {workload_inputs.get('business_criticality', 'medium')}
+
+        Please provide your analysis in the following JSON structure:
+        
+        {{
+            "complexity_score": <number 0-100>,
+            "complexity_level": "<LOW|MEDIUM|HIGH|CRITICAL>",
+            "complexity_color": "<low|medium|high|critical>",
+            "migration_strategy": {{
+                "approach": "<migration approach>",
+                "methodology": "<migration methodology>",
+                "timeline": "<estimated timeline>",
+                "risk_level": "<risk assessment>"
+            }},
+            "migration_steps": [
+                {{
+                    "phase": "<phase name>",
+                    "duration": "<duration>",
+                    "tasks": ["<task1>", "<task2>", "<task3>"],
+                    "deliverables": ["<deliverable1>", "<deliverable2>"]
+                }}
+            ],
+            "risk_factors": [
+                {{
+                    "category": "<risk category>",
+                    "risk": "<risk description>",
+                    "probability": "<Low|Medium|High>",
+                    "impact": "<Low|Medium|High|Critical>",
+                    "mitigation": "<mitigation strategy>"
+                }}
+            ],
+            "estimated_timeline": {{
+                "min_weeks": <number>,
+                "max_weeks": <number>,
+                "confidence": "<Low|Medium|High>"
+            }},
+            "recommendations": [
+                "<recommendation1>",
+                "<recommendation2>",
+                "<recommendation3>"
+            ],
+            "success_factors": [
+                "<factor1>",
+                "<factor2>",
+                "<factor3>"
+            ]
+        }}
+
+        Consider the environment type ({environment}) when assessing complexity, risk, and timeline. Production environments should have higher complexity scores and longer timelines due to stricter requirements.
+
+        Base your complexity score on:
+        - Technical complexity (40%)
+        - Operational requirements (25%)
+        - Business impact (20%)
+        - Migration risk (15%)
+
+        Provide specific, actionable recommendations based on AWS best practices.
+        """
+        
+        return prompt
+
+    def _parse_claude_response(self, response_text: str) -> Dict[str, Any]:
+        """Parse Claude's JSON response and validate it."""
+        try:
+            # Try to extract JSON from the response
+            import re
+            
+            # Look for JSON block in the response
+            json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
+            
+            if json_match:
+                json_str = json_match.group(0)
+                parsed_response = json.loads(json_str)
+                
+                # Validate required fields
+                required_fields = ['complexity_score', 'complexity_level', 'migration_strategy']
+                
+                for field in required_fields:
+                    if field not in parsed_response:
+                        logger.warning(f"Missing required field: {field}")
+                        return self._get_fallback_analysis()
+                
+                # Ensure complexity_color is set
+                if 'complexity_color' not in parsed_response:
+                    level = parsed_response.get('complexity_level', 'MEDIUM').lower()
+                    parsed_response['complexity_color'] = level.lower()
+                
+                return parsed_response
+            
+            else:
+                logger.warning("No JSON found in Claude response")
+                return self._get_fallback_analysis()
+                
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse Claude response as JSON: {e}")
+            return self._get_fallback_analysis()
+        except Exception as e:
+            logger.error(f"Error parsing Claude response: {e}")
+            return self._get_fallback_analysis()
 
     def _get_fallback_analysis(self) -> Dict[str, Any]:
-        """Fallback analysis."""
+        """Fallback analysis when Claude API is not available."""
         return {
             'complexity_score': 50,
             'complexity_level': 'MEDIUM',
             'complexity_color': 'medium',
             'migration_strategy': {
-                'approach': 'Standard Migration',
-                'methodology': 'Lift and shift with optimization',
+                'approach': 'Standard Migration with Optimization',
+                'methodology': 'Lift and shift with selective modernization',
                 'timeline': '6-10 weeks',
                 'risk_level': 'Medium'
             },
-            'migration_steps': [],
-            'risk_factors': [],
+            'migration_steps': [
+                {
+                    'phase': 'Discovery & Assessment',
+                    'duration': '1-2 weeks',
+                    'tasks': [
+                        'Infrastructure inventory and dependency mapping',
+                        'Performance baseline establishment',
+                        'Security and compliance assessment'
+                    ],
+                    'deliverables': ['Migration plan', 'Risk assessment', 'Architecture design']
+                },
+                {
+                    'phase': 'Migration Execution',
+                    'duration': '3-6 weeks',
+                    'tasks': [
+                        'Environment setup and configuration',
+                        'Application migration and testing',
+                        'Performance optimization'
+                    ],
+                    'deliverables': ['Migrated workload', 'Test results', 'Documentation']
+                },
+                {
+                    'phase': 'Validation & Go-Live',
+                    'duration': '1-2 weeks',
+                    'tasks': [
+                        'End-to-end testing',
+                        'Production cutover',
+                        'Post-migration optimization'
+                    ],
+                    'deliverables': ['Production workload', 'Support procedures']
+                }
+            ],
+            'risk_factors': [
+                {
+                    'category': 'Technical',
+                    'risk': 'Application compatibility issues',
+                    'probability': 'Medium',
+                    'impact': 'High',
+                    'mitigation': 'Comprehensive testing in staging environment'
+                },
+                {
+                    'category': 'Operational',
+                    'risk': 'Extended downtime during cutover',
+                    'probability': 'Low',
+                    'impact': 'High',
+                    'mitigation': 'Blue-green deployment strategy'
+                }
+            ],
             'estimated_timeline': {'min_weeks': 6, 'max_weeks': 10, 'confidence': 'Medium'},
-            'recommendations': ['Follow standard best practices'],
-            'success_factors': ['Strong project leadership']
+            'recommendations': [
+                'Implement comprehensive backup and rollback procedures',
+                'Conduct thorough security and compliance validation',
+                'Plan for adequate testing and validation phases',
+                'Establish clear success criteria and KPIs'
+            ],
+            'success_factors': [
+                'Strong project leadership and governance',
+                'Clear communication with all stakeholders',
+                'Adequate resource allocation and timeline',
+                'Comprehensive testing strategy'
+            ]
         }
 
 class AWSCostCalculator:
@@ -349,50 +374,50 @@ class AWSCostCalculator:
                     'r6i.large': {'on_demand': 73.58, 'ri_1y': 51.54, 'ri_3y': 36.79, 'spot': 22.07},
                     'r6i.xlarge': {'on_demand': 147.17, 'ri_1y': 103.07, 'ri_3y': 73.58, 'spot': 44.15}
                 },
-                'auto_scaling': 0,  # No additional cost
-                'placement_groups': 0,  # No additional cost
-                'elastic_ip': 3.65  # Per month when not associated
+                'auto_scaling': 0,
+                'placement_groups': 0,
+                'elastic_ip': 3.65
             },
             'network': {
-                'vpc': 0,  # No cost for VPC itself
-                'nat_gateway': 32.85,  # Per NAT Gateway per month
-                'alb': 16.43,  # Application Load Balancer per month
-                'nlb': 16.43,  # Network Load Balancer per month
+                'vpc': 0,
+                'nat_gateway': 32.85,
+                'alb': 16.43,
+                'nlb': 16.43,
                 'cloudfront': {
-                    'per_gb': 0.085,  # First 10TB per month
+                    'per_gb': 0.085,
                     'requests_per_10k': 0.0075
                 },
                 'route53': {
-                    'hosted_zone': 0.50,  # Per hosted zone per month
+                    'hosted_zone': 0.50,
                     'queries_per_million': 0.40
                 },
                 'data_transfer': {
                     'out_to_internet_first_1gb': 0,
-                    'out_to_internet_up_to_10tb': 0.09,  # Per GB
+                    'out_to_internet_up_to_10tb': 0.09,
                     'out_to_cloudfront': 0,
-                    'between_azs': 0.01  # Per GB
+                    'between_azs': 0.01
                 },
-                'vpn_gateway': 36.50,  # Per VPN connection per month
+                'vpn_gateway': 36.50,
                 'direct_connect': {
-                    '1gbps': 30,  # Per month
-                    '10gbps': 300  # Per month
+                    '1gbps': 30,
+                    '10gbps': 300
                 }
             },
             'storage': {
                 'ebs': {
-                    'gp3': 0.08,  # Per GB per month
-                    'io2': 0.125,  # Per GB per month
-                    'io2_iops': 0.065,  # Per provisioned IOPS per month
-                    'snapshots': 0.05  # Per GB per month
+                    'gp3': 0.08,
+                    'io2': 0.125,
+                    'io2_iops': 0.065,
+                    'snapshots': 0.05
                 },
                 's3': {
-                    'standard': 0.023,  # Per GB per month
-                    'standard_ia': 0.0125,  # Per GB per month
-                    'glacier': 0.004,  # Per GB per month
-                    'deep_archive': 0.00099  # Per GB per month
+                    'standard': 0.023,
+                    'standard_ia': 0.0125,
+                    'glacier': 0.004,
+                    'deep_archive': 0.00099
                 },
-                'efs': 0.30,  # Per GB per month
-                'fsx': 0.145  # Per GB per month (Lustre)
+                'efs': 0.30,
+                'fsx': 0.145
             },
             'database': {
                 'rds_mysql': {
@@ -409,39 +434,39 @@ class AWSCostCalculator:
                     'db.r6g.2xlarge': 420.48
                 },
                 'storage': {
-                    'rds_gp2': 0.115,  # Per GB per month
-                    'rds_io1': 0.125,  # Per GB per month
-                    'aurora_storage': 0.10,  # Per GB per month
-                    'aurora_io': 0.20  # Per million requests
+                    'rds_gp2': 0.115,
+                    'rds_io1': 0.125,
+                    'aurora_storage': 0.10,
+                    'aurora_io': 0.20
                 },
-                'backup_storage': 0.095,  # Per GB per month
-                'rds_proxy': 0.015  # Per vCPU per hour
+                'backup_storage': 0.095,
+                'rds_proxy': 0.015
             },
             'security': {
-                'secrets_manager': 0.40,  # Per secret per month
-                'kms': 1.00,  # Per key per month
-                'acm': 0,  # Free for AWS services
-                'config': 0.003,  # Per configuration item per month
-                'cloudtrail': 2.00,  # Per trail per month
-                'guardduty': 4.62,  # Per million events
-                'inspector': 0.30,  # Per agent assessment
-                'security_hub': 0.0030,  # Per finding per month
-                'waf': 1.00,  # Per web ACL per month
-                'shield_advanced': 3000  # Per month
+                'secrets_manager': 0.40,
+                'kms': 1.00,
+                'acm': 0,
+                'config': 0.003,
+                'cloudtrail': 2.00,
+                'guardduty': 4.62,
+                'inspector': 0.30,
+                'security_hub': 0.0030,
+                'waf': 1.00,
+                'shield_advanced': 3000
             },
             'monitoring': {
                 'cloudwatch': {
-                    'metrics': 0.30,  # Per metric per month
-                    'dashboards': 3.00,  # Per dashboard per month
-                    'alarms': 0.10,  # Per alarm per month
-                    'logs_ingestion': 0.50,  # Per GB ingested
-                    'logs_storage': 0.03  # Per GB per month
+                    'metrics': 0.30,
+                    'dashboards': 3.00,
+                    'alarms': 0.10,
+                    'logs_ingestion': 0.50,
+                    'logs_storage': 0.03
                 },
-                'xray': 5.00,  # Per million traces
-                'application_insights': 0.0012,  # Per resource per hour
-                'synthetics': 0.0012,  # Per canary run
-                'cost_explorer': 0,  # Free
-                'budgets': 0.02  # Per budget per day
+                'xray': 5.00,
+                'application_insights': 0.0012,
+                'synthetics': 0.0012,
+                'cost_explorer': 0,
+                'budgets': 0.02
             }
         }
     
@@ -532,7 +557,7 @@ class AWSCostCalculator:
         # NAT Gateway costs
         nat_cost = 0
         if network_recs.get('nat_gateway') == 'Required':
-            nat_count = 2 if env in ['PROD', 'PREPROD'] else 1  # Multi-AZ for production
+            nat_count = 2 if env in ['PROD', 'PREPROD'] else 1
             nat_cost = self.pricing['network']['nat_gateway'] * nat_count
         
         # CloudFront costs (estimated)
@@ -544,7 +569,7 @@ class AWSCostCalculator:
         # Route 53 costs
         dns_cost = self.pricing['network']['route53']['hosted_zone']
         if 'health checks' in network_recs.get('dns', ''):
-            dns_cost += 0.50 * 2  # 2 health checks
+            dns_cost += 0.50 * 2
         
         # Data transfer costs (estimated)
         data_transfer_cost = self._estimate_data_transfer_costs(env)
@@ -599,7 +624,7 @@ class AWSCostCalculator:
             ebs_cost = storage_gb * self.pricing['storage']['ebs']['io2']
             # Add IOPS costs for io2
             iops = self._extract_iops_from_recommendation(storage_recs.get('iops_recommendation', ''))
-            if iops > 3000:  # Free IOPS up to 3000 for io2
+            if iops > 3000:
                 additional_iops = iops - 3000
                 ebs_cost += additional_iops * self.pricing['storage']['ebs']['io2_iops']
         else:
@@ -607,14 +632,13 @@ class AWSCostCalculator:
         
         # Snapshot costs (for backup)
         snapshot_frequency = self._get_snapshot_frequency(storage_recs.get('backup_strategy', ''))
-        snapshot_retention_gb = storage_gb * snapshot_frequency * 0.3  # Assume 30% change rate
+        snapshot_retention_gb = storage_gb * snapshot_frequency * 0.3
         snapshot_cost = snapshot_retention_gb * self.pricing['storage']['ebs']['snapshots']
         
         # S3 costs for long-term backup/archival
         s3_cost = 0
         if env in ['PROD', 'PREPROD']:
-            # Estimate S3 usage for long-term backups
-            s3_storage_gb = storage_gb * 2  # 2x for long-term retention
+            s3_storage_gb = storage_gb * 2
             s3_cost = s3_storage_gb * self.pricing['storage']['s3']['standard_ia']
         
         total_storage = ebs_cost + snapshot_cost + s3_cost
@@ -658,34 +682,31 @@ class AWSCostCalculator:
             db_instance_cost *= 2
         
         # Storage costs
-        db_storage_gb = max(requirements.get('storage_GB', 100), 20)  # Minimum 20GB for RDS
+        db_storage_gb = max(requirements.get('storage_GB', 100), 20)
         
         if 'Aurora' in engine:
-            # Aurora storage pricing
             storage_cost = db_storage_gb * self.pricing['database']['storage']['aurora_storage']
-            # Add IO costs (estimated)
-            io_cost = 1000000 * self.pricing['database']['storage']['aurora_io']  # 1M IOs estimate
+            io_cost = 1000000 * self.pricing['database']['storage']['aurora_io']
             storage_cost += io_cost
         else:
-            # RDS storage pricing
             storage_cost = db_storage_gb * self.pricing['database']['storage']['rds_gp2']
         
         # Backup storage costs
         backup_retention = self._extract_backup_days(db_recs.get('backup_retention', '7 days'))
-        backup_storage_gb = db_storage_gb * (backup_retention / 30) * 0.2  # Estimate backup size
+        backup_storage_gb = db_storage_gb * (backup_retention / 30) * 0.2
         backup_cost = backup_storage_gb * self.pricing['database']['backup_storage']
         
         # Read replica costs
         read_replica_cost = 0
         read_replicas = self._extract_read_replica_count(db_recs.get('read_replicas', 'No read replicas'))
         if read_replicas > 0:
-            read_replica_cost = db_instance_cost * read_replicas * 0.8  # 80% of primary cost
+            read_replica_cost = db_instance_cost * read_replicas * 0.8
         
         # RDS Proxy costs (if used)
         proxy_cost = 0
         if 'RDS Proxy' in db_recs.get('connection_pooling', ''):
             vcpus = requirements.get('vCPUs', 2)
-            proxy_cost = vcpus * self.pricing['database']['rds_proxy'] * 730  # Per hour pricing
+            proxy_cost = vcpus * self.pricing['database']['rds_proxy'] * 730
         
         total_database = db_instance_cost + storage_cost + backup_cost + read_replica_cost + proxy_cost
         
@@ -740,7 +761,7 @@ class AWSCostCalculator:
         # Security Hub
         security_hub_cost = 0
         if env in ['PROD', 'PREPROD']:
-            findings_per_month = 1000  # Estimate
+            findings_per_month = 1000
             security_hub_cost = findings_per_month * self.pricing['security']['security_hub']
         
         # WAF (if web application)
@@ -806,13 +827,13 @@ class AWSCostCalculator:
         # X-Ray (if enabled)
         xray_cost = 0
         if monitoring_recs.get('apm') == 'X-Ray':
-            trace_volume = 1  # 1 million traces estimate
+            trace_volume = 1
             xray_cost = trace_volume * self.pricing['monitoring']['xray']
         
         # Synthetics (if enabled)
         synthetics_cost = 0
         if monitoring_recs.get('synthetic_monitoring') == 'Required':
-            canary_runs = 30 * 24 * 12  # 12 runs per hour, 24/7
+            canary_runs = 30 * 24 * 12
             synthetics_cost = canary_runs * self.pricing['monitoring']['synthetics']
         
         total_monitoring = metrics_cost + dashboard_cost + alarm_cost + log_cost + log_storage_cost + xray_cost + synthetics_cost
@@ -863,7 +884,6 @@ class AWSCostCalculator:
     
     def _estimate_data_transfer_costs(self, env: str) -> float:
         """Estimate data transfer costs."""
-        # Simplified estimation
         transfer_gb = {'DEV': 10, 'QA': 20, 'UAT': 50, 'PREPROD': 100, 'PROD': 500}
         gb = transfer_gb.get(env, 50)
         return gb * self.pricing['network']['data_transfer']['out_to_internet_up_to_10tb']
@@ -2247,7 +2267,7 @@ def render_enhanced_results():
                 st.markdown("**Migration Steps**")
                 migration_steps = claude_analysis.get('migration_steps', [])
                 
-                for i, step in enumerate(migration_steps[:3], 1):  # Show first 3 steps
+                for i, step in enumerate(migration_steps[:3], 1):
                     if isinstance(step, dict):
                         with st.expander(f"Phase {i}: {step.get('phase', 'N/A')}", expanded=False):
                             st.markdown(f"**Duration:** {step.get('duration', 'N/A')}")
@@ -2255,7 +2275,7 @@ def render_enhanced_results():
                             tasks = step.get('tasks', [])
                             if tasks:
                                 st.markdown("**Key Tasks:**")
-                                for task in tasks[:3]:  # Show first 3 tasks
+                                for task in tasks[:3]:
                                     st.markdown(f"• {task}")
         
         # Cost Analysis
@@ -2486,21 +2506,63 @@ def render_technical_recommendations_tab():
     categories = ['compute', 'network', 'storage', 'database', 'security', 'monitoring']
     costs = [service_costs[cat]['total'] for cat in categories]
     
-    fig_pie = go.Figure(data=[go.Pie(
-        labels=[cat.title() for cat in categories],
-        values=costs,
-        hole=.3,
-        textinfo='label+percent',
-        textposition='auto'
-    )])
+    # Filter out zero costs to avoid clutter
+    filtered_data = [(cat.title(), cost) for cat, cost in zip(categories, costs) if cost > 0]
     
-    fig_pie.update_layout(
-        title="Monthly Cost Distribution",
-        height=400,
-        showlegend=True
-    )
-    
-    st.plotly_chart(fig_pie, use_container_width=True)
+    if filtered_data:
+        labels, values = zip(*filtered_data)
+        
+        # Create a more visually appealing pie chart
+        fig_pie = go.Figure(data=[go.Pie(
+            labels=labels,
+            values=values,
+            hole=.4,  # Donut chart
+            textinfo='label+percent+value',
+            textposition='auto',
+            textfont=dict(size=14),
+            marker=dict(
+                colors=['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4'],
+                line=dict(color='#FFFFFF', width=2)
+            ),
+            hovertemplate='<b>%{label}</b><br>' +
+                         'Cost: $%{value:.2f}<br>' +
+                         'Percentage: %{percent}<br>' +
+                         '<extra></extra>',
+            pull=[0.05 if max(values) == val else 0 for val in values]  # Pull out the largest slice
+        )])
+        
+        fig_pie.update_layout(
+            title=dict(
+                text="Monthly Cost Distribution",
+                x=0.5,
+                font=dict(size=18, color='#1f2937')
+            ),
+            height=500,
+            width=700,
+            showlegend=True,
+            legend=dict(
+                orientation="v",
+                yanchor="middle",
+                y=0.5,
+                xanchor="left",
+                x=1.05,
+                font=dict(size=12)
+            ),
+            margin=dict(l=20, r=120, t=60, b=20),
+            annotations=[
+                dict(
+                    text=f"Total<br>${sum(values):.2f}/month",
+                    x=0.5, y=0.5,
+                    font_size=16,
+                    font_color='#1f2937',
+                    showarrow=False
+                )
+            ]
+        )
+        
+        st.plotly_chart(fig_pie, use_container_width=True)
+    else:
+        st.warning("No cost data available for visualization.")
     
     # Create tabs for different technical areas with costs
     tech_tabs = st.tabs([
@@ -2945,6 +3007,287 @@ def render_technical_recommendations_tab():
     for rec in summary_recommendations:
         st.markdown(rec)
 
+def generate_enhanced_excel_report():
+    """Generate comprehensive Excel report with multiple sheets."""
+    
+    if 'enhanced_results' not in st.session_state or not st.session_state.enhanced_results:
+        st.warning("No analysis results available for Excel generation.")
+        return
+    
+    if not OPENPYXL_AVAILABLE:
+        st.error("📊 openpyxl not available. Please install with: `pip install openpyxl`")
+        return
+    
+    try:
+        results = st.session_state.enhanced_results
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        
+        # Create Excel workbook
+        wb = openpyxl.Workbook()
+        
+        # Remove default sheet
+        wb.remove(wb.active)
+        
+        # Define styles
+        header_font = Font(bold=True, color="FFFFFF")
+        header_fill = PatternFill(start_color="2563EB", end_color="2563EB", fill_type="solid")
+        data_font = Font(size=11)
+        border = Border(
+            left=Side(style='thin'),
+            right=Side(style='thin'),
+            top=Side(style='thin'),
+            bottom=Side(style='thin')
+        )
+        
+        # Sheet 1: Executive Summary
+        ws_summary = wb.create_sheet("Executive Summary")
+        
+        # Add title
+        ws_summary['A1'] = "AWS Migration Analysis - Executive Summary"
+        ws_summary['A1'].font = Font(bold=True, size=16)
+        ws_summary.merge_cells('A1:E1')
+        
+        # Add generation date
+        ws_summary['A2'] = f"Generated: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}"
+        ws_summary['A2'].font = Font(size=12, italic=True)
+        ws_summary.merge_cells('A2:E2')
+        
+        # Summary data
+        prod_results = results['recommendations']['PROD']
+        claude_analysis = prod_results.get('claude_analysis', {})
+        tco_analysis = prod_results.get('tco_analysis', {})
+        
+        summary_data = [
+            ["Metric", "Value"],
+            ["Workload Name", results['inputs']['workload_name']],
+            ["Workload Type", results['inputs']['workload_type']],
+            ["Migration Complexity Level", claude_analysis.get('complexity_level', 'MEDIUM')],
+            ["Complexity Score", f"{claude_analysis.get('complexity_score', 50):.0f}/100"],
+            ["Estimated Timeline (weeks)", f"{claude_analysis.get('estimated_timeline', {}).get('max_weeks', 8)}"],
+            ["Monthly Cost (Production)", f"${tco_analysis.get('monthly_cost', 0):,.2f}"],
+            ["Annual Cost (Production)", f"${tco_analysis.get('monthly_cost', 0) * 12:,.2f}"],
+            ["Best Pricing Option", tco_analysis.get('best_pricing_option', 'N/A').replace('_', ' ').title()],
+            ["Migration Strategy", claude_analysis.get('migration_strategy', {}).get('approach', 'N/A')]
+        ]
+        
+        # Write summary data
+        start_row = 4
+        for row_idx, (metric, value) in enumerate(summary_data, start_row):
+            ws_summary[f'A{row_idx}'] = metric
+            ws_summary[f'B{row_idx}'] = value
+            
+            if row_idx == start_row:  # Header row
+                ws_summary[f'A{row_idx}'].font = header_font
+                ws_summary[f'A{row_idx}'].fill = header_fill
+                ws_summary[f'B{row_idx}'].font = header_font
+                ws_summary[f'B{row_idx}'].fill = header_fill
+            else:
+                ws_summary[f'A{row_idx}'].font = data_font
+                ws_summary[f'B{row_idx}'].font = data_font
+            
+            ws_summary[f'A{row_idx}'].border = border
+            ws_summary[f'B{row_idx}'].border = border
+        
+        # Auto-adjust column widths
+        ws_summary.column_dimensions['A'].width = 25
+        ws_summary.column_dimensions['B'].width = 30
+        
+        # Sheet 2: Environment Comparison
+        ws_env = wb.create_sheet("Environment Comparison")
+        
+        env_headers = ["Environment", "Complexity Score", "Instance Type", "Monthly Cost", "vCPUs", "RAM (GB)", "Storage (GB)"]
+        
+        # Write headers
+        for col_idx, header in enumerate(env_headers, 1):
+            cell = ws_env.cell(row=1, column=col_idx, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.border = border
+            cell.alignment = Alignment(horizontal='center')
+        
+        # Write environment data
+        for row_idx, env in enumerate(['DEV', 'QA', 'UAT', 'PREPROD', 'PROD'], 2):
+            env_results = results['recommendations'].get(env, {})
+            env_claude_analysis = env_results.get('claude_analysis', {})
+            cost_breakdown = env_results.get('cost_breakdown', {})
+            selected_instance = cost_breakdown.get('selected_instance', {})
+            total_costs = cost_breakdown.get('total_costs', {})
+            requirements = env_results.get('requirements', {})
+            
+            env_data = [
+                env,
+                f"{env_claude_analysis.get('complexity_score', 50):.0f}",
+                selected_instance.get('type', 'N/A'),
+                f"${total_costs.get('on_demand', 0):,.2f}",
+                str(requirements.get('vCPUs', 'N/A')),
+                str(requirements.get('RAM_GB', 'N/A')),
+                str(requirements.get('storage_GB', 'N/A'))
+            ]
+            
+            for col_idx, value in enumerate(env_data, 1):
+                cell = ws_env.cell(row=row_idx, column=col_idx, value=value)
+                cell.font = data_font
+                cell.border = border
+                if col_idx > 1:  # Center align numeric data
+                    cell.alignment = Alignment(horizontal='center')
+        
+        # Auto-adjust column widths
+        for col_idx in range(1, len(env_headers) + 1):
+            ws_env.column_dimensions[openpyxl.utils.get_column_letter(col_idx)].width = 15
+        
+        # Sheet 3: Cost Analysis by Environment
+        ws_cost = wb.create_sheet("Cost Analysis")
+        
+        analyzer = EnhancedEnvironmentAnalyzer()
+        cost_calculator = AWSCostCalculator()
+        
+        cost_headers = ["Environment", "Compute", "Network", "Storage", "Database", "Security", "Monitoring", "Total Monthly"]
+        
+        # Write headers
+        for col_idx, header in enumerate(cost_headers, 1):
+            cell = ws_cost.cell(row=1, column=col_idx, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.border = border
+            cell.alignment = Alignment(horizontal='center')
+        
+        # Calculate and write cost data for all environments
+        for row_idx, env in enumerate(['DEV', 'QA', 'UAT', 'PREPROD', 'PROD'], 2):
+            env_results_temp = results['recommendations'].get(env, {})
+            if env_results_temp:
+                tech_recs_temp = analyzer.get_technical_recommendations(env, env_results_temp)
+                requirements_temp = env_results_temp.get('requirements', {})
+                costs_temp = cost_calculator.calculate_service_costs(env, tech_recs_temp, requirements_temp)
+                
+                cost_data = [
+                    env,
+                    f"${costs_temp['compute']['total']:.2f}",
+                    f"${costs_temp['network']['total']:.2f}",
+                    f"${costs_temp['storage']['total']:.2f}",
+                    f"${costs_temp['database']['total']:.2f}",
+                    f"${costs_temp['security']['total']:.2f}",
+                    f"${costs_temp['monitoring']['total']:.2f}",
+                    f"${costs_temp['summary']['total_monthly']:.2f}"
+                ]
+            else:
+                cost_data = [env] + ["N/A"] * 7
+            
+            for col_idx, value in enumerate(cost_data, 1):
+                cell = ws_cost.cell(row=row_idx, column=col_idx, value=value)
+                cell.font = data_font
+                cell.border = border
+                if col_idx > 1:  # Center align cost data
+                    cell.alignment = Alignment(horizontal='center')
+        
+        # Auto-adjust column widths
+        for col_idx in range(1, len(cost_headers) + 1):
+            ws_cost.column_dimensions[openpyxl.utils.get_column_letter(col_idx)].width = 12
+        
+        # Sheet 4: Migration Recommendations
+        ws_recs = wb.create_sheet("Migration Recommendations")
+        
+        ws_recs['A1'] = "Migration Recommendations"
+        ws_recs['A1'].font = Font(bold=True, size=14)
+        ws_recs.merge_cells('A1:C1')
+        
+        # Migration strategy
+        strategy = claude_analysis.get('migration_strategy', {})
+        strategy_data = [
+            ["Migration Strategy", ""],
+            ["Approach", strategy.get('approach', 'N/A')],
+            ["Methodology", strategy.get('methodology', 'N/A')],
+            ["Timeline", strategy.get('timeline', 'N/A')],
+            ["Risk Level", strategy.get('risk_level', 'N/A')],
+            ["", ""],
+            ["Key Recommendations", ""]
+        ]
+        
+        # Add recommendations
+        recommendations = claude_analysis.get('recommendations', [])
+        for i, rec in enumerate(recommendations, 1):
+            strategy_data.append([f"{i}.", rec])
+        
+        # Write recommendations data
+        for row_idx, (label, value) in enumerate(strategy_data, 3):
+            ws_recs[f'A{row_idx}'] = label
+            ws_recs[f'B{row_idx}'] = value
+            
+            if "Strategy" in label or "Recommendations" in label:
+                ws_recs[f'A{row_idx}'].font = Font(bold=True, size=12)
+                ws_recs[f'B{row_idx}'].font = Font(bold=True, size=12)
+            else:
+                ws_recs[f'A{row_idx}'].font = data_font
+                ws_recs[f'B{row_idx}'].font = data_font
+        
+        # Auto-adjust column widths
+        ws_recs.column_dimensions['A'].width = 20
+        ws_recs.column_dimensions['B'].width = 60
+        
+        # Sheet 5: Technical Specifications (Production)
+        ws_tech = wb.create_sheet("Technical Specifications")
+        
+        if prod_results:
+            tech_recs = analyzer.get_technical_recommendations('PROD', prod_results)
+            requirements = prod_results.get('requirements', {})
+            service_costs = cost_calculator.calculate_service_costs('PROD', tech_recs, requirements)
+            
+            ws_tech['A1'] = "Production Environment Technical Specifications"
+            ws_tech['A1'].font = Font(bold=True, size=14)
+            ws_tech.merge_cells('A1:D1')
+            
+            tech_sections = [
+                ("Compute Configuration", tech_recs['compute']),
+                ("Network Configuration", tech_recs['network']),
+                ("Storage Configuration", tech_recs['storage']),
+                ("Database Configuration", tech_recs['database']),
+                ("Security Configuration", tech_recs['security']),
+                ("Monitoring Configuration", tech_recs['monitoring'])
+            ]
+            
+            current_row = 3
+            for section_name, section_data in tech_sections:
+                # Section header
+                ws_tech[f'A{current_row}'] = section_name
+                ws_tech[f'A{current_row}'].font = Font(bold=True, size=12)
+                ws_tech.merge_cells(f'A{current_row}:D{current_row}')
+                current_row += 1
+                
+                # Section data
+                if isinstance(section_data, dict):
+                    for key, value in section_data.items():
+                        if isinstance(value, (str, int, float, bool)):
+                            ws_tech[f'A{current_row}'] = key.replace('_', ' ').title()
+                            ws_tech[f'B{current_row}'] = str(value)
+                            ws_tech[f'A{current_row}'].font = data_font
+                            ws_tech[f'B{current_row}'].font = data_font
+                            current_row += 1
+                
+                current_row += 1  # Add space between sections
+            
+            # Auto-adjust column widths
+            ws_tech.column_dimensions['A'].width = 25
+            ws_tech.column_dimensions['B'].width = 40
+        
+        # Save to BytesIO buffer
+        buffer = io.BytesIO()
+        wb.save(buffer)
+        buffer.seek(0)
+        
+        filename = f"Enhanced_AWS_Migration_Analysis_{timestamp}.xlsx"
+        
+        st.download_button(
+            label="⬇️ Download Excel Report",
+            data=buffer.getvalue(),
+            file_name=filename,
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+        
+        st.success("✅ Enhanced Excel report generated successfully!")
+        
+    except Exception as e:
+        st.error(f"Error generating Excel report: {str(e)}")
+        logger.error(f"Error in Excel generation: {e}")
+
 def generate_enhanced_pdf_report():
     """Generate enhanced PDF report."""
     
@@ -3129,134 +3472,6 @@ def generate_enhanced_pdf_report():
             
             story.append(cost_summary_table)
             story.append(Spacer(1, 0.3*inch))
-            
-            # Compute recommendations with costs
-            story.append(Paragraph("Compute Configuration & Costs", styles['Heading2']))
-            compute_recs = tech_recs['compute']
-            compute_costs = service_costs['compute']
-            
-            compute_data = [
-                ['Component', 'Specification', 'Monthly Cost'],
-                ['Instance Type', compute_recs['primary_instance']['type'], f"${compute_costs['ec2_instances']['cost']:.2f}"],
-                ['vCPUs', str(compute_recs['primary_instance']['vcpus']), 'Included'],
-                ['Memory (GB)', str(compute_recs['primary_instance']['memory_gb']), 'Included'],
-                ['Placement Strategy', compute_recs['placement_strategy'], '$0.00'],
-                ['Auto Scaling', compute_recs['auto_scaling'], '$0.00'],
-                ['Elastic IPs', 'Production deployment', f"${compute_costs['elastic_ip']['cost']:.2f}"],
-                ['Total Compute Cost', '', f"${compute_costs['total']:.2f}"]
-            ]
-            
-            compute_table = Table(compute_data, colWidths=[2*inch, 2.5*inch, 1.5*inch])
-            compute_table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#059669')),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-                ('BACKGROUND', (-1, -1), (-1, -1), colors.HexColor('#f3f4f6')),
-                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTNAME', (-1, -1), (-1, -1), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 10),
-                ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#10b981')),
-                ('FONTSIZE', (0, 1), (-1, -1), 9)
-            ]))
-            
-            story.append(compute_table)
-            story.append(Spacer(1, 0.2*inch))
-            
-            # Network recommendations with costs
-            story.append(Paragraph("Network Configuration & Costs", styles['Heading2']))
-            network_recs = tech_recs['network']
-            network_costs = service_costs['network']
-            
-            network_data = [
-                ['Network Component', 'Configuration', 'Monthly Cost'],
-                ['VPC Design', network_recs['vpc_design'], '$0.00'],
-                ['Load Balancer', network_recs['load_balancer'], f"${network_costs['load_balancer']['cost']:.2f}"],
-                ['NAT Gateway', network_recs['nat_gateway'], f"${network_costs['nat_gateway']['cost']:.2f}"],
-                ['CloudFront CDN', network_recs['cdn'], f"${network_costs['cloudfront_cdn']['cost']:.2f}"],
-                ['Route 53 DNS', network_recs['dns'], f"${network_costs['route53_dns']['cost']:.2f}"],
-                ['VPN Gateway', network_recs['vpn'], f"${network_costs['vpn_gateway']['cost']:.2f}"],
-                ['Data Transfer', 'Estimated costs', f"${network_costs['data_transfer']['cost']:.2f}"],
-                ['Total Network Cost', '', f"${network_costs['total']:.2f}"]
-            ]
-            
-            network_table = Table(network_data, colWidths=[2*inch, 2.5*inch, 1.5*inch])
-            network_table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#dc2626')),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-                ('BACKGROUND', (-1, -1), (-1, -1), colors.HexColor('#fef2f2')),
-                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTNAME', (-1, -1), (-1, -1), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 10),
-                ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#f87171')),
-                ('FONTSIZE', (0, 1), (-1, -1), 9)
-            ]))
-            
-            story.append(network_table)
-            story.append(Spacer(1, 0.2*inch))
-            
-            # Storage recommendations with costs
-            storage_recs = tech_recs['storage']
-            storage_costs = service_costs['storage']
-            
-            storage_data = [
-                ['Storage Component', 'Configuration', 'Monthly Cost'],
-                ['Primary Storage', storage_recs['primary_storage'], f"${storage_costs['ebs_primary']['cost']:.2f}"],
-                ['Storage Size', storage_recs['recommended_size'], 'Included above'],
-                ['IOPS', storage_recs['iops_recommendation'], 'Included above'],
-                ['EBS Snapshots', storage_recs['backup_strategy'], f"${storage_costs['ebs_snapshots']['cost']:.2f}"],
-                ['S3 Backup', 'Long-term retention', f"${storage_costs['s3_backup']['cost']:.2f}"],
-                ['Total Storage Cost', '', f"${storage_costs['total']:.2f}"]
-            ]
-            
-            storage_table = Table(storage_data, colWidths=[2*inch, 2.5*inch, 1.5*inch])
-            storage_table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#7c2d12')),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-                ('BACKGROUND', (-1, -1), (-1, -1), colors.HexColor('#f5f3ff')),
-                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTNAME', (-1, -1), (-1, -1), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 10),
-                ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#a78bfa')),
-                ('FONTSIZE', (0, 1), (-1, -1), 9)
-            ]))
-            
-            story.append(storage_table)
-            story.append(PageBreak())
-            
-            # Cost optimization recommendations
-            story.append(Paragraph("Cost Optimization Recommendations", styles['Heading2']))
-            
-            optimization_text = """
-            <b>Compute Optimization:</b><br/>
-            • Consider Reserved Instances for production workloads (up to 40% savings)<br/>
-            • Monitor CPU utilization to right-size instances<br/>
-            • Use Spot Instances for development environments<br/><br/>
-            
-            <b>Network Optimization:</b><br/>
-            • Implement VPC endpoints to reduce NAT Gateway costs<br/>
-            • Use CloudFront to minimize data transfer costs<br/>
-            • Single NAT Gateway sufficient for non-production environments<br/><br/>
-            
-            <b>Storage Optimization:</b><br/>
-            • Use gp3 volumes for better price-performance<br/>
-            • Implement S3 lifecycle policies for backup data<br/>
-            • Regular cleanup of unused snapshots<br/><br/>
-            
-            <b>Database Optimization:</b><br/>
-            • Use Aurora for better performance at scale<br/>
-            • Single-AZ for non-production environments<br/>
-            • Monitor and optimize database performance<br/><br/>
-            
-            <b>Overall Cost Management:</b><br/>
-            • Implement AWS Budgets and Cost Anomaly Detection<br/>
-            • Regular cost reviews and optimization cycles<br/>
-            • Use AWS Cost Explorer for detailed cost analysis
-            """
-            
-            story.append(Paragraph(optimization_text, styles['Normal']))
-            story.append(Spacer(1, 0.2*inch))
         
         # Recommendations
         recommendations = claude_analysis.get('recommendations', [])
@@ -3267,7 +3482,7 @@ def generate_enhanced_pdf_report():
         
         # Footer
         story.append(Spacer(1, 0.3*inch))
-        footer_text = f"Report generated by Enhanced AWS Migration Platform v6.0 on {datetime.now().strftime('%B %d, %Y')}"
+        footer_text = f"Report generated by Enhanced AWS Migration Platform v7.0 with Real Claude AI on {datetime.now().strftime('%B %d, %Y')}"
         footer_style = ParagraphStyle('Footer', parent=styles['Normal'], fontSize=8, alignment=TA_CENTER, textColor=colors.HexColor('#6b7280'))
         story.append(Paragraph(footer_text, footer_style))
         
@@ -3353,21 +3568,62 @@ def main():
     # Enhanced header
     st.markdown("""
     <div class="main-header">
-        <h1>🏢 Enhanced AWS Migration Platform v6.0</h1>
-        <p>Comprehensive environment analysis with detailed technical recommendations and AI-powered migration insights</p>
+        <h1>🏢 Enhanced AWS Migration Platform v7.0</h1>
+        <p>Comprehensive environment analysis with real Claude AI integration, detailed technical recommendations, and AI-powered migration insights</p>
+        <p style="font-size: 0.9rem; opacity: 0.9;">🤖 Now featuring real Anthropic Claude API integration for intelligent migration analysis</p>
     </div>
     """, unsafe_allow_html=True)
     
     # Enhanced sidebar
     with st.sidebar:
+        st.markdown("### 🔑 Claude AI Configuration")
+        
+        # Claude API Key configuration
+        api_key_placeholder = st.empty()
+        
+        # Check if API key is available
+        analyzer = ClaudeAIMigrationAnalyzer()
+        api_key = analyzer._get_claude_api_key()
+        
+        if api_key:
+            api_status = "🟢 Connected"
+            api_help = "Claude AI is connected and ready for analysis"
+        else:
+            api_status = "🔴 Not Connected"
+            api_help = "Add ANTHROPIC_API_KEY to Streamlit secrets or environment variables"
+        
+        with api_key_placeholder.container():
+            st.markdown(f"**Status:** {api_status}")
+            st.markdown(f"*{api_help}*")
+            
+            if not api_key:
+                with st.expander("🔧 How to configure Claude API", expanded=False):
+                    st.markdown("""
+                    **Option 1: Streamlit Secrets (Recommended)**
+                    1. Create `.streamlit/secrets.toml` file
+                    2. Add: `ANTHROPIC_API_KEY = "your-api-key-here"`
+                    
+                    **Option 2: Environment Variable**
+                    1. Set environment variable: `ANTHROPIC_API_KEY=your-api-key-here`
+                    
+                    **Get API Key:**
+                    1. Visit [Anthropic Console](https://console.anthropic.com/)
+                    2. Create account and get API key
+                    3. Add to your configuration
+                    """)
+        
+        st.markdown("---")
+        
         st.markdown("### 🤖 AI + AWS Integration Status")
         
         # Integration status indicators
-        st.markdown("""
+        claude_status = "🟢 Active" if api_key else "🟡 Fallback Mode"
+        
+        st.markdown(f"""
         <div style="padding: 1rem; border-radius: 8px; background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%); margin-bottom: 1rem;">
             <h4 style="margin: 0; color: #dc2626;">🤖 Claude AI</h4>
             <p style="margin: 0; font-size: 0.875rem;">Migration Complexity Analysis</p>
-            <span style="background: #10b981; color: white; padding: 0.25rem 0.5rem; border-radius: 12px; font-size: 0.75rem;">Active</span>
+            <span style="background: {'#10b981' if api_key else '#f59e0b'}; color: white; padding: 0.25rem 0.5rem; border-radius: 12px; font-size: 0.75rem;">{claude_status}</span>
         </div>
         """, unsafe_allow_html=True)
         
@@ -3459,7 +3715,7 @@ def main():
             
             with col2:
                 if st.button("📊 Export to Excel"):
-                    st.info("Excel export functionality - install openpyxl for full Excel support")
+                    generate_enhanced_excel_report()
             
             with col3:
                 if st.button("📈 Generate Heat Map CSV"):
@@ -3509,9 +3765,9 @@ def main():
     st.markdown("---")
     st.markdown("""
     <div style="text-align: center; color: #6b7280; font-size: 0.875rem; padding: 2rem 0;">
-        <strong>Enhanced AWS Migration Platform v6.0</strong><br>
-        Powered by Claude AI for intelligent migration analysis and comprehensive technical recommendations<br>
-        <em>🤖 AI-Enhanced • ☁️ AWS-Native • 📊 Data-Driven • 🔧 Technical-Complete</em>
+        <strong>Enhanced AWS Migration Platform v7.0</strong><br>
+        Now powered by <strong>Real Anthropic Claude AI API</strong> for intelligent migration analysis and comprehensive technical recommendations<br>
+        <em>🤖 Real AI-Enhanced • ☁️ AWS-Native • 📊 Data-Driven • 🔧 Technical-Complete • 📋 Excel/PDF Reports</em>
     </div>
     """, unsafe_allow_html=True)
 
