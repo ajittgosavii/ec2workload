@@ -2880,7 +2880,7 @@ tabs = st.tabs(["Single Workload", "Bulk Upload"])
     
     # Compute tab with costs
     with tech_tabs[0]:
-    sw_subtabs = st.tabs(["Single Workload", "Heat Map", "Technical Recommendation"])
+        sw_subtabs = st.tabs(["Single Workload", "Heat Map", "Technical Recommendation"])
         st.markdown("#### 💻 Compute Single Workload & Costs")
         
         compute_recs = tech_recs['compute']
