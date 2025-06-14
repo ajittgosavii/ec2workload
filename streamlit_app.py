@@ -53,11 +53,12 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Enhanced Modern CSS with Frame Structure - REPLACE YOUR EXISTING CSS SECTION
+# Enhanced Modern CSS with Frame Structure - REPLACE YOUR EXISTING CSS SECTION
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
     
-    /* Global Styles */
+    /* ==================== GLOBAL STYLES ==================== */
     html, body, [class*="css"] {
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
@@ -68,23 +69,39 @@ st.markdown("""
     footer {visibility: hidden;}
     header {visibility: hidden;}
     
+    /* ==================== LAYOUT STRUCTURE ==================== */
+    
+    /* Main Container - Remove default Streamlit spacing */
+    .main .block-container {
+        padding-top: 0rem !important;
+        padding-bottom: 1rem !important;
+        max-width: 100% !important;
+    }
+    
+    /* Remove extra spacing from Streamlit elements */
+    .element-container {
+        margin-bottom: 0.25rem !important;
+    }
+    
     /* Main Application Frame */
     .main-app-frame {
         background: white;
         border-radius: 20px;
         box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-        margin: 1rem;
+        margin: 0.5rem;
         overflow: hidden;
         border: 1px solid #e2e8f0;
     }
     
-    /* Enhanced Header Frame */
+    /* ==================== HEADER FRAME ==================== */
     .header-frame {
         background: linear-gradient(135deg, #1e3a8a 0%, #3730a3 50%, #1e40af 100%);
         color: white;
-        padding: 2rem 3rem;
+        padding: 1.5rem 2rem;
         position: relative;
         overflow: hidden;
+        margin: 0;
+        border-radius: 20px 20px 0 0;
     }
     
     .header-frame::before {
@@ -105,38 +122,39 @@ st.markdown("""
     }
     
     .header-title {
-        font-size: 2.5rem;
+        font-size: 2.2rem;
         font-weight: 800;
-        margin-bottom: 0.5rem;
+        margin-bottom: 0.4rem;
         text-shadow: 0 2px 4px rgba(0,0,0,0.3);
     }
     
     .header-subtitle {
-        font-size: 1.2rem;
+        font-size: 1.1rem;
         opacity: 0.9;
-        margin-bottom: 1rem;
+        margin-bottom: 0.8rem;
         font-weight: 400;
     }
     
     .header-version {
         display: inline-block;
         background: rgba(255,255,255,0.2);
-        padding: 0.5rem 1rem;
+        padding: 0.4rem 0.8rem;
         border-radius: 50px;
-        font-size: 0.9rem;
+        font-size: 0.85rem;
         font-weight: 500;
         backdrop-filter: blur(10px);
         border: 1px solid rgba(255,255,255,0.3);
     }
     
-    /* Content Frame */
+    /* ==================== CONTENT FRAME ==================== */
     .content-frame {
-        padding: 2rem 3rem;
+        padding: 1rem 2rem;
         min-height: 60vh;
         background: white;
+        margin: 0;
     }
     
-    /* Navigation Frame */
+    /* Navigation frame */
     .nav-frame {
         background: #f8fafc;
         border-bottom: 1px solid #e2e8f0;
@@ -144,136 +162,21 @@ st.markdown("""
         margin: 0;
     }
     
-    /* Sidebar Frame */
-    .sidebar-frame {
-        background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
-        border-right: 1px solid #e2e8f0;
-        padding: 1.5rem;
-        height: 100vh;
-        overflow-y: auto;
+    /* ==================== TABS STYLING ==================== */
+    
+    /* Main tabs - Remove spacing issues */
+    .stTabs {
+        margin-top: 0 !important;
+        padding-top: 0 !important;
     }
     
-    /* Enhanced Cards */
-    .modern-card {
-        background: white;
-        border-radius: 16px;
-        padding: 2rem;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-        border: 1px solid #f1f5f9;
-        margin-bottom: 1.5rem;
-        transition: all 0.3s ease;
-        position: relative;
-        overflow: hidden;
-    }
-    
-    .modern-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 30px rgba(0,0,0,0.12);
-    }
-    
-    .modern-card::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        height: 4px;
-        background: linear-gradient(90deg, #3b82f6, #8b5cf6, #06b6d4);
-    }
-    
-    /* Metric Cards */
-    .metric-card-enhanced {
-        background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-        border: 2px solid transparent;
-        border-radius: 20px;
-        padding: 2rem;
-        text-align: center;
-        position: relative;
-        overflow: hidden;
-        transition: all 0.3s ease;
-    }
-    
-    .metric-card-enhanced::before {
-        content: '';
-        position: absolute;
-        top: -2px;
-        left: -2px;
-        right: -2px;
-        bottom: -2px;
-        background: linear-gradient(45deg, #3b82f6, #8b5cf6, #06b6d4, #10b981);
-        border-radius: 20px;
-        z-index: -1;
-        animation: gradient-border 3s ease infinite;
-        background-size: 400% 400%;
-    }
-    
-    @keyframes gradient-border {
-        0%, 100% { background-position: 0% 50%; }
-        50% { background-position: 100% 50%; }
-    }
-    
-    .metric-card-enhanced:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 15px 35px rgba(0,0,0,0.15);
-    }
-    
-    .metric-value {
-        font-size: 2.5rem;
-        font-weight: 800;
-        color: #1e293b;
-        margin: 0.5rem 0;
-        text-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    
-    .metric-label {
-        font-size: 0.9rem;
-        font-weight: 600;
-        color: #64748b;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        margin-bottom: 0.5rem;
-    }
-    
-    .metric-description {
-        font-size: 0.8rem;
-        color: #94a3b8;
-        font-weight: 500;
-    }
-    
-    /* Status Indicators */
-    .status-indicator {
-        display: inline-flex;
-        align-items: center;
-        padding: 0.5rem 1rem;
-        border-radius: 50px;
-        font-weight: 600;
-        font-size: 0.85rem;
-        margin: 0.25rem;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    }
-    
-    .status-connected {
-        background: linear-gradient(135deg, #10b981, #059669);
-        color: white;
-    }
-    
-    .status-warning {
-        background: linear-gradient(135deg, #f59e0b, #d97706);
-        color: white;
-    }
-    
-    .status-error {
-        background: linear-gradient(135deg, #ef4444, #dc2626);
-        color: white;
-    }
-    
-    /* Enhanced Tabs */
     .stTabs [data-baseweb="tab-list"] {
         gap: 8px;
         background: #f8fafc;
         padding: 0.5rem;
         border-radius: 16px;
         border: 1px solid #e2e8f0;
+        margin-top: 0 !important;
     }
     
     .stTabs [data-baseweb="tab"] {
@@ -341,7 +244,122 @@ st.markdown("""
         color: white !important;
     }
     
-    /* Form Elements */
+    /* ==================== MODERN CARDS ==================== */
+    .modern-card {
+        background: white;
+        border-radius: 16px;
+        padding: 1.5rem;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        border: 1px solid #f1f5f9;
+        margin-bottom: 1rem;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .modern-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+    }
+    
+    .modern-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: linear-gradient(90deg, #3b82f6, #8b5cf6, #06b6d4);
+    }
+    
+    /* ==================== METRIC CARDS ==================== */
+    .metric-card-enhanced {
+        background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+        border: 2px solid transparent;
+        border-radius: 20px;
+        padding: 1.5rem;
+        text-align: center;
+        position: relative;
+        overflow: hidden;
+        transition: all 0.3s ease;
+        margin-bottom: 1rem;
+    }
+    
+    .metric-card-enhanced::before {
+        content: '';
+        position: absolute;
+        top: -2px;
+        left: -2px;
+        right: -2px;
+        bottom: -2px;
+        background: linear-gradient(45deg, #3b82f6, #8b5cf6, #06b6d4, #10b981);
+        border-radius: 20px;
+        z-index: -1;
+        animation: gradient-border 3s ease infinite;
+        background-size: 400% 400%;
+    }
+    
+    @keyframes gradient-border {
+        0%, 100% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+    }
+    
+    .metric-card-enhanced:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 15px 35px rgba(0,0,0,0.15);
+    }
+    
+    .metric-value {
+        font-size: 2.2rem;
+        font-weight: 800;
+        color: #1e293b;
+        margin: 0.4rem 0;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .metric-label {
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 0.4rem;
+    }
+    
+    .metric-description {
+        font-size: 0.75rem;
+        color: #94a3b8;
+        font-weight: 500;
+    }
+    
+    /* ==================== STATUS INDICATORS ==================== */
+    .status-indicator {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.5rem 1rem;
+        border-radius: 50px;
+        font-weight: 600;
+        font-size: 0.85rem;
+        margin: 0.25rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    
+    .status-connected {
+        background: linear-gradient(135deg, #10b981, #059669);
+        color: white;
+    }
+    
+    .status-warning {
+        background: linear-gradient(135deg, #f59e0b, #d97706);
+        color: white;
+    }
+    
+    .status-error {
+        background: linear-gradient(135deg, #ef4444, #dc2626);
+        color: white;
+    }
+    
+    /* ==================== FORM ELEMENTS ==================== */
     .stSelectbox > div > div {
         border-radius: 12px;
         border: 2px solid #e2e8f0;
@@ -364,7 +382,7 @@ st.markdown("""
         box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
     }
     
-    /* Buttons */
+    /* ==================== BUTTONS ==================== */
     .stButton > button {
         border-radius: 12px;
         font-weight: 600;
@@ -386,7 +404,7 @@ st.markdown("""
         box-shadow: 0 8px 25px rgba(59, 130, 246, 0.4);
     }
     
-    /* Expandable Sections */
+    /* ==================== EXPANDABLE SECTIONS ==================== */
     .streamlit-expanderHeader {
         background: linear-gradient(135deg, #f8fafc, #f1f5f9);
         border-radius: 12px;
@@ -395,31 +413,34 @@ st.markdown("""
         color: #374151;
     }
     
-    /* Progress Indicators */
-    .progress-ring {
-        display: inline-block;
-        width: 80px;
-        height: 80px;
-        margin: 1rem;
-    }
-    
-    /* Alert Boxes */
+    /* ==================== ALERTS ==================== */
     .stAlert {
         border-radius: 12px;
         border: none;
         box-shadow: 0 4px 15px rgba(0,0,0,0.08);
     }
     
-    /* Footer Frame */
+    /* ==================== SIDEBAR STYLING ==================== */
+    .sidebar-frame {
+        background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+        border-right: 1px solid #e2e8f0;
+        padding: 1rem;
+        height: 100vh;
+        overflow-y: auto;
+    }
+    
+    /* ==================== FOOTER FRAME ==================== */
     .footer-frame {
         background: linear-gradient(135deg, #1e293b, #374151);
         color: #e2e8f0;
-        padding: 2rem 3rem;
+        padding: 1.5rem 2rem;
         text-align: center;
         border-top: 1px solid #374151;
+        margin-top: 2rem;
+        border-radius: 0 0 20px 20px;
     }
     
-    /* Animation Classes */
+    /* ==================== ANIMATIONS ==================== */
     .fade-in {
         animation: fadeIn 0.6s ease-in;
     }
@@ -438,7 +459,7 @@ st.markdown("""
         to { opacity: 1; transform: translateX(0); }
     }
     
-    /* Loading States */
+    /* ==================== LOADING STATES ==================== */
     .loading-container {
         display: flex;
         justify-content: center;
@@ -460,24 +481,55 @@ st.markdown("""
         100% { transform: rotate(360deg); }
     }
     
-    /* Responsive Design */
+    /* ==================== RESPONSIVE DESIGN ==================== */
     @media (max-width: 768px) {
         .header-frame {
-            padding: 1.5rem 2rem;
+            padding: 1rem 1.5rem;
         }
         
         .header-title {
-            font-size: 2rem;
+            font-size: 1.8rem;
         }
         
         .content-frame {
-            padding: 1.5rem 2rem;
+            padding: 1rem 1.5rem;
         }
         
         .modern-card {
-            padding: 1.5rem;
+            padding: 1rem;
+        }
+        
+        .metric-card-enhanced {
+            padding: 1rem;
         }
     }
+    
+    /* ==================== SPACING FIXES ==================== */
+    
+    /* Remove extra spacing between elements */
+    div[data-testid="stVerticalBlock"] > div:first-child {
+        margin-top: 0 !important;
+    }
+    
+    /* Fix spacing between header and tabs */
+    .main > div:first-child {
+        margin-top: 0 !important;
+    }
+    
+    /* Ensure consistent spacing */
+    .stMarkdown {
+        margin-bottom: 0.5rem !important;
+    }
+    
+    /* Remove excessive padding from containers */
+    .css-1d391kg {
+        padding-top: 0 !important;
+    }
+    
+    .css-12oz5g7 {
+        padding-top: 0 !important;
+    }
+    
 </style>
 """, unsafe_allow_html=True)
 
