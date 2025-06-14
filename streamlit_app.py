@@ -119,7 +119,7 @@ class ClaudeAIMigrationAnalyzer:
             
             if not api_key:
                 logger.warning("Claude API key not found, using fallback analysis")
-                return self._get_fallback_analysis()
+                raise RuntimeError('Claude AI analysis failed — no fallback available.')
             
             # Initialize Claude client
             client = anthropic.Anthropic(api_key=api_key)
@@ -148,14 +148,14 @@ class ClaudeAIMigrationAnalyzer:
             
         except Exception as e:
             logger.error(f"Error in Claude AI analysis: {e}")
-            return self._get_fallback_analysis()
+            raise RuntimeError('Claude AI analysis failed — no fallback available.')
 
     def _get_claude_api_key(self) -> Optional[str]:
         """Get Claude API key from Streamlit secrets or environment variables."""
         try:
             # Try Streamlit secrets first
             if hasattr(st, 'secrets') and 'ANTHROPIC_API_KEY' in st.secrets:
-                return str(st.secrets['ANTHROPIC_API_KEY'])
+                return st.secrets['ANTHROPIC_API_KEY']
             
             # Try environment variable
             import os
@@ -266,7 +266,7 @@ class ClaudeAIMigrationAnalyzer:
                 for field in required_fields:
                     if field not in parsed_response:
                         logger.warning(f"Missing required field: {field}")
-                        return self._get_fallback_analysis()
+                        raise RuntimeError('Claude AI analysis failed — no fallback available.')
                 
                 # Ensure complexity_color is set
                 if 'complexity_color' not in parsed_response:
@@ -277,14 +277,14 @@ class ClaudeAIMigrationAnalyzer:
             
             else:
                 logger.warning("No JSON found in Claude response")
-                return self._get_fallback_analysis()
+                raise RuntimeError('Claude AI analysis failed — no fallback available.')
                 
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse Claude response as JSON: {e}")
-            return self._get_fallback_analysis()
+            raise RuntimeError('Claude AI analysis failed — no fallback available.')
         except Exception as e:
             logger.error(f"Error parsing Claude response: {e}")
-            return self._get_fallback_analysis()
+            raise RuntimeError('Claude AI analysis failed — no fallback available.')
 
     def _get_fallback_analysis(self) -> Dict[str, Any]:
         """Fallback analysis when Claude API is not available."""
@@ -541,9 +541,7 @@ class AWSCostCalculator:
         instance_count = self._get_instance_count(env)
         
         # EC2 instance costs
-        instance_pricing = self.pricing['compute']['ec2_instances'].get(instance_type, {
-        'on_demand': 0.1, 'ri_1y': 0.07, 'ri_3y': 0.05, 'spot': 0.03
-    })
+        instance_pricing = self.pricing['compute']['ec2_instances'].get(instance_type, self.pricing['compute']['ec2_instances']['m6i.large'])
         
         # Determine pricing model
         pricing_model = 'on_demand'
@@ -2781,6 +2779,7 @@ def render_technical_recommendations_tab():
         return
     
     # Get technical recommendations and costs
+        # TODO: Refactor this block to support both single and bulk workflows
     tech_recs = analyzer.get_technical_recommendations(selected_env, env_results)
     requirements = env_results.get('requirements', {})
     service_costs = cost_calculator.calculate_service_costs(selected_env, tech_recs, requirements)
@@ -5334,75 +5333,5 @@ def main():
     with tabs[4]:
         render_technical_recommendations_tab()
     
-    with tabs[5]:
-        st.markdown("### 📋 Enhanced Reports")
-        
-        if st.session_state.enhanced_results:
-            st.markdown("#### Available Reports")
-            
-            col1, col2, col3 = st.columns(3)
-            
-            with col1:
-                if st.button("📄 Generate PDF Report", type="primary", key="reports_pdf_generate"):
-                    generate_enhanced_pdf_report()
-            
-            with col2:
-                if st.button("📊 Export to Excel", key="reports_tab_excel"):
-                    generate_enhanced_excel_report()
-            
-            with col3:
-                if st.button("📈 Generate Heat Map CSV", key="reports_heatmap_csv"):
-                    if 'heat_map_data' in st.session_state.enhanced_results:
-                        csv_data = st.session_state.enhanced_results['heat_map_data'].to_csv(index=False)
-                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                        st.download_button(
-                            "⬇️ Download Heat Map CSV",
-                            csv_data,
-                            f"environment_heatmap_{timestamp}.csv",
-                            "text/csv",
-                            key="heatmap_csv_download"
-                        )
-            
-            # Report preview
-            st.markdown("#### Report Preview")
-            
-            if st.session_state.enhanced_results:
-                prod_results = st.session_state.enhanced_results['recommendations']['PROD']
-                claude_analysis = prod_results.get('claude_analysis', {})
-                
-                st.markdown("**Executive Summary Preview:**")
-                
-                summary_preview = f"""
-                **Workload:** {st.session_state.enhanced_results['inputs']['workload_name']}
-                
-                **Migration Complexity:** {claude_analysis.get('complexity_level', 'MEDIUM')} ({claude_analysis.get('complexity_score', 50):.0f}/100)
-                
-                **Recommended Strategy:** {claude_analysis.get('migration_strategy', {}).get('approach', 'Standard Migration')}
-                
-                **Estimated Timeline:** {claude_analysis.get('estimated_timeline', {}).get('max_weeks', 8)} weeks
-                
-                **Key Recommendations:**
-                """
-                
-                st.markdown(summary_preview)
-                
-                recommendations = claude_analysis.get('recommendations', [])
-                for i, rec in enumerate(recommendations[:3], 1):
-                    st.markdown(f"{i}. {rec}")
-                
-                if len(recommendations) > 3:
-                    st.markdown(f"... and {len(recommendations) - 3} more recommendations in the full report")
-        else:
-            st.info("💡 Run an enhanced analysis to generate comprehensive reports.")
-    
-    # Enhanced footer
-    st.markdown("---")
-    st.markdown("""
-    <div style="text-align: center; color: #6b7280; font-size: 0.875rem; padding: 2rem 0;">
-        <strong>Enhanced AWS Migration Platform v7.0</strong><br>
-        Now powered by <strong>Real Anthropic Claude AI API</strong> for intelligent migration analysis and comprehensive technical recommendations<br>
-        <em>🤖 Real AI-Enhanced • ☁️ AWS-Native • 📊 Data-Driven • 🔧 Technical-Complete • 📋 Excel/PDF Reports</em>
-    </div>
-    """, unsafe_allow_html=True)
-if __name__ == "__main__":
+    if __name__ == "__main__":
     main()
