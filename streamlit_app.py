@@ -5350,7 +5350,7 @@ def main():
     ])
     
     with tabs[0]:
-    render_enhanced_configuration()
+        render_enhanced_configuration()
     
     with tabs[1]:
         render_bulk_upload_tab()
