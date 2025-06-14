@@ -58,53 +58,74 @@ st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
     
+    /* ==================== AGGRESSIVE SPACING FIXES ==================== */
+    
+    /* Remove ALL default Streamlit spacing */
+    .main .block-container {
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+    }
+    
+    /* Target all Streamlit containers */
+    .css-1d391kg, .css-12oz5g7, .css-1v0mbdj, .css-18e3th9 {
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+    
+    /* Remove spacing from all div containers */
+    div[data-testid="stVerticalBlock"] {
+        gap: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    
+    div[data-testid="stVerticalBlock"] > div {
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    
+    /* Remove spacing from markdown elements */
+    .stMarkdown {
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    
+    /* Remove spacing from all elements */
+    .element-container {
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    
     /* ==================== GLOBAL STYLES ==================== */
     html, body, [class*="css"] {
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+        margin: 0;
+        padding: 0;
     }
     
-    /* Hide Streamlit Default Elements */
+    /* Hide Streamlit elements */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
     
-    /* ==================== LAYOUT STRUCTURE ==================== */
-    
-    /* Main Container - Remove default Streamlit spacing */
-    .main .block-container {
-        padding-top: 0rem !important;
-        padding-bottom: 1rem !important;
-        max-width: 100% !important;
-    }
-    
-    /* Remove extra spacing from Streamlit elements */
-    .element-container {
-        margin-bottom: 0.25rem !important;
-    }
-    
-    /* Main Application Frame */
-    .main-app-frame {
-        background: white;
-        border-radius: 20px;
-        box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-        margin: 0.5rem;
-        overflow: hidden;
-        border: 1px solid #e2e8f0;
-    }
-    
-    /* ==================== HEADER FRAME ==================== */
-    .header-frame {
+    /* ==================== COMPACT HEADER ==================== */
+    .compact-header {
         background: linear-gradient(135deg, #1e3a8a 0%, #3730a3 50%, #1e40af 100%);
         color: white;
-        padding: 1.5rem 2rem;
+        padding: 1rem 2rem;
+        margin: 0;
+        width: 100%;
+        box-sizing: border-box;
         position: relative;
         overflow: hidden;
-        margin: 0;
-        border-radius: 20px 20px 0 0;
     }
     
-    .header-frame::before {
+    .compact-header::before {
         content: '';
         position: absolute;
         top: 0;
@@ -116,58 +137,49 @@ st.markdown("""
         pointer-events: none;
     }
     
-    .header-content {
+    .compact-header-content {
         position: relative;
         z-index: 2;
     }
     
-    .header-title {
-        font-size: 2.2rem;
+    .compact-title {
+        font-size: 2rem;
         font-weight: 800;
-        margin-bottom: 0.4rem;
+        margin: 0 0 0.3rem 0;
         text-shadow: 0 2px 4px rgba(0,0,0,0.3);
     }
     
-    .header-subtitle {
-        font-size: 1.1rem;
+    .compact-subtitle {
+        font-size: 1rem;
         opacity: 0.9;
-        margin-bottom: 0.8rem;
+        margin: 0 0 0.5rem 0;
         font-weight: 400;
     }
     
-    .header-version {
+    .compact-version {
         display: inline-block;
         background: rgba(255,255,255,0.2);
-        padding: 0.4rem 0.8rem;
-        border-radius: 50px;
-        font-size: 0.85rem;
+        padding: 0.3rem 0.6rem;
+        border-radius: 20px;
+        font-size: 0.8rem;
         font-weight: 500;
         backdrop-filter: blur(10px);
         border: 1px solid rgba(255,255,255,0.3);
+        margin: 0;
     }
     
-    /* ==================== CONTENT FRAME ==================== */
-    .content-frame {
+    /* ==================== CONTENT AREA ==================== */
+    .main-content {
         padding: 1rem 2rem;
-        min-height: 60vh;
         background: white;
         margin: 0;
-    }
-    
-    /* Navigation frame */
-    .nav-frame {
-        background: #f8fafc;
-        border-bottom: 1px solid #e2e8f0;
-        padding: 0;
-        margin: 0;
+        min-height: calc(100vh - 200px);
     }
     
     /* ==================== TABS STYLING ==================== */
-    
-    /* Main tabs - Remove spacing issues */
     .stTabs {
-        margin-top: 0 !important;
-        padding-top: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
     }
     
     .stTabs [data-baseweb="tab-list"] {
@@ -176,7 +188,7 @@ st.markdown("""
         padding: 0.5rem;
         border-radius: 16px;
         border: 1px solid #e2e8f0;
-        margin-top: 0 !important;
+        margin: 0 !important;
     }
     
     .stTabs [data-baseweb="tab"] {
@@ -192,18 +204,6 @@ st.markdown("""
         overflow: hidden;
     }
     
-    .stTabs [data-baseweb="tab"]::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: linear-gradient(135deg, #3b82f6, #8b5cf6);
-        opacity: 0;
-        transition: opacity 0.3s ease;
-    }
-    
     .stTabs [aria-selected="true"] {
         background: linear-gradient(135deg, #3b82f6, #8b5cf6) !important;
         color: white !important;
@@ -217,7 +217,7 @@ st.markdown("""
         border-color: #e2e8f0;
     }
     
-    /* Sub-tabs styling for Single Workload */
+    /* Sub-tabs */
     .stTabs .stTabs [data-baseweb="tab"] {
         height: 50px;
         background-color: #f1f5f9;
@@ -232,16 +232,6 @@ st.markdown("""
         color: white !important;
         border: 1px solid #0d9488;
         box-shadow: 0 2px 8px rgba(15, 118, 110, 0.3);
-    }
-    
-    .stTabs .stTabs [data-baseweb="tab"]:hover {
-        background-color: #e2e8f0;
-        color: #334155;
-    }
-    
-    .stTabs .stTabs [aria-selected="true"]:hover {
-        background-color: #0d9488 !important;
-        color: white !important;
     }
     
     /* ==================== MODERN CARDS ==================== */
@@ -420,26 +410,6 @@ st.markdown("""
         box-shadow: 0 4px 15px rgba(0,0,0,0.08);
     }
     
-    /* ==================== SIDEBAR STYLING ==================== */
-    .sidebar-frame {
-        background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
-        border-right: 1px solid #e2e8f0;
-        padding: 1rem;
-        height: 100vh;
-        overflow-y: auto;
-    }
-    
-    /* ==================== FOOTER FRAME ==================== */
-    .footer-frame {
-        background: linear-gradient(135deg, #1e293b, #374151);
-        color: #e2e8f0;
-        padding: 1.5rem 2rem;
-        text-align: center;
-        border-top: 1px solid #374151;
-        margin-top: 2rem;
-        border-radius: 0 0 20px 20px;
-    }
-    
     /* ==================== ANIMATIONS ==================== */
     .fade-in {
         animation: fadeIn 0.6s ease-in;
@@ -459,39 +429,17 @@ st.markdown("""
         to { opacity: 1; transform: translateX(0); }
     }
     
-    /* ==================== LOADING STATES ==================== */
-    .loading-container {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        padding: 3rem;
-    }
-    
-    .loading-spinner {
-        width: 50px;
-        height: 50px;
-        border: 4px solid #f3f4f6;
-        border-top: 4px solid #3b82f6;
-        border-radius: 50%;
-        animation: spin 1s linear infinite;
-    }
-    
-    @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-    }
-    
     /* ==================== RESPONSIVE DESIGN ==================== */
     @media (max-width: 768px) {
-        .header-frame {
+        .compact-header {
             padding: 1rem 1.5rem;
         }
         
-        .header-title {
+        .compact-title {
             font-size: 1.8rem;
         }
         
-        .content-frame {
+        .main-content {
             padding: 1rem 1.5rem;
         }
         
@@ -504,34 +452,23 @@ st.markdown("""
         }
     }
     
-    /* ==================== SPACING FIXES ==================== */
-    
-    /* Remove extra spacing between elements */
-    div[data-testid="stVerticalBlock"] > div:first-child {
-        margin-top: 0 !important;
-    }
-    
-    /* Fix spacing between header and tabs */
-    .main > div:first-child {
-        margin-top: 0 !important;
-    }
-    
-    /* Ensure consistent spacing */
-    .stMarkdown {
-        margin-bottom: 0.5rem !important;
-    }
-    
-    /* Remove excessive padding from containers */
-    .css-1d391kg {
-        padding-top: 0 !important;
-    }
-    
-    .css-12oz5g7 {
-        padding-top: 0 !important;
-    }
-    
 </style>
 """, unsafe_allow_html=True)
+
+# STEP 2: Replace your render_modern_header() function with this compact version
+def render_compact_header():
+    """Render compact header with zero spacing."""
+    st.markdown("""
+    <div class="compact-header">
+        <div class="compact-header-content">
+            <div class="compact-title">🏢 AWS Migration Platform</div>
+            <div class="compact-subtitle">Comprehensive Enterprise Migration Analysis with AI-Powered Insights</div>
+            <div class="compact-version">
+                🤖 v7.0 Enhanced • Powered by Claude AI • Real-time AWS Integration
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
 class ClaudeAIMigrationAnalyzer:
     """Real Claude AI powered migration complexity analyzer using Anthropic API."""
@@ -5169,7 +5106,7 @@ def get_env_characteristics(env: str) -> str:
 # REPLACE YOUR EXISTING main() FUNCTION WITH THIS
 
 def main():
-    """Main application with modern frame layout."""
+    """Main application with zero spacing layout."""
     
     # Initialize session state
     initialize_enhanced_session_state()
@@ -5181,25 +5118,19 @@ def main():
             st.rerun()
         st.stop()
     
-    # Main Application Frame
-    st.markdown('<div class="main-app-frame">', unsafe_allow_html=True)
+    # Render compact header IMMEDIATELY (no containers)
+    render_compact_header()
     
-    # Render modern header
-    render_modern_header()
-    
-    # Navigation frame (tabs)
-    st.markdown('<div class="nav-frame">', unsafe_allow_html=True)
-    
-    # Main content area
-    st.markdown('<div class="content-frame">', unsafe_allow_html=True)
+    # Start main content immediately after header
+    st.markdown('<div class="main-content">', unsafe_allow_html=True)
     
     # Render sidebar
     render_modern_sidebar()
     
-    # Main tabs
+    # Main tabs - NO SPACING
     main_tabs = st.tabs(["🖥️ Single Workload", "📁 Bulk Analysis", "📋 Reports"])
     
-    # Single Workload Tab with full functionality
+    # Single Workload Tab
     with main_tabs[0]:
         st.markdown("### 🖥️ Single Workload Analysis")
         
@@ -5216,21 +5147,18 @@ def main():
         
         # Heat Map sub-tab
         with single_workload_subtabs[2]:
-            # KEEP YOUR ORIGINAL FUNCTION HERE
             render_enhanced_environment_heatmap_tab()
         
         # Technical Reports sub-tab
         with single_workload_subtabs[3]:
-            # KEEP YOUR ORIGINAL FUNCTION HERE
             render_technical_recommendations_tab()
     
-    # Bulk Analysis Tab with full functionality
+    # Bulk Analysis Tab
     with main_tabs[1]:
         st.markdown("### 📁 Bulk Workload Analysis")
-        # KEEP YOUR ORIGINAL FUNCTION HERE
         render_bulk_upload_tab()
     
-    # Reports Tab with full functionality
+    # Reports Tab
     with main_tabs[2]:
         st.markdown("### 📋 Enhanced Reports")
         
@@ -5266,12 +5194,10 @@ def main():
                 
                 with col1:
                     if st.button("📄 Generate PDF Report", type="primary", key="reports_pdf_generate"):
-                        # KEEP YOUR ORIGINAL FUNCTION HERE
                         generate_enhanced_pdf_report()
                 
                 with col2:
                     if st.button("📊 Export to Excel", key="reports_tab_excel"):
-                        # KEEP YOUR ORIGINAL FUNCTION HERE
                         generate_enhanced_excel_report()
                 
                 with col3:
@@ -5322,11 +5248,9 @@ def main():
                 col1, col2 = st.columns(2)
                 with col1:
                     if st.button("📊 Export to Excel", key="bulk_excel_export_reports"):
-                        # KEEP YOUR ORIGINAL FUNCTION HERE
                         export_bulk_results_to_excel(st.session_state.bulk_results)
                 with col2:
                     if st.button("📄 Generate PDF Report", key="bulk_pdf_export_reports"):
-                        # KEEP YOUR ORIGINAL FUNCTION HERE
                         export_bulk_results_to_pdf(st.session_state.bulk_results)
                 
                 # Show bulk summary
@@ -5352,26 +5276,12 @@ def main():
         else:
             st.info("💡 Run an analysis (Single Workload or Bulk Upload) to generate comprehensive reports.")
     
-    st.markdown('</div>', unsafe_allow_html=True)  # Close content-frame
-    st.markdown('</div>', unsafe_allow_html=True)  # Close nav-frame
+    st.markdown('</div>', unsafe_allow_html=True)  # Close main-content
     
-    # Enhanced Footer
+    # Simple footer
     st.markdown("""
-    <div class="footer-frame">
-        <div style="font-weight: 600; font-size: 1.1rem; margin-bottom: 0.5rem;">
-            Enhanced AWS Migration Platform v7.0
-        </div>
-        <div style="opacity: 0.8;">
-            Powered by Real Anthropic Claude AI • AWS Integration • Enterprise-Grade Analysis
-        </div>
-        <div style="margin-top: 1rem; font-size: 0.9rem; opacity: 0.7;">
-            🤖 AI-Enhanced • ☁️ AWS-Native • 📊 Data-Driven • 🔧 Technical-Complete
-        </div>
+    <div style="text-align: center; padding: 1rem; background: #f8fafc; color: #64748b; margin-top: 2rem;">
+        <strong>Enhanced AWS Migration Platform v7.0</strong><br>
+        Powered by Real Anthropic Claude AI • AWS Integration • Enterprise Analysis
     </div>
     """, unsafe_allow_html=True)
-    
-    st.markdown('</div>', unsafe_allow_html=True)  # Close main-app-frame
-
-if __name__ == "__main__":
-    main()
-      
