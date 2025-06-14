@@ -3032,8 +3032,8 @@ def render_technical_recommendations_tab():
                         'Details': details['details']
                     })
             
-            df_storage_costs = pd.DataFrame(storage_cost_data)
-            st.dataframe(df_storage_costs, use_container_width=True, hide_index=True)
+        df_storage_costs = pd.DataFrame(storage_cost_data)
+        st.dataframe(df_storage_costs, use_container_width=True, hide_index=True)
         
         # Data protection
         st.markdown("**Data Protection & Management**")        
