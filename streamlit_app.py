@@ -5333,5 +5333,5 @@ def main():
     with tabs[4]:
         render_technical_recommendations_tab()
     
-    if __name__ == "__main__":
+if __name__ == "__main__":
     main()
