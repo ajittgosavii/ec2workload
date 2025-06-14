@@ -2928,12 +2928,12 @@ def render_technical_recommendations_tab():
                 {'Single Workload': 'Pricing Optimization', 'Recommendation': compute_recs['pricing_optimization']}
         ]
         
-        df_deployment = pd.DataFrame(deployment_data)
-        st.dataframe(df_deployment, use_container_width=True, hide_index=True)
+            df_deployment = pd.DataFrame(deployment_data)
+            st.dataframe(df_deployment, use_container_width=True, hide_index=True)
         
         # Cost optimization notes
-        st.markdown("**💡 Cost Optimization Recommendations**")
-        for note in compute_costs.get('optimization_notes', []):
+            st.markdown("**💡 Cost Optimization Recommendations**")
+            for note in compute_costs.get('optimization_notes', []):
             st.markdown(note)
     
         # Network tab with costs
