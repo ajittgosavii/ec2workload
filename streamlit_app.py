@@ -155,7 +155,7 @@ class ClaudeAIMigrationAnalyzer:
         try:
             # Try Streamlit secrets first
             if hasattr(st, 'secrets') and 'ANTHROPIC_API_KEY' in st.secrets:
-                return st.secrets['ANTHROPIC_API_KEY']
+                return str(st.secrets['ANTHROPIC_API_KEY'])
             
             # Try environment variable
             import os
@@ -541,7 +541,9 @@ class AWSCostCalculator:
         instance_count = self._get_instance_count(env)
         
         # EC2 instance costs
-        instance_pricing = self.pricing['compute']['ec2_instances'].get(instance_type, self.pricing['compute']['ec2_instances']['m6i.large'])
+        instance_pricing = self.pricing['compute']['ec2_instances'].get(instance_type, {
+        'on_demand': 0.1, 'ri_1y': 0.07, 'ri_3y': 0.05, 'spot': 0.03
+    })
         
         # Determine pricing model
         pricing_model = 'on_demand'
