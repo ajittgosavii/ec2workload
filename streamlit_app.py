@@ -2978,21 +2978,21 @@ def render_technical_recommendations_tab():
             st.dataframe(df_network_costs, use_container_width=True, hide_index=True)
         
         # Advanced network services
-        st.markdown("**Advanced Network Services**")
+            st.markdown("**Advanced Network Services**")
         
-        advanced_network_data = [
-            {'Service': 'CDN', 'Single Workload': network_recs['cdn']},
-            {'Service': 'DNS', 'Single Workload': network_recs['dns']},
-            {'Service': 'NAT Gateway', 'Single Workload': network_recs['nat_gateway']},
-            {'Service': 'VPN', 'Single Workload': network_recs['vpn']}
+            advanced_network_data = [
+                {'Service': 'CDN', 'Single Workload': network_recs['cdn']},
+                {'Service': 'DNS', 'Single Workload': network_recs['dns']},
+                {'Service': 'NAT Gateway', 'Single Workload': network_recs['nat_gateway']},
+                {'Service': 'VPN', 'Single Workload': network_recs['vpn']}
         ]
         
-        df_advanced_network = pd.DataFrame(advanced_network_data)
-        st.dataframe(df_advanced_network, use_container_width=True, hide_index=True)
+            df_advanced_network = pd.DataFrame(advanced_network_data)
+            st.dataframe(df_advanced_network, use_container_width=True, hide_index=True)
         
         # Cost optimization notes
-        st.markdown("**💡 Network Cost Optimization**")
-        for note in network_costs.get('optimization_notes', []):
+            st.markdown("**💡 Network Cost Optimization**")
+    for note in network_costs.get('optimization_notes', []):
             st.markdown(note)
     
     # Storage tab with costs
@@ -3024,7 +3024,7 @@ def render_technical_recommendations_tab():
             st.markdown("**Storage Cost Breakdown**")
             
             storage_cost_data = []
-            for service, details in storage_costs.items():
+    for service, details in storage_costs.items():
                 if service != 'total' and service != 'optimization_notes':
                     storage_cost_data.append({
                         'Storage Type': service.replace('_', ' ').title(),
@@ -3036,8 +3036,7 @@ def render_technical_recommendations_tab():
             st.dataframe(df_storage_costs, use_container_width=True, hide_index=True)
         
         # Data protection
-        st.markdown("**Data Protection & Management**")
-        
+        st.markdown("**Data Protection & Management**")        
         protection_data = [
             {'Feature': 'Backup Strategy', 'Single Workload': storage_recs['backup_strategy']},
             {'Feature': 'Encryption', 'Single Workload': storage_recs['encryption']},
@@ -3050,7 +3049,7 @@ def render_technical_recommendations_tab():
         
         # Cost optimization notes
         st.markdown("**💡 Storage Cost Optimization**")
-        for note in storage_costs.get('optimization_notes', []):
+    for note in storage_costs.get('optimization_notes', []):
             st.markdown(note)
     
     # Database tab with costs
@@ -3082,7 +3081,7 @@ def render_technical_recommendations_tab():
             st.markdown("**Database Cost Breakdown**")
             
             db_cost_data = []
-            for service, details in db_costs.items():
+    for service, details in db_costs.items():
                 if service != 'total' and service != 'optimization_notes':
                     db_cost_data.append({
                         'Database Component': service.replace('_', ' ').title(),
@@ -3094,32 +3093,32 @@ def render_technical_recommendations_tab():
             st.dataframe(df_db_costs, use_container_width=True, hide_index=True)
         
         # Advanced database features
-        st.markdown("**Advanced Database Features**")
+            st.markdown("**Advanced Database Features**")
         
-        db_advanced_data = [
+            db_advanced_data = [
             {'Feature': 'Read Replicas', 'Single Workload': db_recs['read_replicas']},
             {'Feature': 'Connection Pooling', 'Single Workload': db_recs['connection_pooling']},
             {'Feature': 'Maintenance Window', 'Single Workload': db_recs['maintenance_window']},
             {'Feature': 'Monitoring', 'Single Workload': db_recs['monitoring']}
         ]
         
-        df_db_advanced = pd.DataFrame(db_advanced_data)
-        st.dataframe(df_db_advanced, use_container_width=True, hide_index=True)
+            df_db_advanced = pd.DataFrame(db_advanced_data)
+            st.dataframe(df_db_advanced, use_container_width=True, hide_index=True)
         
         # Cost optimization notes
-        st.markdown("**💡 Database Cost Optimization**")
-        for note in db_costs.get('optimization_notes', []):
+            st.markdown("**💡 Database Cost Optimization**")
+    for note in db_costs.get('optimization_notes', []):
             st.markdown(note)
     
     # Security tab with costs
     with tech_tabs[4]:
-        st.markdown("#### 🔒 Security Single Workload & Costs")
+            st.markdown("#### 🔒 Security Single Workload & Costs")
         
-        security_recs = tech_recs['security']
-        security_costs = service_costs['security']
+            security_recs = tech_recs['security']
+            security_costs = service_costs['security']
         
         # Cost overview
-        st.markdown(f"**Monthly Security Cost: ${security_costs['total']:.2f}**")
+            st.markdown(f"**Monthly Security Cost: ${security_costs['total']:.2f}**")
         
         col1, col2 = st.columns(2)
         
@@ -3127,7 +3126,7 @@ def render_technical_recommendations_tab():
             st.markdown("**Security Services Single Workload**")
             
             security_data = []
-            for key, value in security_recs.items():
+    for key, value in security_recs.items():
                 security_data.append({'Security Area': key.replace('_', ' ').title(), 'Single Workload': value})
             
             df_security = pd.DataFrame(security_data)
@@ -3208,13 +3207,13 @@ def render_technical_recommendations_tab():
             st.dataframe(df_monitoring_costs, use_container_width=True, hide_index=True)
         
         # Advanced monitoring services
-        st.markdown("**Advanced Monitoring Services**")
+            st.markdown("**Advanced Monitoring Services**")
         
-        monitoring_advanced_data = [
-            {'Service': 'APM (X-Ray)', 'Single Workload': monitoring_recs['apm']},
-            {'Service': 'Synthetic Monitoring', 'Single Workload': monitoring_recs['synthetic_monitoring']},
-            {'Service': 'Cost Monitoring', 'Single Workload': monitoring_recs['cost_monitoring']},
-            {'Service': 'Health Checks', 'Single Workload': monitoring_recs['health_checks']}
+            monitoring_advanced_data = [
+                {'Service': 'APM (X-Ray)', 'Single Workload': monitoring_recs['apm']},
+                {'Service': 'Synthetic Monitoring', 'Single Workload': monitoring_recs['synthetic_monitoring']},
+                {'Service': 'Cost Monitoring', 'Single Workload': monitoring_recs['cost_monitoring']},
+                {'Service': 'Health Checks', 'Single Workload': monitoring_recs['health_checks']}
         ]
         
         df_monitoring_advanced = pd.DataFrame(monitoring_advanced_data)
@@ -3259,7 +3258,7 @@ def render_technical_recommendations_tab():
         categories = ['Compute', 'Network', 'Storage', 'Database', 'Security', 'Monitoring']
         colors = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4']
         
-        for i, category in enumerate(categories):
+    for i, category in enumerate(categories):
             fig_bar.add_trace(go.Bar(
                 name=category,
                 x=df_env_costs['Environment'],
@@ -3296,22 +3295,22 @@ def render_technical_recommendations_tab():
             st.markdown(f"• Annual cost across all environments: ${total_all_envs * 12:,.2f}")
     
     # Summary recommendations for the environment
-    st.markdown("---")
-    st.markdown(f"### 📋 {selected_env} Environment Implementation Summary")
+        st.markdown("---")
+        st.markdown(f"### 📋 {selected_env} Environment Implementation Summary")
     
-    total_cost = service_costs['summary']['total_monthly']
-    annual_cost = service_costs['summary']['total_annual']
+        total_cost = service_costs['summary']['total_monthly']
+        annual_cost = service_costs['summary']['total_annual']
     
-    summary_recommendations = [
-        f"🏗️ **Architecture:** Deploy using {tech_recs['compute']['placement_strategy'].lower()}",
-        f"🔧 **Compute:** Use {tech_recs['compute']['primary_instance']['type']} instances (${compute_costs['total']:.2f}/month)",
-        f"🌐 **Network:** Implement {tech_recs['network']['vpc_design'].lower()} (${network_costs['total']:.2f}/month)",
-        f"💾 **Storage:** Configure {tech_recs['storage']['primary_storage']} (${storage_costs['total']:.2f}/month)",
-        f"🗄️ **Database:** Deploy {tech_recs['database']['engine']} (${db_costs['total']:.2f}/month)",
-        f"🔒 **Security:** Implement {len([k for k, v in security_costs.items() if isinstance(v, dict) and v.get('cost', 0) > 0])} security services (${security_costs['total']:.2f}/month)",
-        f"📊 **Monitoring:** Set up comprehensive monitoring (${monitoring_costs['total']:.2f}/month)",
-        f"💰 **Total Cost:** ${total_cost:.2f}/month (${annual_cost:,.2f}/year)"
-    ]
+        summary_recommendations = [
+                f"🏗️ **Architecture:** Deploy using {tech_recs['compute']['placement_strategy'].lower()}",
+                f"🔧 **Compute:** Use {tech_recs['compute']['primary_instance']['type']} instances (${compute_costs['total']:.2f}/month)",
+                f"🌐 **Network:** Implement {tech_recs['network']['vpc_design'].lower()} (${network_costs['total']:.2f}/month)",
+                f"💾 **Storage:** Configure {tech_recs['storage']['primary_storage']} (${storage_costs['total']:.2f}/month)",
+                f"🗄️ **Database:** Deploy {tech_recs['database']['engine']} (${db_costs['total']:.2f}/month)",
+                f"🔒 **Security:** Implement {len([k for k, v in security_costs.items() if isinstance(v, dict) and v.get('cost', 0) > 0])} security services (${security_costs['total']:.2f}/month)",
+                f"📊 **Monitoring:** Set up comprehensive monitoring (${monitoring_costs['total']:.2f}/month)",
+                f"💰 **Total Cost:** ${total_cost:.2f}/month (${annual_cost:,.2f}/year)"
+            ]
     
     for rec in summary_recommendations:
         st.markdown(rec)
@@ -3381,7 +3380,7 @@ def generate_enhanced_excel_report():
         
         # Write summary data
         start_row = 4
-        for row_idx, (metric, value) in enumerate(summary_data, start_row):
+    for row_idx, (metric, value) in enumerate(summary_data, start_row):
             ws_summary[f'A{row_idx}'] = metric
             ws_summary[f'B{row_idx}'] = value
             
@@ -3407,7 +3406,7 @@ def generate_enhanced_excel_report():
         env_headers = ["Environment", "Complexity Score", "Instance Type", "Monthly Cost", "vCPUs", "RAM (GB)", "Storage (GB)"]
         
         # Write headers
-        for col_idx, header in enumerate(env_headers, 1):
+    for col_idx, header in enumerate(env_headers, 1):
             cell = ws_env.cell(row=1, column=col_idx, value=header)
             cell.font = header_font
             cell.fill = header_fill
@@ -3415,7 +3414,7 @@ def generate_enhanced_excel_report():
             cell.alignment = Alignment(horizontal='center')
         
         # Write environment data
-        for row_idx, env in enumerate(['DEV', 'QA', 'UAT', 'PREPROD', 'PROD'], 2):
+    for row_idx, env in enumerate(['DEV', 'QA', 'UAT', 'PREPROD', 'PROD'], 2):
             env_results = results['recommendations'].get(env, {})
             env_claude_analysis = env_results.get('claude_analysis', {})
             cost_breakdown = env_results.get('cost_breakdown', {})
@@ -3433,7 +3432,7 @@ def generate_enhanced_excel_report():
                 str(requirements.get('storage_GB', 'N/A'))
             ]
             
-            for col_idx, value in enumerate(env_data, 1):
+    for col_idx, value in enumerate(env_data, 1):
                 cell = ws_env.cell(row=row_idx, column=col_idx, value=value)
                 cell.font = data_font
                 cell.border = border
@@ -3441,7 +3440,7 @@ def generate_enhanced_excel_report():
                     cell.alignment = Alignment(horizontal='center')
         
         # Auto-adjust column widths
-        for col_idx in range(1, len(env_headers) + 1):
+    for col_idx in range(1, len(env_headers) + 1):
             ws_env.column_dimensions[openpyxl.utils.get_column_letter(col_idx)].width = 15
         
         # Sheet 3: Cost Analysis by Environment
@@ -3453,7 +3452,7 @@ def generate_enhanced_excel_report():
         cost_headers = ["Environment", "Compute", "Network", "Storage", "Database", "Security", "Monitoring", "Total Monthly"]
         
         # Write headers
-        for col_idx, header in enumerate(cost_headers, 1):
+    for col_idx, header in enumerate(cost_headers, 1):
             cell = ws_cost.cell(row=1, column=col_idx, value=header)
             cell.font = header_font
             cell.fill = header_fill
@@ -3461,7 +3460,7 @@ def generate_enhanced_excel_report():
             cell.alignment = Alignment(horizontal='center')
         
         # Calculate and write cost data for all environments
-        for row_idx, env in enumerate(['DEV', 'QA', 'UAT', 'PREPROD', 'PROD'], 2):
+    for row_idx, env in enumerate(['DEV', 'QA', 'UAT', 'PREPROD', 'PROD'], 2):
             env_results_temp = results['recommendations'].get(env, {})
             if env_results_temp:
                 tech_recs_temp = analyzer.get_technical_recommendations(env, env_results_temp)
@@ -3481,7 +3480,7 @@ def generate_enhanced_excel_report():
             else:
                 cost_data = [env] + ["N/A"] * 7
             
-            for col_idx, value in enumerate(cost_data, 1):
+    for col_idx, value in enumerate(cost_data, 1):
                 cell = ws_cost.cell(row=row_idx, column=col_idx, value=value)
                 cell.font = data_font
                 cell.border = border
@@ -3489,7 +3488,7 @@ def generate_enhanced_excel_report():
                     cell.alignment = Alignment(horizontal='center')
         
         # Auto-adjust column widths
-        for col_idx in range(1, len(cost_headers) + 1):
+    for col_idx in range(1, len(cost_headers) + 1):
             ws_cost.column_dimensions[openpyxl.utils.get_column_letter(col_idx)].width = 12
         
         # Sheet 4: Migration Recommendations
@@ -3513,11 +3512,11 @@ def generate_enhanced_excel_report():
         
         # Add recommendations
         recommendations = claude_analysis.get('recommendations', [])
-        for i, rec in enumerate(recommendations, 1):
+    for i, rec in enumerate(recommendations, 1):
             strategy_data.append([f"{i}.", rec])
         
         # Write recommendations data
-        for row_idx, (label, value) in enumerate(strategy_data, 3):
+    for row_idx, (label, value) in enumerate(strategy_data, 3):
             ws_recs[f'A{row_idx}'] = label
             ws_recs[f'B{row_idx}'] = value
             
@@ -3554,7 +3553,7 @@ def generate_enhanced_excel_report():
             ]
             
             current_row = 3
-            for section_name, section_data in tech_sections:
+    for section_name, section_data in tech_sections:
                 # Section header
                 ws_tech[f'A{current_row}'] = section_name
                 ws_tech[f'A{current_row}'].font = Font(bold=True, size=12)
@@ -3563,7 +3562,7 @@ def generate_enhanced_excel_report():
                 
                 # Section data
                 if isinstance(value, (str, int, float, bool)): # ensure value is scalar
-                    for key, value in section_data.items():
+    for key, value in section_data.items():
                         ws_tech[f'A{current_row}'] = key.replace('_', ' ').title()
                         ws_tech[f'B{current_row}'] = str(value)
                         ws_tech[f'A{current_row}'].font = data_font
