@@ -2921,12 +2921,11 @@ def render_technical_recommendations_tab():
             st.dataframe(df_compute_costs, use_container_width=True, hide_index=True)
         
         # Deployment configuration
-        st.markdown("**Deployment Single Workload**")
-        
-        deployment_data = [
-            {'Single Workload': 'Placement Strategy', 'Recommendation': compute_recs['placement_strategy']},
-            {'Single Workload': 'Auto Scaling', 'Recommendation': compute_recs['auto_scaling']},
-            {'Single Workload': 'Pricing Optimization', 'Recommendation': compute_recs['pricing_optimization']}
+            st.markdown("**Deployment Single Workload**")        
+            deployment_data = [
+                {'Single Workload': 'Placement Strategy', 'Recommendation': compute_recs['placement_strategy']},
+                {'Single Workload': 'Auto Scaling', 'Recommendation': compute_recs['auto_scaling']},
+                {'Single Workload': 'Pricing Optimization', 'Recommendation': compute_recs['pricing_optimization']}
         ]
         
         df_deployment = pd.DataFrame(deployment_data)
