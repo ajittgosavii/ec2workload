@@ -3828,7 +3828,36 @@ def render_bulk_upload_tab():
     - Export consolidated reports
     - Compare workloads side-by-side
     """)
-    
+def generate_bulk_template():
+    """Downloadable CSV template for bulk upload."""
+    import io
+
+    sample_data = {
+        "workload_name": ["App 1", "DB 1"],
+        "cpu_cores": [4, 8],
+        "ram_gb": [16, 32],
+        "storage_gb": [200, 500],
+        "workload_type": ["web_application", "database_server"],
+        "operating_system": ["linux", "windows"],
+        "peak_cpu_percent": [70, 85],
+        "peak_ram_percent": [75, 90],
+        "peak_iops": [3000, 6000],
+        "business_criticality": ["medium", "high"],
+        "region": ["us-east-1", "us-east-1"]
+    }
+
+    df = pd.DataFrame(sample_data)
+    output = io.BytesIO()
+    df.to_csv(output, index=False)
+    output.seek(0)
+
+    st.download_button(
+        label="⬇️ Click to Download CSV Template",
+        data=output,
+        file_name="bulk_upload_template.csv",
+        mime="text/csv"
+    )
+ 
     # File upload section
     st.markdown("#### 📤 Upload Workloads File")
     
