@@ -2876,7 +2876,10 @@ def render_technical_recommendations_tab():
         st.warning("No cost data available for visualization.")
     
     # Create tabs for different technical areas with costs
-    tech_tabs = ["Single Workload"]
+    tech_tabs = st.tabs([
+        "💻 Compute & Costs", "🌐 Network & Costs", "💾 Storage & Costs", 
+        "🗄️ Database & Costs", "🔒 Security & Costs", "📊 Monitoring & Costs"
+    ])
     
     # Compute tab with costs
     with tech_tabs[0]:
@@ -3959,13 +3962,20 @@ def render_bulk_results():
                              if w['workload_name'] == selected_workload and w['status'] == 'success')
             
             # Create tabs for detailed analysis
-            tab1, tab2, tab3 = ["Single Workload"]
+            tab1, tab2, tab3 = st.tabs([
+                "Single Workload",
+                "Single Workload",
+                "🔧 Technical Recommendations"
+            ])
             
-            render_workload_analysis(workload_data)
+            with tab1:
+                render_workload_analysis(workload_data)
                 
-            render_workload_heatmaps(workload_data)
+            with tab2:
+                render_workload_heatmaps(workload_data)
                 
-            render_workload_recommendations(workload_data)
+            with tab3:
+                render_workload_recommendations(workload_data)
 
 def render_workload_analysis(workload_data):
     """Render analysis for a specific workload."""
@@ -4229,7 +4239,10 @@ def render_workload_recommendations(workload_data):
             st.metric("Cost per vCPU/month", f"${cost_per_vcpu:.2f}")
         
         # Create tabs for different technical areas with costs
-        tech_tabs = ["Single Workload"]
+        tech_tabs = st.tabs([
+            "💻 Compute & Costs", "🌐 Network & Costs", "💾 Storage & Costs", 
+            "🗄️ Database & Costs", "🔒 Security & Costs", "📊 Monitoring & Costs"
+        ])
         
         # Compute tab with costs
         with tech_tabs[0]:
@@ -5327,24 +5340,31 @@ def main():
             st.metric("Monthly Cost", f"${monthly_cost:,.0f}")
     
     # Main tabs - CORRECTED SECTION
-    tabs = ["Single Workload"]
+    tabs = st.tabs([
+        "⚙️ Single Workload",
+        "📁 Bulk Upload",
+        "Single Workload", 
+        "Single Workload",
+        "🔧 Technical Recommendations",
+        "📋 Enhanced Reports"
+    ])
     
-    st.header("Single Workload")
-        render_enhanced_configuration()
+    with tabs[0]:
+    render_enhanced_configuration()
     
-    st.header("Single Workload")
+    with tabs[1]:
         render_bulk_upload_tab()
     
-    st.header("Single Workload")
+    with tabs[2]:
         render_enhanced_results()
     
-    st.header("Single Workload")
+    with tabs[3]:
         render_enhanced_environment_heatmap_tab()
     
-    st.header("Single Workload")
+    with tabs[4]:
         render_technical_recommendations_tab()
     
-    st.header("Single Workload")
+    with tabs[5]:
         st.markdown("### 📋 Enhanced Reports")
         
         if st.session_state.enhanced_results:
