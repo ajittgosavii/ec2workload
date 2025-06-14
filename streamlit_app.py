@@ -3694,7 +3694,7 @@ def export_bulk_results_to_excel(results):
         logger.error(f"Error in bulk Excel generation: {e}")
 
 def export_bulk_results_to_pdf(results):
-    """Export bulk results to PDF."""
+    """Export enhanced bulk results to PDF with detailed analysis for each workload."""
     if not REPORTLAB_AVAILABLE:
         st.error("📄 ReportLab not available. Please install with: `pip install reportlab`")
         return
@@ -3715,29 +3715,41 @@ def export_bulk_results_to_pdf(results):
             fontName='Helvetica-Bold'
         )
         
+        subtitle_style = ParagraphStyle(
+            'CustomSubtitle',
+            parent=styles['Heading1'],
+            fontSize=16,
+            spaceAfter=15,
+            textColor=colors.HexColor('#2563eb'),
+            fontName='Helvetica-Bold'
+        )
+        
         story = []
         
         # Title
         story.append(Paragraph("Bulk Workload Analysis Report", title_style))
+        story.append(Paragraph("Enterprise AWS Migration Analysis", styles['Normal']))
         story.append(Paragraph(f"Generated: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}", styles['Normal']))
         story.append(Spacer(1, 0.5*inch))
         
-        # Summary
-        story.append(Paragraph("Analysis Summary", styles['Heading1']))
+        # Executive Summary
+        story.append(Paragraph("Executive Summary", styles['Heading1']))
         
         summary = results.get('summary', {})
         if 'error' in summary:
             story.append(Paragraph(f"Error: {summary['error']}", styles['Normal']))
         else:
             summary_data = [
-                ["Total Workloads", str(summary.get('total_workloads_analyzed', 0))],
-                ["Total Monthly Cost", f"${summary.get('total_monthly_cost', 0):,.2f}"],
-                ["Average Monthly Cost", f"${summary.get('average_monthly_cost', 0):,.2f}"],
-                ["Average Complexity", f"{summary.get('average_complexity_score', 0):.1f}/100"],
-                ["Most Common Instance", summary.get('most_common_instance_type', 'N/A')]
+                ['Metric', 'Value'],
+                ['Total Workloads Analyzed', str(summary.get('total_workloads_analyzed', 0))],
+                ['Total Monthly Cost', f"${summary.get('total_monthly_cost', 0):,.2f}"],
+                ['Total Annual Cost', f"${summary.get('total_annual_cost', 0):,.2f}"],
+                ['Average Monthly Cost', f"${summary.get('average_monthly_cost', 0):,.2f}"],
+                ['Average Complexity Score', f"{summary.get('average_complexity_score', 0):.1f}/100"],
+                ['Most Common Instance Type', summary.get('most_common_instance_type', 'N/A')]
             ]
             
-            summary_table = Table(summary_data, colWidths=[3*inch, 2*inch])
+            summary_table = Table(summary_data, colWidths=[3*inch, 3*inch])
             summary_table.setStyle(TableStyle([
                 ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f3f4f6')),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.HexColor('#1f2937')),
@@ -3751,11 +3763,13 @@ def export_bulk_results_to_pdf(results):
             story.append(summary_table)
             story.append(Spacer(1, 0.3*inch))
         
-        # Workloads Table
-        story.append(Paragraph("Workload Analysis", styles['Heading1']))
+        # Overview Table
+        story.append(Paragraph("Workload Overview", styles['Heading1']))
         
-        headers = ["Workload", "Status", "Complexity", "Monthly Cost", "Instance Type"]
-        workload_data = [headers]
+        headers = ["Workload", "Status", "Complexity", "Monthly Cost", "Instance Type", "Timeline"]
+        workload_overview_data = [headers]
+        
+        successful_workloads = []
         
         for workload in results.get('workloads', []):
             if workload['status'] == 'success':
@@ -3765,38 +3779,270 @@ def export_bulk_results_to_pdf(results):
                 cost_breakdown = prod_analysis.get('cost_breakdown', {})
                 selected_instance = cost_breakdown.get('selected_instance', {})
                 
-                workload_data.append([
+                workload_overview_data.append([
                     workload['workload_name'],
-                    "Success",
+                    "✓ Success",
                     f"{claude_analysis.get('complexity_score', 0):.0f}/100",
                     f"${tco_analysis.get('monthly_cost', 0):,.2f}",
-                    selected_instance.get('type', 'N/A')
+                    selected_instance.get('type', 'N/A'),
+                    f"{claude_analysis.get('estimated_timeline', {}).get('max_weeks', 'N/A')} weeks"
                 ])
+                
+                successful_workloads.append(workload)
             else:
-                workload_data.append([
+                workload_overview_data.append([
                     workload['workload_name'],
-                    "Failed",
+                    "✗ Failed",
+                    "N/A",
                     "N/A",
                     "N/A",
                     "N/A"
                 ])
         
-        workload_table = Table(workload_data, colWidths=[2*inch, 1*inch, 1*inch, 1.2*inch, 1.5*inch])
+        workload_table = Table(workload_overview_data, colWidths=[1.5*inch, 0.8*inch, 0.8*inch, 1*inch, 1*inch, 0.9*inch])
         workload_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2563eb')),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
             ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 10),
+            ('FONTSIZE', (0, 0), (-1, 0), 9),
             ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#93c5fd')),
-            ('FONTSIZE', (0, 1), (-1, -1), 9)
+            ('FONTSIZE', (0, 1), (-1, -1), 8)
         ]))
         
         story.append(workload_table)
+        story.append(PageBreak())
+        
+        # Detailed Analysis for Each Workload
+        story.append(Paragraph("Detailed Workload Analysis", title_style))
+        
+        analyzer = EnhancedEnvironmentAnalyzer()
+        cost_calculator = AWSCostCalculator()
+        
+        for i, workload in enumerate(successful_workloads, 1):
+            if i > 1:  # Add page break between workloads (except first)
+                story.append(PageBreak())
+            
+            workload_name = workload['workload_name']
+            story.append(Paragraph(f"Workload {i}: {workload_name}", subtitle_style))
+            
+            # Get production analysis for this workload
+            prod_analysis = workload['analysis']['PROD']
+            claude_analysis = prod_analysis.get('claude_analysis', {})
+            tco_analysis = prod_analysis.get('tco_analysis', {})
+            requirements = prod_analysis.get('requirements', {})
+            
+            # Executive Summary for this workload
+            story.append(Paragraph("Executive Summary", styles['Heading2']))
+            
+            workload_summary_data = [
+                ['Metric', 'Value'],
+                ['Migration Complexity', f"{claude_analysis.get('complexity_level', 'MEDIUM')} ({claude_analysis.get('complexity_score', 50):.0f}/100)"],
+                ['Estimated Timeline', f"{claude_analysis.get('estimated_timeline', {}).get('max_weeks', 8)} weeks"],
+                ['Monthly Cost (PROD)', f"${tco_analysis.get('monthly_cost', 0):,.2f}"],
+                ['Annual Cost (PROD)', f"${tco_analysis.get('monthly_cost', 0) * 12:,.2f}"],
+                ['Best Pricing Option', tco_analysis.get('best_pricing_option', 'N/A').replace('_', ' ').title()],
+                ['Recommended Instance', prod_analysis.get('cost_breakdown', {}).get('selected_instance', {}).get('type', 'N/A')]
+            ]
+            
+            workload_summary_table = Table(workload_summary_data, colWidths=[2.5*inch, 3.5*inch])
+            workload_summary_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f3f4f6')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.HexColor('#1f2937')),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#e5e7eb')),
+                ('FONTSIZE', (0, 1), (-1, -1), 9)
+            ]))
+            
+            story.append(workload_summary_table)
+            story.append(Spacer(1, 0.2*inch))
+            
+            # Environment Analysis for this workload
+            story.append(Paragraph("Environment Analysis", styles['Heading2']))
+            
+            env_data = [['Environment', 'Complexity Score', 'Instance Type', 'Monthly Cost', 'Key Characteristics']]
+            
+            for env in ['DEV', 'QA', 'UAT', 'PREPROD', 'PROD']:
+                env_results = workload['analysis'].get(env, {})
+                if env_results:
+                    claude_env_analysis = env_results.get('claude_analysis', {})
+                    cost_breakdown = env_results.get('cost_breakdown', {})
+                    selected_instance = cost_breakdown.get('selected_instance', {})
+                    total_costs = cost_breakdown.get('total_costs', {})
+                    
+                    characteristics = get_env_characteristics(env)
+                    
+                    env_data.append([
+                        env,
+                        f"{claude_env_analysis.get('complexity_score', 50):.0f}/100",
+                        selected_instance.get('type', 'N/A'),
+                        f"${total_costs.get('on_demand', 0):,.0f}",
+                        characteristics[:50] + "..." if len(characteristics) > 50 else characteristics
+                    ])
+            
+            env_table = Table(env_data, colWidths=[0.8*inch, 1*inch, 1*inch, 0.8*inch, 2.4*inch])
+            env_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2563eb')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 8),
+                ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#93c5fd')),
+                ('FONTSIZE', (0, 1), (-1, -1), 7),
+                ('VALIGN', (0, 0), (-1, -1), 'TOP')
+            ]))
+            
+            story.append(env_table)
+            story.append(Spacer(1, 0.2*inch))
+            
+            # Migration Strategy for this workload
+            story.append(Paragraph("Migration Strategy", styles['Heading2']))
+            
+            strategy = claude_analysis.get('migration_strategy', {})
+            if strategy:
+                strategy_text = f"""
+                <b>Approach:</b> {strategy.get('approach', 'N/A')}<br/>
+                <b>Methodology:</b> {strategy.get('methodology', 'N/A')}<br/>
+                <b>Timeline:</b> {strategy.get('timeline', 'N/A')}<br/>
+                <b>Risk Level:</b> {strategy.get('risk_level', 'N/A')}
+                """
+                story.append(Paragraph(strategy_text, styles['Normal']))
+                story.append(Spacer(1, 0.1*inch))
+            
+            # Migration Steps
+            migration_steps = claude_analysis.get('migration_steps', [])
+            if migration_steps:
+                story.append(Paragraph("Migration Implementation Plan", styles['Heading3']))
+                
+                for step_num, step in enumerate(migration_steps[:3], 1):  # Limit to 3 steps for space
+                    if isinstance(step, dict):
+                        story.append(Paragraph(f"Phase {step_num}: {step.get('phase', 'N/A')} ({step.get('duration', 'N/A')})", 
+                                             ParagraphStyle('PhaseTitle', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=10)))
+                        
+                        tasks = step.get('tasks', [])
+                        if tasks:
+                            tasks_text = "<b>Key Tasks:</b><br/>" + "<br/>".join([f"• {task}" for task in tasks[:3]])
+                            story.append(Paragraph(tasks_text, ParagraphStyle('Tasks', parent=styles['Normal'], fontSize=9)))
+                        
+                        story.append(Spacer(1, 0.05*inch))
+            
+            # Cost Analysis for this workload (Production)
+            story.append(Paragraph("Production Cost Analysis", styles['Heading2']))
+            
+            try:
+                tech_recs = analyzer.get_technical_recommendations('PROD', prod_analysis)
+                service_costs = cost_calculator.calculate_service_costs('PROD', tech_recs, requirements)
+                
+                cost_analysis_data = [
+                    ['Service Category', 'Monthly Cost', 'Annual Cost', 'Key Components'],
+                    ['Compute', f"${service_costs['compute']['total']:.2f}", 
+                     f"${service_costs['compute']['total'] * 12:.2f}", 'EC2 instances, Auto Scaling'],
+                    ['Network', f"${service_costs['network']['total']:.2f}", 
+                     f"${service_costs['network']['total'] * 12:.2f}", 'Load balancers, NAT Gateway'],
+                    ['Storage', f"${service_costs['storage']['total']:.2f}", 
+                     f"${service_costs['storage']['total'] * 12:.2f}", 'EBS volumes, Snapshots'],
+                    ['Database', f"${service_costs['database']['total']:.2f}", 
+                     f"${service_costs['database']['total'] * 12:.2f}", 'RDS/Aurora, Backup'],
+                    ['Security', f"${service_costs['security']['total']:.2f}", 
+                     f"${service_costs['security']['total'] * 12:.2f}", 'KMS, Secrets Manager'],
+                    ['Monitoring', f"${service_costs['monitoring']['total']:.2f}", 
+                     f"${service_costs['monitoring']['total'] * 12:.2f}", 'CloudWatch, X-Ray'],
+                    ['TOTAL', f"${service_costs['summary']['total_monthly']:.2f}", 
+                     f"${service_costs['summary']['total_annual']:.2f}", 'All AWS services']
+                ]
+                
+                cost_analysis_table = Table(cost_analysis_data, colWidths=[1.3*inch, 1.1*inch, 1.1*inch, 2.5*inch])
+                cost_analysis_table.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1f2937')),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                    ('BACKGROUND', (-1, -1), (-1, -1), colors.HexColor('#059669')),
+                    ('TEXTCOLOR', (-1, -1), (-1, -1), colors.white),
+                    ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('FONTNAME', (-1, -1), (-1, -1), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0, 0), (-1, 0), 9),
+                    ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#6b7280')),
+                    ('FONTSIZE', (0, 1), (-1, -1), 8)
+                ]))
+                
+                story.append(cost_analysis_table)
+                story.append(Spacer(1, 0.2*inch))
+                
+            except Exception as e:
+                logger.error(f"Error calculating detailed costs for {workload_name}: {e}")
+                story.append(Paragraph(f"Cost analysis unavailable for this workload.", styles['Normal']))
+                story.append(Spacer(1, 0.1*inch))
+            
+            # Key Recommendations for this workload
+            recommendations = claude_analysis.get('recommendations', [])
+            if recommendations:
+                story.append(Paragraph("Key Recommendations", styles['Heading3']))
+                recs_text = "<br/>".join([f"{j}. {rec}" for j, rec in enumerate(recommendations[:4], 1)])
+                story.append(Paragraph(recs_text, styles['Normal']))
+                story.append(Spacer(1, 0.2*inch))
+        
+        # Consolidated Summary Section
+        if len(successful_workloads) > 1:
+            story.append(PageBreak())
+            story.append(Paragraph("Consolidated Analysis Summary", title_style))
+            
+            # Cost comparison across workloads
+            story.append(Paragraph("Cost Comparison Across Workloads", styles['Heading2']))
+            
+            cost_comparison_data = [['Workload', 'Monthly Cost', 'Annual Cost', 'Complexity Score', 'Primary Instance']]
+            
+            for workload in successful_workloads:
+                prod_analysis = workload['analysis']['PROD']
+                claude_analysis = prod_analysis.get('claude_analysis', {})
+                tco_analysis = prod_analysis.get('tco_analysis', {})
+                cost_breakdown = prod_analysis.get('cost_breakdown', {})
+                selected_instance = cost_breakdown.get('selected_instance', {})
+                
+                cost_comparison_data.append([
+                    workload['workload_name'],
+                    f"${tco_analysis.get('monthly_cost', 0):,.2f}",
+                    f"${tco_analysis.get('monthly_cost', 0) * 12:,.2f}",
+                    f"{claude_analysis.get('complexity_score', 0):.0f}/100",
+                    selected_instance.get('type', 'N/A')
+                ])
+            
+            cost_comparison_table = Table(cost_comparison_data, colWidths=[1.5*inch, 1.1*inch, 1.2*inch, 1*inch, 1.2*inch])
+            cost_comparison_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2563eb')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 9),
+                ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#93c5fd')),
+                ('FONTSIZE', (0, 1), (-1, -1), 8)
+            ]))
+            
+            story.append(cost_comparison_table)
+            story.append(Spacer(1, 0.3*inch))
+            
+            # Portfolio-level insights
+            story.append(Paragraph("Portfolio-Level Insights", styles['Heading2']))
+            
+            total_monthly = sum(workload['analysis']['PROD'].get('tco_analysis', {}).get('monthly_cost', 0) 
+                              for workload in successful_workloads)
+            avg_complexity = sum(workload['analysis']['PROD'].get('claude_analysis', {}).get('complexity_score', 0) 
+                               for workload in successful_workloads) / len(successful_workloads)
+            
+            insights_text = f"""
+            <b>Total Portfolio Monthly Cost:</b> ${total_monthly:,.2f}<br/>
+            <b>Total Portfolio Annual Cost:</b> ${total_monthly * 12:,.2f}<br/>
+            <b>Average Complexity Score:</b> {avg_complexity:.1f}/100<br/>
+            <b>Workloads Count:</b> {len(successful_workloads)}<br/>
+            <b>Estimated Total Migration Time:</b> {max(workload['analysis']['PROD'].get('claude_analysis', {}).get('estimated_timeline', {}).get('max_weeks', 8) for workload in successful_workloads)} weeks (parallel execution)
+            """
+            
+            story.append(Paragraph(insights_text, styles['Normal']))
         
         # Footer
         story.append(Spacer(1, 0.3*inch))
-        footer_text = f"Report generated by Enhanced AWS Migration Platform v7.0 on {datetime.now().strftime('%B %d, %Y')}"
+        footer_text = f"Bulk Analysis Report generated by Enhanced AWS Migration Platform v7.0 with Real Claude AI on {datetime.now().strftime('%B %d, %Y')}"
         footer_style = ParagraphStyle('Footer', parent=styles['Normal'], fontSize=8, alignment=TA_CENTER, textColor=colors.HexColor('#6b7280'))
         story.append(Paragraph(footer_text, footer_style))
         
@@ -3805,20 +4051,21 @@ def export_bulk_results_to_pdf(results):
         buffer.seek(0)
         
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"bulk_workload_analysis_{timestamp}.pdf"
+        filename = f"bulk_workload_analysis_detailed_{timestamp}.pdf"
         
         st.download_button(
-            label="⬇️ Download PDF Report",
+            label="⬇️ Download Detailed PDF Report",
             data=buffer.getvalue(),
             file_name=filename,
             mime="application/pdf",
-            key="bulk_pdf_report_download"
+            key="bulk_pdf_detailed_report_download"
         )
         
-        st.success("✅ Bulk PDF report generated successfully!")
+        st.success("✅ Detailed bulk PDF report generated successfully!")
         
     except Exception as e:
-        st.error(f"Error generating PDF: {str(e)}")
+        st.error(f"Error generating detailed PDF: {str(e)}")
+        logger.error(f"Error in detailed bulk PDF generation: {e}")
 
 def generate_enhanced_excel_report():
     """Generate comprehensive Excel report with multiple sheets for enhanced analysis."""
