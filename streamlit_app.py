@@ -2350,7 +2350,7 @@ def initialize_enhanced_session_state():
 def render_enhanced_configuration():
     """Render enhanced configuration."""
     
-    st.markdown("### ⚙️ Enhanced Enterprise Workload Configuration")
+    st.markdown("### ⚙️ Enhanced Enterprise Workload Single Workload")
     
     # Check if calculator exists
     if 'enhanced_calculator' not in st.session_state or st.session_state.enhanced_calculator is None:
@@ -2883,7 +2883,7 @@ def render_technical_recommendations_tab():
     
     # Compute tab with costs
     with tech_tabs[0]:
-        st.markdown("#### 💻 Compute Configuration & Costs")
+        st.markdown("#### 💻 Compute Single Workload & Costs")
         
         compute_recs = tech_recs['compute']
         compute_costs = service_costs['compute']
@@ -2923,12 +2923,12 @@ def render_technical_recommendations_tab():
             st.dataframe(df_compute_costs, use_container_width=True, hide_index=True)
         
         # Deployment configuration
-        st.markdown("**Deployment Configuration**")
+        st.markdown("**Deployment Single Workload**")
         
         deployment_data = [
-            {'Configuration': 'Placement Strategy', 'Recommendation': compute_recs['placement_strategy']},
-            {'Configuration': 'Auto Scaling', 'Recommendation': compute_recs['auto_scaling']},
-            {'Configuration': 'Pricing Optimization', 'Recommendation': compute_recs['pricing_optimization']}
+            {'Single Workload': 'Placement Strategy', 'Recommendation': compute_recs['placement_strategy']},
+            {'Single Workload': 'Auto Scaling', 'Recommendation': compute_recs['auto_scaling']},
+            {'Single Workload': 'Pricing Optimization', 'Recommendation': compute_recs['pricing_optimization']}
         ]
         
         df_deployment = pd.DataFrame(deployment_data)
@@ -2941,7 +2941,7 @@ def render_technical_recommendations_tab():
     
     # Network tab with costs
     with tech_tabs[1]:
-        st.markdown("#### 🌐 Network Configuration & Costs")
+        st.markdown("#### 🌐 Network Single Workload & Costs")
         
         network_recs = tech_recs['network']
         network_costs = service_costs['network']
@@ -2955,10 +2955,10 @@ def render_technical_recommendations_tab():
             st.markdown("**Core Network Components**")
             
             core_network_data = [
-                {'Component': 'VPC Design', 'Configuration': network_recs['vpc_design']},
-                {'Component': 'Subnets', 'Configuration': network_recs['subnets']},
-                {'Component': 'Security Groups', 'Configuration': network_recs['security_groups']},
-                {'Component': 'Load Balancer', 'Configuration': network_recs['load_balancer']}
+                {'Component': 'VPC Design', 'Single Workload': network_recs['vpc_design']},
+                {'Component': 'Subnets', 'Single Workload': network_recs['subnets']},
+                {'Component': 'Security Groups', 'Single Workload': network_recs['security_groups']},
+                {'Component': 'Load Balancer', 'Single Workload': network_recs['load_balancer']}
             ]
             
             df_core_network = pd.DataFrame(core_network_data)
@@ -2983,10 +2983,10 @@ def render_technical_recommendations_tab():
         st.markdown("**Advanced Network Services**")
         
         advanced_network_data = [
-            {'Service': 'CDN', 'Configuration': network_recs['cdn']},
-            {'Service': 'DNS', 'Configuration': network_recs['dns']},
-            {'Service': 'NAT Gateway', 'Configuration': network_recs['nat_gateway']},
-            {'Service': 'VPN', 'Configuration': network_recs['vpn']}
+            {'Service': 'CDN', 'Single Workload': network_recs['cdn']},
+            {'Service': 'DNS', 'Single Workload': network_recs['dns']},
+            {'Service': 'NAT Gateway', 'Single Workload': network_recs['nat_gateway']},
+            {'Service': 'VPN', 'Single Workload': network_recs['vpn']}
         ]
         
         df_advanced_network = pd.DataFrame(advanced_network_data)
@@ -2999,7 +2999,7 @@ def render_technical_recommendations_tab():
     
     # Storage tab with costs
     with tech_tabs[2]:
-        st.markdown("#### 💾 Storage Configuration & Costs")
+        st.markdown("#### 💾 Storage Single Workload & Costs")
         
         storage_recs = tech_recs['storage']
         storage_costs = service_costs['storage']
@@ -3010,7 +3010,7 @@ def render_technical_recommendations_tab():
         col1, col2 = st.columns(2)
         
         with col1:
-            st.markdown("**Primary Storage Configuration**")
+            st.markdown("**Primary Storage Single Workload**")
             
             storage_config_data = [
                 {'Setting': 'Storage Type', 'Value': storage_recs['primary_storage']},
@@ -3041,10 +3041,10 @@ def render_technical_recommendations_tab():
         st.markdown("**Data Protection & Management**")
         
         protection_data = [
-            {'Feature': 'Backup Strategy', 'Configuration': storage_recs['backup_strategy']},
-            {'Feature': 'Encryption', 'Configuration': storage_recs['encryption']},
-            {'Feature': 'Performance', 'Configuration': storage_recs['performance']},
-            {'Feature': 'Lifecycle Policy', 'Configuration': storage_recs['lifecycle_policy']}
+            {'Feature': 'Backup Strategy', 'Single Workload': storage_recs['backup_strategy']},
+            {'Feature': 'Encryption', 'Single Workload': storage_recs['encryption']},
+            {'Feature': 'Performance', 'Single Workload': storage_recs['performance']},
+            {'Feature': 'Lifecycle Policy', 'Single Workload': storage_recs['lifecycle_policy']}
         ]
         
         df_protection = pd.DataFrame(protection_data)
@@ -3057,7 +3057,7 @@ def render_technical_recommendations_tab():
     
     # Database tab with costs
     with tech_tabs[3]:
-        st.markdown("#### 🗄️ Database Configuration & Costs")
+        st.markdown("#### 🗄️ Database Single Workload & Costs")
         
         db_recs = tech_recs['database']
         db_costs = service_costs['database']
@@ -3099,10 +3099,10 @@ def render_technical_recommendations_tab():
         st.markdown("**Advanced Database Features**")
         
         db_advanced_data = [
-            {'Feature': 'Read Replicas', 'Configuration': db_recs['read_replicas']},
-            {'Feature': 'Connection Pooling', 'Configuration': db_recs['connection_pooling']},
-            {'Feature': 'Maintenance Window', 'Configuration': db_recs['maintenance_window']},
-            {'Feature': 'Monitoring', 'Configuration': db_recs['monitoring']}
+            {'Feature': 'Read Replicas', 'Single Workload': db_recs['read_replicas']},
+            {'Feature': 'Connection Pooling', 'Single Workload': db_recs['connection_pooling']},
+            {'Feature': 'Maintenance Window', 'Single Workload': db_recs['maintenance_window']},
+            {'Feature': 'Monitoring', 'Single Workload': db_recs['monitoring']}
         ]
         
         df_db_advanced = pd.DataFrame(db_advanced_data)
@@ -3115,7 +3115,7 @@ def render_technical_recommendations_tab():
     
     # Security tab with costs
     with tech_tabs[4]:
-        st.markdown("#### 🔒 Security Configuration & Costs")
+        st.markdown("#### 🔒 Security Single Workload & Costs")
         
         security_recs = tech_recs['security']
         security_costs = service_costs['security']
@@ -3126,11 +3126,11 @@ def render_technical_recommendations_tab():
         col1, col2 = st.columns(2)
         
         with col1:
-            st.markdown("**Security Services Configuration**")
+            st.markdown("**Security Services Single Workload**")
             
             security_data = []
             for key, value in security_recs.items():
-                security_data.append({'Security Area': key.replace('_', ' ').title(), 'Configuration': value})
+                security_data.append({'Security Area': key.replace('_', ' ').title(), 'Single Workload': value})
             
             df_security = pd.DataFrame(security_data)
             st.dataframe(df_security, use_container_width=True, hide_index=True)
@@ -3171,7 +3171,7 @@ def render_technical_recommendations_tab():
     
     # Monitoring tab with costs
     with tech_tabs[5]:
-        st.markdown("#### 📊 Monitoring Configuration & Costs")
+        st.markdown("#### 📊 Monitoring Single Workload & Costs")
         
         monitoring_recs = tech_recs['monitoring']
         monitoring_costs = service_costs['monitoring']
@@ -3185,10 +3185,10 @@ def render_technical_recommendations_tab():
             st.markdown("**Core Monitoring Setup**")
             
             monitoring_core_data = [
-                {'Component': 'CloudWatch', 'Configuration': monitoring_recs['cloudwatch']},
-                {'Component': 'Alerting', 'Configuration': monitoring_recs['alerting']},
-                {'Component': 'Dashboards', 'Configuration': monitoring_recs['dashboards']},
-                {'Component': 'Log Retention', 'Configuration': monitoring_recs['log_retention']}
+                {'Component': 'CloudWatch', 'Single Workload': monitoring_recs['cloudwatch']},
+                {'Component': 'Alerting', 'Single Workload': monitoring_recs['alerting']},
+                {'Component': 'Dashboards', 'Single Workload': monitoring_recs['dashboards']},
+                {'Component': 'Log Retention', 'Single Workload': monitoring_recs['log_retention']}
             ]
             
             df_monitoring_core = pd.DataFrame(monitoring_core_data)
@@ -3213,10 +3213,10 @@ def render_technical_recommendations_tab():
         st.markdown("**Advanced Monitoring Services**")
         
         monitoring_advanced_data = [
-            {'Service': 'APM (X-Ray)', 'Configuration': monitoring_recs['apm']},
-            {'Service': 'Synthetic Monitoring', 'Configuration': monitoring_recs['synthetic_monitoring']},
-            {'Service': 'Cost Monitoring', 'Configuration': monitoring_recs['cost_monitoring']},
-            {'Service': 'Health Checks', 'Configuration': monitoring_recs['health_checks']}
+            {'Service': 'APM (X-Ray)', 'Single Workload': monitoring_recs['apm']},
+            {'Service': 'Synthetic Monitoring', 'Single Workload': monitoring_recs['synthetic_monitoring']},
+            {'Service': 'Cost Monitoring', 'Single Workload': monitoring_recs['cost_monitoring']},
+            {'Service': 'Health Checks', 'Single Workload': monitoring_recs['health_checks']}
         ]
         
         df_monitoring_advanced = pd.DataFrame(monitoring_advanced_data)
@@ -3547,12 +3547,12 @@ def generate_enhanced_excel_report():
             ws_tech.merge_cells('A1:D1')
             
             tech_sections = [
-                ("Compute Configuration", tech_recs['compute']),
-                ("Network Configuration", tech_recs['network']),
-                ("Storage Configuration", tech_recs['storage']),
-                ("Database Configuration", tech_recs['database']),
-                ("Security Configuration", tech_recs['security']),
-                ("Monitoring Configuration", tech_recs['monitoring'])
+                ("Compute Single Workload", tech_recs['compute']),
+                ("Network Single Workload", tech_recs['network']),
+                ("Storage Single Workload", tech_recs['storage']),
+                ("Database Single Workload", tech_recs['database']),
+                ("Security Single Workload", tech_recs['security']),
+                ("Monitoring Single Workload", tech_recs['monitoring'])
             ]
             
             current_row = 3
@@ -3963,8 +3963,8 @@ def render_bulk_results():
             
             # Create tabs for detailed analysis
             tab1, tab2, tab3 = st.tabs([
-                "📊 Analysis Results",
-                "🌡️ Environment Heat Maps",
+                "Single Workload",
+                "Single Workload",
                 "🔧 Technical Recommendations"
             ])
             
@@ -4246,7 +4246,7 @@ def render_workload_recommendations(workload_data):
         
         # Compute tab with costs
         with tech_tabs[0]:
-            st.markdown("#### 💻 Compute Configuration & Costs")
+            st.markdown("#### 💻 Compute Single Workload & Costs")
             
             compute_recs = tech_recs['compute']
             compute_costs = service_costs['compute']
@@ -4286,12 +4286,12 @@ def render_workload_recommendations(workload_data):
                 st.dataframe(df_compute_costs, use_container_width=True, hide_index=True)
             
             # Deployment configuration
-            st.markdown("**Deployment Configuration**")
+            st.markdown("**Deployment Single Workload**")
             
             deployment_data = [
-                {'Configuration': 'Placement Strategy', 'Recommendation': compute_recs['placement_strategy']},
-                {'Configuration': 'Auto Scaling', 'Recommendation': compute_recs['auto_scaling']},
-                {'Configuration': 'Pricing Optimization', 'Recommendation': compute_recs['pricing_optimization']}
+                {'Single Workload': 'Placement Strategy', 'Recommendation': compute_recs['placement_strategy']},
+                {'Single Workload': 'Auto Scaling', 'Recommendation': compute_recs['auto_scaling']},
+                {'Single Workload': 'Pricing Optimization', 'Recommendation': compute_recs['pricing_optimization']}
             ]
             
             df_deployment = pd.DataFrame(deployment_data)
@@ -4304,7 +4304,7 @@ def render_workload_recommendations(workload_data):
         
         # Network tab with costs
         with tech_tabs[1]:
-            st.markdown("#### 🌐 Network Configuration & Costs")
+            st.markdown("#### 🌐 Network Single Workload & Costs")
             
             network_recs = tech_recs['network']
             network_costs = service_costs['network']
@@ -4318,10 +4318,10 @@ def render_workload_recommendations(workload_data):
                 st.markdown("**Core Network Components**")
                 
                 core_network_data = [
-                    {'Component': 'VPC Design', 'Configuration': network_recs['vpc_design']},
-                    {'Component': 'Subnets', 'Configuration': network_recs['subnets']},
-                    {'Component': 'Security Groups', 'Configuration': network_recs['security_groups']},
-                    {'Component': 'Load Balancer', 'Configuration': network_recs['load_balancer']}
+                    {'Component': 'VPC Design', 'Single Workload': network_recs['vpc_design']},
+                    {'Component': 'Subnets', 'Single Workload': network_recs['subnets']},
+                    {'Component': 'Security Groups', 'Single Workload': network_recs['security_groups']},
+                    {'Component': 'Load Balancer', 'Single Workload': network_recs['load_balancer']}
                 ]
                 
                 df_core_network = pd.DataFrame(core_network_data)
@@ -4346,10 +4346,10 @@ def render_workload_recommendations(workload_data):
             st.markdown("**Advanced Network Services**")
             
             advanced_network_data = [
-                {'Service': 'CDN', 'Configuration': network_recs['cdn']},
-                {'Service': 'DNS', 'Configuration': network_recs['dns']},
-                {'Service': 'NAT Gateway', 'Configuration': network_recs['nat_gateway']},
-                {'Service': 'VPN', 'Configuration': network_recs['vpn']}
+                {'Service': 'CDN', 'Single Workload': network_recs['cdn']},
+                {'Service': 'DNS', 'Single Workload': network_recs['dns']},
+                {'Service': 'NAT Gateway', 'Single Workload': network_recs['nat_gateway']},
+                {'Service': 'VPN', 'Single Workload': network_recs['vpn']}
             ]
             
             df_advanced_network = pd.DataFrame(advanced_network_data)
@@ -4362,7 +4362,7 @@ def render_workload_recommendations(workload_data):
         
         # Storage tab with costs
         with tech_tabs[2]:
-            st.markdown("#### 💾 Storage Configuration & Costs")
+            st.markdown("#### 💾 Storage Single Workload & Costs")
             
             storage_recs = tech_recs['storage']
             storage_costs = service_costs['storage']
@@ -4373,7 +4373,7 @@ def render_workload_recommendations(workload_data):
             col1, col2 = st.columns(2)
             
             with col1:
-                st.markdown("**Primary Storage Configuration**")
+                st.markdown("**Primary Storage Single Workload**")
                 
                 storage_config_data = [
                     {'Setting': 'Storage Type', 'Value': storage_recs['primary_storage']},
@@ -4404,10 +4404,10 @@ def render_workload_recommendations(workload_data):
             st.markdown("**Data Protection & Management**")
             
             protection_data = [
-                {'Feature': 'Backup Strategy', 'Configuration': storage_recs['backup_strategy']},
-                {'Feature': 'Encryption', 'Configuration': storage_recs['encryption']},
-                {'Feature': 'Performance', 'Configuration': storage_recs['performance']},
-                {'Feature': 'Lifecycle Policy', 'Configuration': storage_recs['lifecycle_policy']}
+                {'Feature': 'Backup Strategy', 'Single Workload': storage_recs['backup_strategy']},
+                {'Feature': 'Encryption', 'Single Workload': storage_recs['encryption']},
+                {'Feature': 'Performance', 'Single Workload': storage_recs['performance']},
+                {'Feature': 'Lifecycle Policy', 'Single Workload': storage_recs['lifecycle_policy']}
             ]
             
             df_protection = pd.DataFrame(protection_data)
@@ -4420,7 +4420,7 @@ def render_workload_recommendations(workload_data):
         
         # Database tab with costs
         with tech_tabs[3]:
-            st.markdown("#### 🗄️ Database Configuration & Costs")
+            st.markdown("#### 🗄️ Database Single Workload & Costs")
             
             db_recs = tech_recs['database']
             db_costs = service_costs['database']
@@ -4462,10 +4462,10 @@ def render_workload_recommendations(workload_data):
             st.markdown("**Advanced Database Features**")
             
             db_advanced_data = [
-                {'Feature': 'Read Replicas', 'Configuration': db_recs['read_replicas']},
-                {'Feature': 'Connection Pooling', 'Configuration': db_recs['connection_pooling']},
-                {'Feature': 'Maintenance Window', 'Configuration': db_recs['maintenance_window']},
-                {'Feature': 'Monitoring', 'Configuration': db_recs['monitoring']}
+                {'Feature': 'Read Replicas', 'Single Workload': db_recs['read_replicas']},
+                {'Feature': 'Connection Pooling', 'Single Workload': db_recs['connection_pooling']},
+                {'Feature': 'Maintenance Window', 'Single Workload': db_recs['maintenance_window']},
+                {'Feature': 'Monitoring', 'Single Workload': db_recs['monitoring']}
             ]
             
             df_db_advanced = pd.DataFrame(db_advanced_data)
@@ -4478,7 +4478,7 @@ def render_workload_recommendations(workload_data):
         
         # Security tab with costs
         with tech_tabs[4]:
-            st.markdown("#### 🔒 Security Configuration & Costs")
+            st.markdown("#### 🔒 Security Single Workload & Costs")
             
             security_recs = tech_recs['security']
             security_costs = service_costs['security']
@@ -4489,11 +4489,11 @@ def render_workload_recommendations(workload_data):
             col1, col2 = st.columns(2)
             
             with col1:
-                st.markdown("**Security Services Configuration**")
+                st.markdown("**Security Services Single Workload**")
                 
                 security_data = []
                 for key, value in security_recs.items():
-                    security_data.append({'Security Area': key.replace('_', ' ').title(), 'Configuration': value})
+                    security_data.append({'Security Area': key.replace('_', ' ').title(), 'Single Workload': value})
                 
                 df_security = pd.DataFrame(security_data)
                 st.dataframe(df_security, use_container_width=True, hide_index=True)
@@ -4534,7 +4534,7 @@ def render_workload_recommendations(workload_data):
         
         # Monitoring tab with costs
         with tech_tabs[5]:
-            st.markdown("#### 📊 Monitoring Configuration & Costs")
+            st.markdown("#### 📊 Monitoring Single Workload & Costs")
             
             monitoring_recs = tech_recs['monitoring']
             monitoring_costs = service_costs['monitoring']
@@ -4548,10 +4548,10 @@ def render_workload_recommendations(workload_data):
                 st.markdown("**Core Monitoring Setup**")
                 
                 monitoring_core_data = [
-                    {'Component': 'CloudWatch', 'Configuration': monitoring_recs['cloudwatch']},
-                    {'Component': 'Alerting', 'Configuration': monitoring_recs['alerting']},
-                    {'Component': 'Dashboards', 'Configuration': monitoring_recs['dashboards']},
-                    {'Component': 'Log Retention', 'Configuration': monitoring_recs['log_retention']}
+                    {'Component': 'CloudWatch', 'Single Workload': monitoring_recs['cloudwatch']},
+                    {'Component': 'Alerting', 'Single Workload': monitoring_recs['alerting']},
+                    {'Component': 'Dashboards', 'Single Workload': monitoring_recs['dashboards']},
+                    {'Component': 'Log Retention', 'Single Workload': monitoring_recs['log_retention']}
                 ]
                 
                 df_monitoring_core = pd.DataFrame(monitoring_core_data)
@@ -4576,10 +4576,10 @@ def render_workload_recommendations(workload_data):
             st.markdown("**Advanced Monitoring Services**")
             
             monitoring_advanced_data = [
-                {'Service': 'APM (X-Ray)', 'Configuration': monitoring_recs['apm']},
-                {'Service': 'Synthetic Monitoring', 'Configuration': monitoring_recs['synthetic_monitoring']},
-                {'Service': 'Cost Monitoring', 'Configuration': monitoring_recs['cost_monitoring']},
-                {'Service': 'Health Checks', 'Configuration': monitoring_recs['health_checks']}
+                {'Service': 'APM (X-Ray)', 'Single Workload': monitoring_recs['apm']},
+                {'Service': 'Synthetic Monitoring', 'Single Workload': monitoring_recs['synthetic_monitoring']},
+                {'Service': 'Cost Monitoring', 'Single Workload': monitoring_recs['cost_monitoring']},
+                {'Service': 'Health Checks', 'Single Workload': monitoring_recs['health_checks']}
             ]
             
             df_monitoring_advanced = pd.DataFrame(monitoring_advanced_data)
@@ -4880,12 +4880,12 @@ def generate_enhanced_excel_report():
         
         # Technical sections
         sections = [
-            ("Compute Configuration", tech_recs['compute']),
-            ("Network Configuration", tech_recs['network']),
-            ("Storage Configuration", tech_recs['storage']),
-            ("Database Configuration", tech_recs['database']),
-            ("Security Configuration", tech_recs['security']),
-            ("Monitoring Configuration", tech_recs['monitoring'])
+            ("Compute Single Workload", tech_recs['compute']),
+            ("Network Single Workload", tech_recs['network']),
+            ("Storage Single Workload", tech_recs['storage']),
+            ("Database Single Workload", tech_recs['database']),
+            ("Security Single Workload", tech_recs['security']),
+            ("Monitoring Single Workload", tech_recs['monitoring'])
         ]
         
         current_row = 3
@@ -5235,7 +5235,7 @@ def main():
     
     # Enhanced sidebar
     with st.sidebar:
-        st.markdown("### 🔑 Claude AI Configuration")
+        st.markdown("### 🔑 Claude AI Single Workload")
         
         # Claude API Key configuration
         api_key_placeholder = st.empty()
@@ -5341,10 +5341,10 @@ def main():
     
     # Main tabs - CORRECTED SECTION
     tabs = st.tabs([
-        "⚙️ Configuration",
+        "⚙️ Single Workload",
         "📁 Bulk Upload",
-        "📊 Analysis Results", 
-        "🌡️ Environment Heat Maps",
+        "Single Workload", 
+        "Single Workload",
         "🔧 Technical Recommendations",
         "📋 Enhanced Reports"
     ])
