@@ -2933,7 +2933,7 @@ def render_technical_recommendations_tab():
         
         # Cost optimization notes
             st.markdown("**💡 Cost Optimization Recommendations**")
-            for note in compute_costs.get('optimization_notes', []):
+        for note in compute_costs.get('optimization_notes', []):
             st.markdown(note)
     
         # Network tab with costs
