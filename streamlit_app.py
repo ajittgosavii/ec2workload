@@ -4529,11 +4529,11 @@ def main():
 if __name__ == "__main__":
     main()
         
-        # Workload information
-        inputs = results['inputs']
-        ws_summary.append(["Workload Information", ""])
-        ws_summary.append(["Workload Name", inputs.get('workload_name', 'Unknown')])
-        ws_summary.append(["Workload Type", inputs.get('workload_type', 'web_application')])
-        ws_summary.append(["Operating System", inputs.get('operating_system', 'linux')])
-        ws_summary.append(["AWS Region", inputs.get('region', 'us-east-1')])
-        ws_summary.append([])  # Empty row
+    # Workload information
+    inputs = results['inputs']
+    ws_summary.append(["Workload Information", ""])
+    ws_summary.append(["Workload Name", inputs.get('workload_name', 'Unknown')])
+    ws_summary.append(["Workload Type", inputs.get('workload_type', 'web_application')])
+    ws_summary.append(["Operating System", inputs.get('operating_system', 'linux')])
+    ws_summary.append(["AWS Region", inputs.get('region', 'us-east-1')])
+    ws_summary.append([])  # Empty row
