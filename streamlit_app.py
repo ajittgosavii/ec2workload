@@ -52,49 +52,432 @@ except ImportError:
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Custom CSS
+# Enhanced Modern CSS with Frame Structure - REPLACE YOUR EXISTING CSS SECTION
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
     
+    /* Global Styles */
     html, body, [class*="css"] {
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
     }
     
-    .main-header {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        padding: 2rem;
-        border-radius: 12px;
-        margin-bottom: 2rem;
-        box-shadow: 0 8px 32px rgba(0,0,0,0.1);
-    }
+    /* Hide Streamlit Default Elements */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
     
-    .metric-card {
+    /* Main Application Frame */
+    .main-app-frame {
         background: white;
-        border: 2px solid #e2e8f0;
-        border-radius: 12px;
-        padding: 1.5rem;
-        text-align: center;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-    }
-    
-    .env-card {
-        background: white;
+        border-radius: 20px;
+        box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        margin: 1rem;
+        overflow: hidden;
         border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        padding: 1rem;
-        margin: 0.5rem;
-        text-align: center;
-        transition: all 0.3s ease;
-        min-height: 120px;
     }
     
-    .env-dev { border-left: 4px solid #3b82f6; }
-    .env-qa { border-left: 4px solid #8b5cf6; }
-    .env-uat { border-left: 4px solid #f59e0b; }
-    .env-preprod { border-left: 4px solid #ef4444; }
-    .env-prod { border-left: 4px solid #10b981; }
+    /* Enhanced Header Frame */
+    .header-frame {
+        background: linear-gradient(135deg, #1e3a8a 0%, #3730a3 50%, #1e40af 100%);
+        color: white;
+        padding: 2rem 3rem;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .header-frame::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000"><polygon fill="%23ffffff08" points="0,1000 1000,0 1000,1000"/></svg>');
+        background-size: cover;
+        pointer-events: none;
+    }
+    
+    .header-content {
+        position: relative;
+        z-index: 2;
+    }
+    
+    .header-title {
+        font-size: 2.5rem;
+        font-weight: 800;
+        margin-bottom: 0.5rem;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+    
+    .header-subtitle {
+        font-size: 1.2rem;
+        opacity: 0.9;
+        margin-bottom: 1rem;
+        font-weight: 400;
+    }
+    
+    .header-version {
+        display: inline-block;
+        background: rgba(255,255,255,0.2);
+        padding: 0.5rem 1rem;
+        border-radius: 50px;
+        font-size: 0.9rem;
+        font-weight: 500;
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255,255,255,0.3);
+    }
+    
+    /* Content Frame */
+    .content-frame {
+        padding: 2rem 3rem;
+        min-height: 60vh;
+        background: white;
+    }
+    
+    /* Navigation Frame */
+    .nav-frame {
+        background: #f8fafc;
+        border-bottom: 1px solid #e2e8f0;
+        padding: 0;
+        margin: 0;
+    }
+    
+    /* Sidebar Frame */
+    .sidebar-frame {
+        background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+        border-right: 1px solid #e2e8f0;
+        padding: 1.5rem;
+        height: 100vh;
+        overflow-y: auto;
+    }
+    
+    /* Enhanced Cards */
+    .modern-card {
+        background: white;
+        border-radius: 16px;
+        padding: 2rem;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        border: 1px solid #f1f5f9;
+        margin-bottom: 1.5rem;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .modern-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+    }
+    
+    .modern-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: linear-gradient(90deg, #3b82f6, #8b5cf6, #06b6d4);
+    }
+    
+    /* Metric Cards */
+    .metric-card-enhanced {
+        background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+        border: 2px solid transparent;
+        border-radius: 20px;
+        padding: 2rem;
+        text-align: center;
+        position: relative;
+        overflow: hidden;
+        transition: all 0.3s ease;
+    }
+    
+    .metric-card-enhanced::before {
+        content: '';
+        position: absolute;
+        top: -2px;
+        left: -2px;
+        right: -2px;
+        bottom: -2px;
+        background: linear-gradient(45deg, #3b82f6, #8b5cf6, #06b6d4, #10b981);
+        border-radius: 20px;
+        z-index: -1;
+        animation: gradient-border 3s ease infinite;
+        background-size: 400% 400%;
+    }
+    
+    @keyframes gradient-border {
+        0%, 100% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+    }
+    
+    .metric-card-enhanced:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 15px 35px rgba(0,0,0,0.15);
+    }
+    
+    .metric-value {
+        font-size: 2.5rem;
+        font-weight: 800;
+        color: #1e293b;
+        margin: 0.5rem 0;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .metric-label {
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 0.5rem;
+    }
+    
+    .metric-description {
+        font-size: 0.8rem;
+        color: #94a3b8;
+        font-weight: 500;
+    }
+    
+    /* Status Indicators */
+    .status-indicator {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.5rem 1rem;
+        border-radius: 50px;
+        font-weight: 600;
+        font-size: 0.85rem;
+        margin: 0.25rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    
+    .status-connected {
+        background: linear-gradient(135deg, #10b981, #059669);
+        color: white;
+    }
+    
+    .status-warning {
+        background: linear-gradient(135deg, #f59e0b, #d97706);
+        color: white;
+    }
+    
+    .status-error {
+        background: linear-gradient(135deg, #ef4444, #dc2626);
+        color: white;
+    }
+    
+    /* Enhanced Tabs */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+        background: #f8fafc;
+        padding: 0.5rem;
+        border-radius: 16px;
+        border: 1px solid #e2e8f0;
+    }
+    
+    .stTabs [data-baseweb="tab"] {
+        height: 60px;
+        background: white;
+        border-radius: 12px;
+        color: #64748b;
+        font-weight: 600;
+        padding: 0 24px;
+        border: 2px solid transparent;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .stTabs [data-baseweb="tab"]::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+    
+    .stTabs [aria-selected="true"] {
+        background: linear-gradient(135deg, #3b82f6, #8b5cf6) !important;
+        color: white !important;
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(59, 130, 246, 0.4);
+    }
+    
+    .stTabs [data-baseweb="tab"]:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        border-color: #e2e8f0;
+    }
+    
+    /* Sub-tabs styling for Single Workload */
+    .stTabs .stTabs [data-baseweb="tab"] {
+        height: 50px;
+        background-color: #f1f5f9;
+        font-size: 14px;
+        color: #475569;
+        border: 1px solid #e2e8f0;
+        margin-right: 4px;
+    }
+    
+    .stTabs .stTabs [aria-selected="true"] {
+        background-color: #0f766e !important;
+        color: white !important;
+        border: 1px solid #0d9488;
+        box-shadow: 0 2px 8px rgba(15, 118, 110, 0.3);
+    }
+    
+    .stTabs .stTabs [data-baseweb="tab"]:hover {
+        background-color: #e2e8f0;
+        color: #334155;
+    }
+    
+    .stTabs .stTabs [aria-selected="true"]:hover {
+        background-color: #0d9488 !important;
+        color: white !important;
+    }
+    
+    /* Form Elements */
+    .stSelectbox > div > div {
+        border-radius: 12px;
+        border: 2px solid #e2e8f0;
+        transition: all 0.3s ease;
+    }
+    
+    .stSelectbox > div > div:focus-within {
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+    
+    .stNumberInput > div > div {
+        border-radius: 12px;
+        border: 2px solid #e2e8f0;
+        transition: all 0.3s ease;
+    }
+    
+    .stNumberInput > div > div:focus-within {
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+    
+    /* Buttons */
+    .stButton > button {
+        border-radius: 12px;
+        font-weight: 600;
+        padding: 0.75rem 2rem;
+        border: none;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .stButton > button[data-testid="baseButton-primary"] {
+        background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+        color: white;
+        box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+    }
+    
+    .stButton > button[data-testid="baseButton-primary"]:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(59, 130, 246, 0.4);
+    }
+    
+    /* Expandable Sections */
+    .streamlit-expanderHeader {
+        background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+        font-weight: 600;
+        color: #374151;
+    }
+    
+    /* Progress Indicators */
+    .progress-ring {
+        display: inline-block;
+        width: 80px;
+        height: 80px;
+        margin: 1rem;
+    }
+    
+    /* Alert Boxes */
+    .stAlert {
+        border-radius: 12px;
+        border: none;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+    }
+    
+    /* Footer Frame */
+    .footer-frame {
+        background: linear-gradient(135deg, #1e293b, #374151);
+        color: #e2e8f0;
+        padding: 2rem 3rem;
+        text-align: center;
+        border-top: 1px solid #374151;
+    }
+    
+    /* Animation Classes */
+    .fade-in {
+        animation: fadeIn 0.6s ease-in;
+    }
+    
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .slide-in-left {
+        animation: slideInLeft 0.6s ease-out;
+    }
+    
+    @keyframes slideInLeft {
+        from { opacity: 0; transform: translateX(-30px); }
+        to { opacity: 1; transform: translateX(0); }
+    }
+    
+    /* Loading States */
+    .loading-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 3rem;
+    }
+    
+    .loading-spinner {
+        width: 50px;
+        height: 50px;
+        border: 4px solid #f3f4f6;
+        border-top: 4px solid #3b82f6;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    
+    /* Responsive Design */
+    @media (max-width: 768px) {
+        .header-frame {
+            padding: 1.5rem 2rem;
+        }
+        
+        .header-title {
+            font-size: 2rem;
+        }
+        
+        .content-frame {
+            padding: 1.5rem 2rem;
+        }
+        
+        .modern-card {
+            padding: 1.5rem;
+        }
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -492,8 +875,6 @@ class AWSCostCalculator:
         
         return pricing
 
-    # ... rest of the class remains the same ...
-    
     def _get_region_name(self, region_code: str) -> str:
         """Map AWS region code to full name."""
         region_map = {
@@ -532,8 +913,6 @@ class AWSCostCalculator:
         
         return costs
     
-    # Remaining methods same as before but using real pricing API
-    # ... (rest of the AWSCostCalculator methods) ...
     def _calculate_compute_costs(self, env: str, compute_recs: Dict, requirements: Dict) -> Dict[str, Any]:
         """Calculate compute-related costs."""
         
@@ -1069,8 +1448,6 @@ class EnhancedEnvironmentAnalyzer:
         self.environments = ['DEV', 'QA', 'UAT', 'PREPROD', 'PROD']
         self.cost_calculator = AWSCostCalculator()
         
-    # ... (rest of the EnhancedEnvironmentAnalyzer methods) ...
-
     def get_detailed_complexity_explanation(self, env: str, env_results: Dict) -> Dict[str, Any]:
         """Get detailed explanation of environment complexity."""
         
@@ -1695,7 +2072,6 @@ class EnhancedEnterpriseEC2Calculator:
                     "architecture": "x86_64", "storage": "EBS Only", "network_performance": "Up to 12.5 Gigabit",
                     "ebs_optimized": True, "enhanced_networking": True, "placement_group": True
                 },
-                # ... other instance types ...
                 {
                     "type": "m6i.xlarge", "vCPU": 4, "RAM": 16, "max_ebs_bandwidth": 9500,
                     "network": "Up to 12.5 Gbps", "family": "general", "processor": "Intel Xeon Ice Lake",
@@ -1727,7 +2103,6 @@ class EnhancedEnterpriseEC2Calculator:
                     "ebs_optimized": True, "enhanced_networking": True, "placement_group": True
                 }
             ]
-                   
             
             # Environment multipliers
             self.ENV_MULTIPLIERS = {
@@ -1761,7 +2136,6 @@ class EnhancedEnterpriseEC2Calculator:
             logger.error(f"Error initializing calculator: {e}")
             raise
 
-    # ... (rest of the EnhancedEnterpriseEC2Calculator methods) ...
     def calculate_enhanced_requirements(self, env: str) -> Dict[str, Any]:
         """Calculate requirements with Claude AI analysis."""
         
@@ -1934,7 +2308,6 @@ class EnhancedEnterpriseEC2Calculator:
             'environment': env
         }
     
-    
 class EnvironmentHeatMapGenerator:
     """Generate environment heat maps for workload analysis."""
     
@@ -1942,7 +2315,6 @@ class EnvironmentHeatMapGenerator:
         self.environments = ['DEV', 'QA', 'UAT', 'PREPROD', 'PROD']
         self.metrics = ['Cost', 'Complexity', 'Risk', 'Timeline', 'Resources']
 
-    # ... (rest of the EnvironmentHeatMapGenerator methods) ...
     def generate_heat_map_data(self, workload_results: Dict) -> pd.DataFrame:
         """Generate heat map data for environments."""
         try:
@@ -2095,7 +2467,6 @@ class BulkWorkloadAnalyzer:
         self.claude_analyzer = ClaudeAIMigrationAnalyzer()
         self.calculator = EnhancedEnterpriseEC2Calculator()
         
-    # ... (rest of the BulkWorkloadAnalyzer methods) ...
     def process_bulk_upload(self, uploaded_file, file_type: str) -> Dict[str, Any]:
         """Process bulk upload file and return analysis results."""
         try:
@@ -2328,6 +2699,7 @@ class BulkWorkloadAnalyzer:
         }
         
         return summary
+
 # Enhanced Streamlit Functions
 def initialize_enhanced_session_state():
     """Initialize enhanced session state."""
@@ -2346,156 +2718,11 @@ def initialize_enhanced_session_state():
         logger.error(f"Error initializing session state: {e}")
         st.session_state.enhanced_calculator = None
         st.session_state.enhanced_results = None
-        
-# ADD THESE NEW FUNCTIONS TO YOUR CODE
-
-def render_modern_header():
-    """Render the modern header frame."""
-    st.markdown("""
-    <div class="header-frame">
-        <div class="header-content">
-            <div class="header-title">🏢 AWS Migration Platform</div>
-            <div class="header-subtitle">Comprehensive Enterprise Migration Analysis with AI-Powered Insights</div>
-            <div class="header-version">
-                🤖 v7.0 Enhanced • Powered by Claude AI • Real-time AWS Integration
-            </div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-def render_modern_sidebar():
-    """Render enhanced sidebar with modern frame."""
-    with st.sidebar:
-        st.markdown("""
-        <div class="modern-card">
-            <h3 style="margin-top: 0; color: #1e293b;">🔑 AI Configuration</h3>
-        """, unsafe_allow_html=True)
-        
-        # Claude API Status
-        analyzer = ClaudeAIMigrationAnalyzer()
-        api_key = analyzer._get_claude_api_key()
-        
-        if api_key:
-            status_class = "status-connected"
-            status_text = "🟢 Claude AI Connected"
-            status_description = "Real-time AI analysis available"
-        else:
-            status_class = "status-warning" 
-            status_text = "🔴 Claude AI Fallback Mode"
-            status_description = "Using default analysis patterns"
-        
-        st.markdown(f"""
-            <div class="{status_class} status-indicator" style="width: 100%; justify-content: center; margin-bottom: 1rem;">
-                {status_text}
-            </div>
-            <p style="text-align: center; color: #64748b; margin-bottom: 1rem;">{status_description}</p>
-        """, unsafe_allow_html=True)
-        
-        if not api_key:
-            with st.expander("🔧 Configure Claude API", expanded=False):
-                st.markdown("""
-                **Add to Streamlit Secrets:**
-                ```toml
-                ANTHROPIC_API_KEY = "your-api-key"
-                ```
-                
-                **Or set environment variable:**
-                ```bash
-                export ANTHROPIC_API_KEY="your-api-key"
-                ```
-                
-                Get your API key at [console.anthropic.com](https://console.anthropic.com/)
-                """)
-        
-        st.markdown("</div>", unsafe_allow_html=True)
-        
-        # Integration Status
-        st.markdown("""
-        <div class="modern-card">
-            <h3 style="margin-top: 0; color: #1e293b;">🔗 Integration Status</h3>
-        """, unsafe_allow_html=True)
-        
-        # Claude AI Status
-        claude_status = "Connected" if api_key else "Fallback Mode"
-        claude_color = "#10b981" if api_key else "#f59e0b"
-        
-        st.markdown(f"""
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding: 1rem; background: linear-gradient(135deg, #fee2e2, #fecaca); border-radius: 12px;">
-            <div>
-                <div style="font-weight: 600; color: #dc2626;">🤖 Claude AI</div>
-                <div style="font-size: 0.85rem; color: #7f1d1d;">Migration Analysis</div>
-            </div>
-            <div style="background: {claude_color}; color: white; padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.75rem; font-weight: 600;">
-                {claude_status}
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        st.markdown(f"""
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding: 1rem; background: linear-gradient(135deg, #fff7ed, #fed7aa); border-radius: 12px;">
-            <div>
-                <div style="font-weight: 600; color: #ea580c;">☁️ AWS Services</div>
-                <div style="font-size: 0.85rem; color: #9a3412;">Cost & Instance Data</div>
-            </div>
-            <div style="background: #10b981; color: white; padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.75rem; font-weight: 600;">
-                Connected
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        st.markdown("</div>", unsafe_allow_html=True)
-        
-        # Features Overview
-        st.markdown("""
-        <div class="modern-card">
-            <h3 style="margin-top: 0; color: #1e293b;">🚀 Platform Features</h3>
-            <div style="font-size: 0.9rem; line-height: 1.6; color: #475569;">
-                <strong>🤖 AI-Powered Analysis</strong><br>
-                • Migration complexity scoring<br>
-                • Risk assessment & mitigation<br>
-                • Intelligent timeline estimation<br><br>
-                
-                <strong>☁️ AWS Integration</strong><br>
-                • Real-time pricing data<br>
-                • Instance recommendations<br>
-                • Cost optimization insights<br><br>
-                
-                <strong>📊 Multi-Environment</strong><br>
-                • Development lifecycle analysis<br>
-                • Environment heat maps<br>
-                • Technical specifications<br><br>
-                
-                <strong>📋 Enterprise Reports</strong><br>
-                • PDF & Excel exports<br>
-                • Bulk workload analysis<br>
-                • Executive summaries
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # Quick Stats
-        if st.session_state.get('enhanced_results'):
-            st.markdown("""
-            <div class="modern-card">
-                <h3 style="margin-top: 0; color: #1e293b;">📈 Current Analysis</h3>
-            """, unsafe_allow_html=True)
-            
-            prod_results = st.session_state.enhanced_results['recommendations'].get('PROD', {})
-            claude_analysis = prod_results.get('claude_analysis', {})
-            tco_analysis = prod_results.get('tco_analysis', {})
-            
-            complexity_score = claude_analysis.get('complexity_score', 0)
-            monthly_cost = tco_analysis.get('monthly_cost', 0)
-            
-            st.metric("Complexity Score", f"{complexity_score:.0f}/100", delta=None)
-            st.metric("Monthly Cost", f"${monthly_cost:,.0f}", delta=None)
-            
-            st.markdown("</div>", unsafe_allow_html=True)
 
 def render_enhanced_configuration():
     """Render enhanced configuration."""
     
-    st.markdown("### ⚙️ Enhanced Enterprise Workload Single Workload")
+    st.markdown("### ⚙️ Enhanced Enterprise Workload Configuration")
     
     # Check if calculator exists
     if 'enhanced_calculator' not in st.session_state or st.session_state.enhanced_calculator is None:
@@ -2506,7 +2733,6 @@ def render_enhanced_configuration():
     
     # Basic workload information
     with st.expander("📋 Workload Information", expanded=True):
-        # ... (workload configuration inputs) ...
         col1, col2 = st.columns(2)
         
         with col1:
@@ -2544,9 +2770,9 @@ def render_enhanced_configuration():
                 ["linux", "windows"],
                 format_func=lambda x: "Linux (Amazon Linux, Ubuntu, RHEL)" if x == "linux" else "Windows Server"
             )
+    
     # Infrastructure metrics
     with st.expander("🖥️ Current Infrastructure Metrics", expanded=True):
-        # ... (infrastructure inputs) ...
         col1, col2, col3 = st.columns(3)
         
         with col1:
@@ -2581,17 +2807,10 @@ def render_enhanced_configuration():
     if st.button("🚀 Run Enhanced Analysis", type="primary", key="main_enhanced_analysis_button"):
         run_enhanced_analysis()
         
-    # Report generation section
+    # Success message with navigation hint
     if st.session_state.enhanced_results:
-        st.markdown("---")
-        st.markdown("### 📋 Report Generation")
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("📄 Generate PDF Report", key="config_pdf_report"):
-                generate_enhanced_pdf_report()
-        with col2:
-            if st.button("📊 Export to Excel", key="config_excel_report"):
-                generate_enhanced_excel_report()
+        st.success("✅ Analysis completed! Check the 'Results', 'Heat Map', and 'Technical Reports' tabs above for detailed analysis.")
+        st.info("💡 Visit the 'Reports' tab to generate PDF and Excel reports.")
 
 def run_enhanced_analysis():
     """Run enhanced analysis."""
@@ -2754,7 +2973,6 @@ def render_enhanced_results():
                 
                 # Calculate detailed service costs if available
                 try:
-                    # Actual implementation added here
                     analyzer = EnhancedEnvironmentAnalyzer()
                     tech_recs = analyzer.get_technical_recommendations('PROD', prod_results)
                     cost_calculator = AWSCostCalculator()
@@ -2805,9 +3023,6 @@ def render_enhanced_results():
         logger.error(f"Error in render_enhanced_results: {e}")
 
 def render_enhanced_environment_heatmap_tab():
-    """Render enhanced environment heat map tab with detailed explanations."""
-    
-    # ... (heat map rendering) ...
     """Render enhanced environment heat map tab with detailed explanations."""
     
     st.markdown("### 🌡️ Environment Impact Analysis with Detailed Explanations")
@@ -2897,11 +3112,9 @@ def render_enhanced_environment_heatmap_tab():
     df_detailed = pd.DataFrame(detailed_data)
     st.dataframe(df_detailed, use_container_width=True, hide_index=True)
 
-    
 def render_technical_recommendations_tab():
     """Render comprehensive technical recommendations tab with cost details."""
     
-    # ... (technical recommendations) ...
     st.markdown("### 🔧 Comprehensive Technical Recommendations by Environment")
     
     if 'enhanced_results' not in st.session_state or not st.session_state.enhanced_results:
@@ -3021,12 +3234,11 @@ def render_technical_recommendations_tab():
         st.warning("No cost data available for visualization.")
     
     # Create tabs for different technical areas with costs
-tabs = st.tabs(["Single Workload", "Bulk Upload"])
+    tech_tabs = st.tabs(["Compute", "Network", "Storage", "Database", "Security", "Monitoring"])
     
     # Compute tab with costs
     with tech_tabs[0]:
-    sw_subtabs = st.tabs(["Single Workload", "Heat Map", "Technical Recommendation"])
-        st.markdown("#### 💻 Compute Single Workload & Costs")
+        st.markdown("#### 💻 Compute Configuration & Costs")
         
         compute_recs = tech_recs['compute']
         compute_costs = service_costs['compute']
@@ -3066,12 +3278,12 @@ tabs = st.tabs(["Single Workload", "Bulk Upload"])
             st.dataframe(df_compute_costs, use_container_width=True, hide_index=True)
         
         # Deployment configuration
-        st.markdown("**Deployment Single Workload**")
+        st.markdown("**Deployment Configuration**")
         
         deployment_data = [
-            {'Single Workload': 'Placement Strategy', 'Recommendation': compute_recs['placement_strategy']},
-            {'Single Workload': 'Auto Scaling', 'Recommendation': compute_recs['auto_scaling']},
-            {'Single Workload': 'Pricing Optimization', 'Recommendation': compute_recs['pricing_optimization']}
+            {'Configuration': 'Placement Strategy', 'Recommendation': compute_recs['placement_strategy']},
+            {'Configuration': 'Auto Scaling', 'Recommendation': compute_recs['auto_scaling']},
+            {'Configuration': 'Pricing Optimization', 'Recommendation': compute_recs['pricing_optimization']}
         ]
         
         df_deployment = pd.DataFrame(deployment_data)
@@ -3084,8 +3296,7 @@ tabs = st.tabs(["Single Workload", "Bulk Upload"])
     
     # Network tab with costs
     with tech_tabs[1]:
-    bu_subtabs = st.tabs(["Single Workload", "Heat Map", "Technical Recommendation"])
-        st.markdown("#### 🌐 Network Single Workload & Costs")
+        st.markdown("#### 🌐 Network Configuration & Costs")
         
         network_recs = tech_recs['network']
         network_costs = service_costs['network']
@@ -3099,10 +3310,10 @@ tabs = st.tabs(["Single Workload", "Bulk Upload"])
             st.markdown("**Core Network Components**")
             
             core_network_data = [
-                {'Component': 'VPC Design', 'Single Workload': network_recs['vpc_design']},
-                {'Component': 'Subnets', 'Single Workload': network_recs['subnets']},
-                {'Component': 'Security Groups', 'Single Workload': network_recs['security_groups']},
-                {'Component': 'Load Balancer', 'Single Workload': network_recs['load_balancer']}
+                {'Component': 'VPC Design', 'Configuration': network_recs['vpc_design']},
+                {'Component': 'Subnets', 'Configuration': network_recs['subnets']},
+                {'Component': 'Security Groups', 'Configuration': network_recs['security_groups']},
+                {'Component': 'Load Balancer', 'Configuration': network_recs['load_balancer']}
             ]
             
             df_core_network = pd.DataFrame(core_network_data)
@@ -3127,10 +3338,10 @@ tabs = st.tabs(["Single Workload", "Bulk Upload"])
         st.markdown("**Advanced Network Services**")
         
         advanced_network_data = [
-            {'Service': 'CDN', 'Single Workload': network_recs['cdn']},
-            {'Service': 'DNS', 'Single Workload': network_recs['dns']},
-            {'Service': 'NAT Gateway', 'Single Workload': network_recs['nat_gateway']},
-            {'Service': 'VPN', 'Single Workload': network_recs['vpn']}
+            {'Service': 'CDN', 'Configuration': network_recs['cdn']},
+            {'Service': 'DNS', 'Configuration': network_recs['dns']},
+            {'Service': 'NAT Gateway', 'Configuration': network_recs['nat_gateway']},
+            {'Service': 'VPN', 'Configuration': network_recs['vpn']}
         ]
         
         df_advanced_network = pd.DataFrame(advanced_network_data)
@@ -3143,7 +3354,7 @@ tabs = st.tabs(["Single Workload", "Bulk Upload"])
     
     # Storage tab with costs
     with tech_tabs[2]:
-        st.markdown("#### 💾 Storage Single Workload & Costs")
+        st.markdown("#### 💾 Storage Configuration & Costs")
         
         storage_recs = tech_recs['storage']
         storage_costs = service_costs['storage']
@@ -3154,7 +3365,7 @@ tabs = st.tabs(["Single Workload", "Bulk Upload"])
         col1, col2 = st.columns(2)
         
         with col1:
-            st.markdown("**Primary Storage Single Workload**")
+            st.markdown("**Primary Storage Configuration**")
             
             storage_config_data = [
                 {'Setting': 'Storage Type', 'Value': storage_recs['primary_storage']},
@@ -3185,10 +3396,10 @@ tabs = st.tabs(["Single Workload", "Bulk Upload"])
         st.markdown("**Data Protection & Management**")
         
         protection_data = [
-            {'Feature': 'Backup Strategy', 'Single Workload': storage_recs['backup_strategy']},
-            {'Feature': 'Encryption', 'Single Workload': storage_recs['encryption']},
-            {'Feature': 'Performance', 'Single Workload': storage_recs['performance']},
-            {'Feature': 'Lifecycle Policy', 'Single Workload': storage_recs['lifecycle_policy']}
+            {'Feature': 'Backup Strategy', 'Configuration': storage_recs['backup_strategy']},
+            {'Feature': 'Encryption', 'Configuration': storage_recs['encryption']},
+            {'Feature': 'Performance', 'Configuration': storage_recs['performance']},
+            {'Feature': 'Lifecycle Policy', 'Configuration': storage_recs['lifecycle_policy']}
         ]
         
         df_protection = pd.DataFrame(protection_data)
@@ -3201,7 +3412,7 @@ tabs = st.tabs(["Single Workload", "Bulk Upload"])
     
     # Database tab with costs
     with tech_tabs[3]:
-        st.markdown("#### 🗄️ Database Single Workload & Costs")
+        st.markdown("#### 🗄️ Database Configuration & Costs")
         
         db_recs = tech_recs['database']
         db_costs = service_costs['database']
@@ -3243,10 +3454,10 @@ tabs = st.tabs(["Single Workload", "Bulk Upload"])
         st.markdown("**Advanced Database Features**")
         
         db_advanced_data = [
-            {'Feature': 'Read Replicas', 'Single Workload': db_recs['read_replicas']},
-            {'Feature': 'Connection Pooling', 'Single Workload': db_recs['connection_pooling']},
-            {'Feature': 'Maintenance Window', 'Single Workload': db_recs['maintenance_window']},
-            {'Feature': 'Monitoring', 'Single Workload': db_recs['monitoring']}
+            {'Feature': 'Read Replicas', 'Configuration': db_recs['read_replicas']},
+            {'Feature': 'Connection Pooling', 'Configuration': db_recs['connection_pooling']},
+            {'Feature': 'Maintenance Window', 'Configuration': db_recs['maintenance_window']},
+            {'Feature': 'Monitoring', 'Configuration': db_recs['monitoring']}
         ]
         
         df_db_advanced = pd.DataFrame(db_advanced_data)
@@ -3259,7 +3470,7 @@ tabs = st.tabs(["Single Workload", "Bulk Upload"])
     
     # Security tab with costs
     with tech_tabs[4]:
-        st.markdown("#### 🔒 Security Single Workload & Costs")
+        st.markdown("#### 🔒 Security Configuration & Costs")
         
         security_recs = tech_recs['security']
         security_costs = service_costs['security']
@@ -3270,11 +3481,11 @@ tabs = st.tabs(["Single Workload", "Bulk Upload"])
         col1, col2 = st.columns(2)
         
         with col1:
-            st.markdown("**Security Services Single Workload**")
+            st.markdown("**Security Services Configuration**")
             
             security_data = []
             for key, value in security_recs.items():
-                security_data.append({'Security Area': key.replace('_', ' ').title(), 'Single Workload': value})
+                security_data.append({'Security Area': key.replace('_', ' ').title(), 'Configuration': value})
             
             df_security = pd.DataFrame(security_data)
             st.dataframe(df_security, use_container_width=True, hide_index=True)
@@ -3315,7 +3526,7 @@ tabs = st.tabs(["Single Workload", "Bulk Upload"])
     
     # Monitoring tab with costs
     with tech_tabs[5]:
-        st.markdown("#### 📊 Monitoring Single Workload & Costs")
+        st.markdown("#### 📊 Monitoring Configuration & Costs")
         
         monitoring_recs = tech_recs['monitoring']
         monitoring_costs = service_costs['monitoring']
@@ -3329,10 +3540,10 @@ tabs = st.tabs(["Single Workload", "Bulk Upload"])
             st.markdown("**Core Monitoring Setup**")
             
             monitoring_core_data = [
-                {'Component': 'CloudWatch', 'Single Workload': monitoring_recs['cloudwatch']},
-                {'Component': 'Alerting', 'Single Workload': monitoring_recs['alerting']},
-                {'Component': 'Dashboards', 'Single Workload': monitoring_recs['dashboards']},
-                {'Component': 'Log Retention', 'Single Workload': monitoring_recs['log_retention']}
+                {'Component': 'CloudWatch', 'Configuration': monitoring_recs['cloudwatch']},
+                {'Component': 'Alerting', 'Configuration': monitoring_recs['alerting']},
+                {'Component': 'Dashboards', 'Configuration': monitoring_recs['dashboards']},
+                {'Component': 'Log Retention', 'Configuration': monitoring_recs['log_retention']}
             ]
             
             df_monitoring_core = pd.DataFrame(monitoring_core_data)
@@ -3357,10 +3568,10 @@ tabs = st.tabs(["Single Workload", "Bulk Upload"])
         st.markdown("**Advanced Monitoring Services**")
         
         monitoring_advanced_data = [
-            {'Service': 'APM (X-Ray)', 'Single Workload': monitoring_recs['apm']},
-            {'Service': 'Synthetic Monitoring', 'Single Workload': monitoring_recs['synthetic_monitoring']},
-            {'Service': 'Cost Monitoring', 'Single Workload': monitoring_recs['cost_monitoring']},
-            {'Service': 'Health Checks', 'Single Workload': monitoring_recs['health_checks']}
+            {'Service': 'APM (X-Ray)', 'Configuration': monitoring_recs['apm']},
+            {'Service': 'Synthetic Monitoring', 'Configuration': monitoring_recs['synthetic_monitoring']},
+            {'Service': 'Cost Monitoring', 'Configuration': monitoring_recs['cost_monitoring']},
+            {'Service': 'Health Checks', 'Configuration': monitoring_recs['health_checks']}
         ]
         
         df_monitoring_advanced = pd.DataFrame(monitoring_advanced_data)
@@ -3370,596 +3581,8 @@ tabs = st.tabs(["Single Workload", "Bulk Upload"])
         st.markdown("**💡 Monitoring Cost Optimization**")
         for note in monitoring_costs.get('optimization_notes', []):
             st.markdown(note)
-    
-    # Cost comparison across environments
-    st.markdown("---")
-    st.markdown("### 📊 Cost Comparison Across Environments")
-    
-    # Calculate costs for all environments
-    all_env_costs = []
-    
-    for env in ['DEV', 'QA', 'UAT', 'PREPROD', 'PROD']:
-        env_results_temp = results['recommendations'].get(env, {})
-        if env_results_temp:
-            tech_recs_temp = analyzer.get_technical_recommendations(env, env_results_temp)
-            requirements_temp = env_results_temp.get('requirements', {})
-            costs_temp = cost_calculator.calculate_service_costs(env, tech_recs_temp, requirements_temp)
-            
-            all_env_costs.append({
-                'Environment': env,
-                'Compute': costs_temp['compute']['total'],
-                'Network': costs_temp['network']['total'],
-                'Storage': costs_temp['storage']['total'],
-                'Database': costs_temp['database']['total'],
-                'Security': costs_temp['security']['total'],
-                'Monitoring': costs_temp['monitoring']['total'],
-                'Total Monthly': costs_temp['summary']['total_monthly']
-            })
-    
-    if all_env_costs:
-        df_env_costs = pd.DataFrame(all_env_costs)
-        
-        # Create stacked bar chart
-        fig_bar = go.Figure()
-        
-        categories = ['Compute', 'Network', 'Storage', 'Database', 'Security', 'Monitoring']
-        colors = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4']
-        
-        for i, category in enumerate(categories):
-            fig_bar.add_trace(go.Bar(
-                name=category,
-                x=df_env_costs['Environment'],
-                y=df_env_costs[category],
-                marker_color=colors[i]
-            ))
-        
-        fig_bar.update_layout(
-            title="Monthly Cost Comparison Across Environments",
-            barmode='stack',
-            xaxis_title="Environment",
-            yaxis_title="Monthly Cost ($)",
-            height=500
-        )
-        
-        st.plotly_chart(fig_bar, use_container_width=True)
-        
-        # Show detailed comparison table
-        st.dataframe(df_env_costs, use_container_width=True, hide_index=True)
-        
-        # Cost insights
-        st.markdown("**💡 Cost Insights:**")
-        total_costs = df_env_costs['Total Monthly'].tolist()
-        if len(total_costs) >= 2:
-            prod_cost = df_env_costs[df_env_costs['Environment'] == 'PROD']['Total Monthly'].iloc[0] if 'PROD' in df_env_costs['Environment'].values else 0
-            dev_cost = df_env_costs[df_env_costs['Environment'] == 'DEV']['Total Monthly'].iloc[0] if 'DEV' in df_env_costs['Environment'].values else 0
-            
-            if prod_cost > 0 and dev_cost > 0:
-                cost_ratio = prod_cost / dev_cost
-                st.markdown(f"• Production environment costs {cost_ratio:.1f}x more than Development")
-            
-            total_all_envs = sum(total_costs)
-            st.markdown(f"• Total monthly cost across all environments: ${total_all_envs:,.2f}")
-            st.markdown(f"• Annual cost across all environments: ${total_all_envs * 12:,.2f}")
-    
-    # Summary recommendations for the environment
-    st.markdown("---")
-    st.markdown(f"### 📋 {selected_env} Environment Implementation Summary")
-    
-    total_cost = service_costs['summary']['total_monthly']
-    annual_cost = service_costs['summary']['total_annual']
-    
-    summary_recommendations = [
-        f"🏗️ **Architecture:** Deploy using {tech_recs['compute']['placement_strategy'].lower()}",
-        f"🔧 **Compute:** Use {tech_recs['compute']['primary_instance']['type']} instances (${compute_costs['total']:.2f}/month)",
-        f"🌐 **Network:** Implement {tech_recs['network']['vpc_design'].lower()} (${network_costs['total']:.2f}/month)",
-        f"💾 **Storage:** Configure {tech_recs['storage']['primary_storage']} (${storage_costs['total']:.2f}/month)",
-        f"🗄️ **Database:** Deploy {tech_recs['database']['engine']} (${db_costs['total']:.2f}/month)",
-        f"🔒 **Security:** Implement {len([k for k, v in security_costs.items() if isinstance(v, dict) and v.get('cost', 0) > 0])} security services (${security_costs['total']:.2f}/month)",
-        f"📊 **Monitoring:** Set up comprehensive monitoring (${monitoring_costs['total']:.2f}/month)",
-        f"💰 **Total Cost:** ${total_cost:.2f}/month (${annual_cost:,.2f}/year)"
-    ]
-    
-    for rec in summary_recommendations:
-        st.markdown(rec)
 
-def generate_enhanced_excel_report():
-    """Generate comprehensive Excel report with multiple sheets."""
-    
-    if 'enhanced_results' not in st.session_state or not st.session_state.enhanced_results:
-        st.warning("No analysis results available for Excel generation.")
-        return
-    
-    if not OPENPYXL_AVAILABLE:
-        st.error("📊 openpyxl not available. Please install with: `pip install openpyxl`")
-        return
-    
-    try:
-        results = st.session_state.enhanced_results
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        
-        # Create Excel workbook
-        wb = openpyxl.Workbook()
-        
-        # Remove default sheet
-        wb.remove(wb.active)
-        
-        # Define styles
-        header_font = Font(bold=True, color="FFFFFF")
-        header_fill = PatternFill(start_color="2563EB", end_color="2563EB", fill_type="solid")
-        data_font = Font(size=11)
-        border = Border(
-            left=Side(style='thin'),
-            right=Side(style='thin'),
-            top=Side(style='thin'),
-            bottom=Side(style='thin')
-        )
-        
-        # Sheet 1: Executive Summary
-        ws_summary = wb.create_sheet("Executive Summary")
-        
-        # Add title
-        ws_summary['A1'] = "AWS Migration Analysis - Executive Summary"
-        ws_summary['A1'].font = Font(bold=True, size=16)
-        ws_summary.merge_cells('A1:E1')
-        
-        # Add generation date
-        ws_summary['A2'] = f"Generated: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}"
-        ws_summary['A2'].font = Font(size=12, italic=True)
-        ws_summary.merge_cells('A2:E2')
-        
-        # Summary data
-        prod_results = results['recommendations']['PROD']
-        claude_analysis = prod_results.get('claude_analysis', {})
-        tco_analysis = prod_results.get('tco_analysis', {})
-        
-        summary_data = [
-            ["Metric", "Value"],
-            ["Workload Name", results['inputs']['workload_name']],
-            ["Workload Type", results['inputs']['workload_type']],
-            ["Migration Complexity Level", claude_analysis.get('complexity_level', 'MEDIUM')],
-            ["Complexity Score", f"{claude_analysis.get('complexity_score', 50):.0f}/100"],
-            ["Estimated Timeline (weeks)", f"{claude_analysis.get('estimated_timeline', {}).get('max_weeks', 8)}"],
-            ["Monthly Cost (Production)", f"${tco_analysis.get('monthly_cost', 0):,.2f}"],
-            ["Annual Cost (Production)", f"${tco_analysis.get('monthly_cost', 0) * 12:,.2f}"],
-            ["Best Pricing Option", tco_analysis.get('best_pricing_option', 'N/A').replace('_', ' ').title()],
-            ["Migration Strategy", claude_analysis.get('migration_strategy', {}).get('approach', 'N/A')]
-        ]
-        
-        # Write summary data
-        start_row = 4
-        for row_idx, (metric, value) in enumerate(summary_data, start_row):
-            ws_summary[f'A{row_idx}'] = metric
-            ws_summary[f'B{row_idx}'] = value
-            
-            if row_idx == start_row:  # Header row
-                ws_summary[f'A{row_idx}'].font = header_font
-                ws_summary[f'A{row_idx}'].fill = header_fill
-                ws_summary[f'B{row_idx}'].font = header_font
-                ws_summary[f'B{row_idx}'].fill = header_fill
-            else:
-                ws_summary[f'A{row_idx}'].font = data_font
-                ws_summary[f'B{row_idx}'].font = data_font
-            
-            ws_summary[f'A{row_idx}'].border = border
-            ws_summary[f'B{row_idx}'].border = border
-        
-        # Auto-adjust column widths
-        ws_summary.column_dimensions['A'].width = 25
-        ws_summary.column_dimensions['B'].width = 30
-        
-        # Sheet 2: Environment Comparison
-        ws_env = wb.create_sheet("Environment Comparison")
-        
-        env_headers = ["Environment", "Complexity Score", "Instance Type", "Monthly Cost", "vCPUs", "RAM (GB)", "Storage (GB)"]
-        
-        # Write headers
-        for col_idx, header in enumerate(env_headers, 1):
-            cell = ws_env.cell(row=1, column=col_idx, value=header)
-            cell.font = header_font
-            cell.fill = header_fill
-            cell.border = border
-            cell.alignment = Alignment(horizontal='center')
-        
-        # Write environment data
-        for row_idx, env in enumerate(['DEV', 'QA', 'UAT', 'PREPROD', 'PROD'], 2):
-            env_results = results['recommendations'].get(env, {})
-            env_claude_analysis = env_results.get('claude_analysis', {})
-            cost_breakdown = env_results.get('cost_breakdown', {})
-            selected_instance = cost_breakdown.get('selected_instance', {})
-            total_costs = cost_breakdown.get('total_costs', {})
-            requirements = env_results.get('requirements', {})
-            
-            env_data = [
-                env,
-                f"{env_claude_analysis.get('complexity_score', 50):.0f}",
-                selected_instance.get('type', 'N/A'),
-                f"${total_costs.get('on_demand', 0):,.2f}",
-                str(requirements.get('vCPUs', 'N/A')),
-                str(requirements.get('RAM_GB', 'N/A')),
-                str(requirements.get('storage_GB', 'N/A'))
-            ]
-            
-            for col_idx, value in enumerate(env_data, 1):
-                cell = ws_env.cell(row=row_idx, column=col_idx, value=value)
-                cell.font = data_font
-                cell.border = border
-                if col_idx > 1:  # Center align numeric data
-                    cell.alignment = Alignment(horizontal='center')
-        
-        # Auto-adjust column widths
-        for col_idx in range(1, len(env_headers) + 1):
-            ws_env.column_dimensions[openpyxl.utils.get_column_letter(col_idx)].width = 15
-        
-        # Sheet 3: Cost Analysis by Environment
-        ws_cost = wb.create_sheet("Cost Analysis")
-        
-        analyzer = EnhancedEnvironmentAnalyzer()
-        cost_calculator = AWSCostCalculator()
-        
-        cost_headers = ["Environment", "Compute", "Network", "Storage", "Database", "Security", "Monitoring", "Total Monthly"]
-        
-        # Write headers
-        for col_idx, header in enumerate(cost_headers, 1):
-            cell = ws_cost.cell(row=1, column=col_idx, value=header)
-            cell.font = header_font
-            cell.fill = header_fill
-            cell.border = border
-            cell.alignment = Alignment(horizontal='center')
-        
-        # Calculate and write cost data for all environments
-        for row_idx, env in enumerate(['DEV', 'QA', 'UAT', 'PREPROD', 'PROD'], 2):
-            env_results_temp = results['recommendations'].get(env, {})
-            if env_results_temp:
-                tech_recs_temp = analyzer.get_technical_recommendations(env, env_results_temp)
-                requirements_temp = env_results_temp.get('requirements', {})
-                costs_temp = cost_calculator.calculate_service_costs(env, tech_recs_temp, requirements_temp)
-                
-                cost_data = [
-                    env,
-                    f"${costs_temp['compute']['total']:.2f}",
-                    f"${costs_temp['network']['total']:.2f}",
-                    f"${costs_temp['storage']['total']:.2f}",
-                    f"${costs_temp['database']['total']:.2f}",
-                    f"${costs_temp['security']['total']:.2f}",
-                    f"${costs_temp['monitoring']['total']:.2f}",
-                    f"${costs_temp['summary']['total_monthly']:.2f}"
-                ]
-            else:
-                cost_data = [env] + ["N/A"] * 7
-            
-            for col_idx, value in enumerate(cost_data, 1):
-                cell = ws_cost.cell(row=row_idx, column=col_idx, value=value)
-                cell.font = data_font
-                cell.border = border
-                if col_idx > 1:  # Center align cost data
-                    cell.alignment = Alignment(horizontal='center')
-        
-        # Auto-adjust column widths
-        for col_idx in range(1, len(cost_headers) + 1):
-            ws_cost.column_dimensions[openpyxl.utils.get_column_letter(col_idx)].width = 12
-        
-        # Sheet 4: Migration Recommendations
-        ws_recs = wb.create_sheet("Migration Recommendations")
-        
-        ws_recs['A1'] = "Migration Recommendations"
-        ws_recs['A1'].font = Font(bold=True, size=14)
-        ws_recs.merge_cells('A1:C1')
-        
-        # Migration strategy
-        strategy = claude_analysis.get('migration_strategy', {})
-        strategy_data = [
-            ["Migration Strategy", ""],
-            ["Approach", strategy.get('approach', 'N/A')],
-            ["Methodology", strategy.get('methodology', 'N/A')],
-            ["Timeline", strategy.get('timeline', 'N/A')],
-            ["Risk Level", strategy.get('risk_level', 'N/A')],
-            ["", ""],
-            ["Key Recommendations", ""]
-        ]
-        
-        # Add recommendations
-        recommendations = claude_analysis.get('recommendations', [])
-        for i, rec in enumerate(recommendations, 1):
-            strategy_data.append([f"{i}.", rec])
-        
-        # Write recommendations data
-        for row_idx, (label, value) in enumerate(strategy_data, 3):
-            ws_recs[f'A{row_idx}'] = label
-            ws_recs[f'B{row_idx}'] = value
-            
-            if "Strategy" in label or "Recommendations" in label:
-                ws_recs[f'A{row_idx}'].font = Font(bold=True, size=12)
-                ws_recs[f'B{row_idx}'].font = Font(bold=True, size=12)
-            else:
-                ws_recs[f'A{row_idx}'].font = data_font
-                ws_recs[f'B{row_idx}'].font = data_font
-        
-        # Auto-adjust column widths
-        ws_recs.column_dimensions['A'].width = 20
-        ws_recs.column_dimensions['B'].width = 60
-        
-        # Sheet 5: Technical Specifications (Production)
-        ws_tech = wb.create_sheet("Technical Specifications")
-        
-        if prod_results:
-            tech_recs = analyzer.get_technical_recommendations('PROD', prod_results)
-            requirements = prod_results.get('requirements', {})
-            service_costs = cost_calculator.calculate_service_costs('PROD', tech_recs, requirements)
-            
-            ws_tech['A1'] = "Production Environment Technical Specifications"
-            ws_tech['A1'].font = Font(bold=True, size=14)
-            ws_tech.merge_cells('A1:D1')
-            
-            tech_sections = [
-                ("Compute Single Workload", tech_recs['compute']),
-                ("Network Single Workload", tech_recs['network']),
-                ("Storage Single Workload", tech_recs['storage']),
-                ("Database Single Workload", tech_recs['database']),
-                ("Security Single Workload", tech_recs['security']),
-                ("Monitoring Single Workload", tech_recs['monitoring'])
-            ]
-            
-            current_row = 3
-            for section_name, section_data in tech_sections:
-                # Section header
-                ws_tech[f'A{current_row}'] = section_name
-                ws_tech[f'A{current_row}'].font = Font(bold=True, size=12)
-                ws_tech.merge_cells(f'A{current_row}:D{current_row}')
-                current_row += 1
-                
-                # Section data
-                if isinstance(value, (str, int, float, bool)): # ensure value is scalar
-                    for key, value in section_data.items():
-                        ws_tech[f'A{current_row}'] = key.replace('_', ' ').title()
-                        ws_tech[f'B{current_row}'] = str(value)
-                        ws_tech[f'A{current_row}'].font = data_font
-                        ws_tech[f'B{current_row}'].font = data_font
-                        current_row += 1
-                
-                current_row += 1  # Add space between sections
-            
-            # Auto-adjust column widths
-            ws_tech.column_dimensions['A'].width = 25
-            ws_tech.column_dimensions['B'].width = 40
-        
-        # Save to BytesIO buffer
-        buffer = io.BytesIO()
-        wb.save(buffer)
-        buffer.seek(0)
-        
-        filename = f"Enhanced_AWS_Migration_Analysis_{timestamp}.xlsx"
-        
-        st.download_button(
-            label="⬇️ Download Excel Report",
-            data=buffer.getvalue(),
-            file_name=filename,
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            key="excel_report_download"
-        )
-        
-        st.success("✅ Enhanced Excel report generated successfully!")
-        
-    except Exception as e:
-        st.error(f"Error generating Excel report: {str(e)}")
-        logger.error(f"Error in Excel generation: {e}")
-
-def generate_enhanced_pdf_report():
-    """Generate enhanced PDF report."""
-    
-    if 'enhanced_results' not in st.session_state or not st.session_state.enhanced_results:
-        st.warning("No analysis results available for PDF generation.")
-        return
-    
-    if not REPORTLAB_AVAILABLE:
-        st.warning("📄 ReportLab not available. Please install with: `pip install reportlab`")
-        return
-    
-    try:
-        results = st.session_state.enhanced_results
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        
-        # Create PDF content
-        buffer = io.BytesIO()
-        doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=1*inch, leftMargin=0.75*inch)
-        
-        styles = getSampleStyleSheet()
-        
-        title_style = ParagraphStyle(
-            'CustomTitle',
-            parent=styles['Title'],
-            fontSize=20,
-            spaceAfter=20,
-            alignment=TA_CENTER,
-            textColor=colors.HexColor('#1f2937'),
-            fontName='Helvetica-Bold'
-        )
-        
-        story = []
-        
-        # Title
-        story.append(Paragraph("Enhanced AWS Migration Analysis", title_style))
-        story.append(Paragraph("Enterprise Corporation", styles['Normal']))
-        story.append(Paragraph(f"Generated: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}", styles['Normal']))
-        story.append(Spacer(1, 0.5*inch))
-        
-        # Executive Summary
-        prod_results = results['recommendations']['PROD']
-        claude_analysis = prod_results.get('claude_analysis', {})
-        tco_analysis = prod_results.get('tco_analysis', {})
-        
-        story.append(Paragraph("Executive Summary", styles['Heading1']))
-        
-        summary_data = [
-            ['Metric', 'Value'],
-            ['Workload Name', results['inputs']['workload_name']],
-            ['Migration Complexity', f"{claude_analysis.get('complexity_level', 'MEDIUM')} ({claude_analysis.get('complexity_score', 50):.0f}/100)"],
-            ['Estimated Timeline', f"{claude_analysis.get('estimated_timeline', {}).get('max_weeks', 8)} weeks"],
-            ['Monthly Cost', f"${tco_analysis.get('monthly_cost', 0):,.2f}"],
-            ['Best Pricing Option', tco_analysis.get('best_pricing_option', 'N/A').replace('_', ' ').title()]
-        ]
-        
-        summary_table = Table(summary_data, colWidths=[3*inch, 3*inch])
-        summary_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f3f4f6')),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.HexColor('#1f2937')),
-            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 11),
-            ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#e5e7eb')),
-            ('FONTSIZE', (0, 1), (-1, -1), 10)
-        ]))
-        
-        story.append(summary_table)
-        story.append(PageBreak())
-        
-        # Environment Analysis Section
-        story.append(Paragraph("Environment Analysis Overview", styles['Heading1']))
-        
-        analyzer = EnhancedEnvironmentAnalyzer()
-        
-        # Environment comparison table
-        env_data = [['Environment', 'Complexity Score', 'Instance Type', 'Monthly Cost', 'Key Characteristics']]
-        
-        for env in ['DEV', 'QA', 'UAT', 'PREPROD', 'PROD']:
-            env_results = results['recommendations'].get(env, {})
-            claude_env_analysis = env_results.get('claude_analysis', {})
-            cost_breakdown = env_results.get('cost_breakdown', {})
-            selected_instance = cost_breakdown.get('selected_instance', {})
-            total_costs = cost_breakdown.get('total_costs', {})
-            
-            characteristics = get_env_characteristics(env)
-            
-            env_data.append([
-                env,
-                f"{claude_env_analysis.get('complexity_score', 50):.0f}/100",
-                selected_instance.get('type', 'N/A'),
-                f"${total_costs.get('on_demand', 0):,.0f}",
-                characteristics
-            ])
-        
-        env_table = Table(env_data, colWidths=[1*inch, 1*inch, 1.2*inch, 1*inch, 2.8*inch])
-        env_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2563eb')),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 10),
-            ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#93c5fd')),
-            ('FONTSIZE', (0, 1), (-1, -1), 9),
-            ('VALIGN', (0, 0), (-1, -1), 'TOP')
-        ]))
-        
-        story.append(env_table)
-        story.append(PageBreak())
-        
-        # Migration Strategy
-        story.append(Paragraph("Migration Strategy", styles['Heading1']))
-        
-        strategy = claude_analysis.get('migration_strategy', {})
-        if strategy:
-            strategy_text = f"""
-            <b>Approach:</b> {strategy.get('approach', 'N/A')}<br/>
-            <b>Methodology:</b> {strategy.get('methodology', 'N/A')}<br/>
-            <b>Timeline:</b> {strategy.get('timeline', 'N/A')}<br/>
-            <b>Risk Level:</b> {strategy.get('risk_level', 'N/A')}
-            """
-            story.append(Paragraph(strategy_text, styles['Normal']))
-        
-        # Migration Steps
-        migration_steps = claude_analysis.get('migration_steps', [])
-        if migration_steps:
-            story.append(Paragraph("Migration Implementation Plan", styles['Heading2']))
-            
-            for i, step in enumerate(migration_steps, 1):
-                if isinstance(step, dict):
-                    story.append(Paragraph(f"Phase {i}: {step.get('phase', 'N/A')} ({step.get('duration', 'N/A')})", styles['Heading3']))
-                    
-                    tasks = step.get('tasks', [])
-                    if tasks:
-                        tasks_text = "<b>Key Tasks:</b><br/>" + "<br/>".join([f"• {task}" for task in tasks])
-                        story.append(Paragraph(tasks_text, styles['Normal']))
-                    
-                    deliverables = step.get('deliverables', [])
-                    if deliverables:
-                        deliverables_text = f"<b>Deliverables:</b> {', '.join(deliverables)}"
-                        story.append(Paragraph(deliverables_text, styles['Normal']))
-                    
-                    story.append(Spacer(1, 0.1*inch))
-        
-        # Technical Recommendations Section
-        story.append(PageBreak())
-        story.append(Paragraph("Technical Recommendations & Cost Analysis", styles['Heading1']))
-        
-        # Production environment technical specs
-        prod_env_results = results['recommendations'].get('PROD', {})
-        if prod_env_results:
-            tech_recs = analyzer.get_technical_recommendations('PROD', prod_env_results)
-            requirements = prod_env_results.get('requirements', {})
-            service_costs = cost_calculator.calculate_service_costs('PROD', tech_recs, requirements)
-            
-            # Cost Summary Section
-            story.append(Paragraph("Production Environment Cost Summary", styles['Heading2']))
-            
-            cost_summary_data = [
-                ['Service Category', 'Monthly Cost', 'Annual Cost', 'Key Components'],
-                ['Compute', f"${service_costs['compute']['total']:.2f}", f"${service_costs['compute']['total'] * 12:.2f}", 'EC2 instances, Auto Scaling'],
-                ['Network', f"${service_costs['network']['total']:.2f}", f"${service_costs['network']['total'] * 12:.2f}", 'Load balancers, NAT Gateway, CloudFront'],
-                ['Storage', f"${service_costs['storage']['total']:.2f}", f"${service_costs['storage']['total'] * 12:.2f}", 'EBS volumes, Snapshots, S3'],
-                ['Database', f"${service_costs['database']['total']:.2f}", f"${service_costs['database']['total'] * 12:.2f}", 'RDS/Aurora, Backup storage'],
-                ['Security', f"${service_costs['security']['total']:.2f}", f"${service_costs['security']['total'] * 12:.2f}", 'KMS, Secrets Manager, GuardDuty'],
-                ['Monitoring', f"${service_costs['monitoring']['total']:.2f}", f"${service_costs['monitoring']['total'] * 12:.2f}", 'CloudWatch, X-Ray, Synthetics'],
-                ['TOTAL', f"${service_costs['summary']['total_monthly']:.2f}", f"${service_costs['summary']['total_annual']:.2f}", 'All AWS services']
-            ]
-            
-            cost_summary_table = Table(cost_summary_data, colWidths=[1.5*inch, 1.2*inch, 1.2*inch, 2.1*inch])
-            cost_summary_table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1f2937')),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-                ('BACKGROUND', (-1, -1), (-1, -1), colors.HexColor('#059669')),
-                ('TEXTCOLOR', (-1, -1), (-1, -1), colors.white),
-                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTNAME', (-1, -1), (-1, -1), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 10),
-                ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#6b7280')),
-                ('FONTSIZE', (0, 1), (-1, -1), 9)
-            ]))
-            
-            story.append(cost_summary_table)
-            story.append(Spacer(1, 0.3*inch))
-        
-        # Recommendations
-        recommendations = claude_analysis.get('recommendations', [])
-        if recommendations:
-            story.append(Paragraph("Key Recommendations", styles['Heading2']))
-            recs_text = "<br/>".join([f"{i}. {rec}" for i, rec in enumerate(recommendations, 1)])
-            story.append(Paragraph(recs_text, styles['Normal']))
-        
-        # Footer
-        story.append(Spacer(1, 0.3*inch))
-        footer_text = f"Report generated by Enhanced AWS Migration Platform v7.0 with Real Claude AI on {datetime.now().strftime('%B %d, %Y')}"
-        footer_style = ParagraphStyle('Footer', parent=styles['Normal'], fontSize=8, alignment=TA_CENTER, textColor=colors.HexColor('#6b7280'))
-        story.append(Paragraph(footer_text, footer_style))
-        
-        # Build PDF
-        doc.build(story)
-        buffer.seek(0)
-        
-        filename = f"Enhanced_AWS_Migration_Report_{timestamp}.pdf"
-        
-        st.download_button(
-            label="⬇️ Download Enhanced PDF Report",
-            data=buffer.getvalue(),
-            file_name=filename,
-            mime="application/pdf",
-            key="pdf_report_download"
-        )
-        
-        st.success("✅ Enhanced PDF report generated successfully!")
-        
-    except Exception as e:
-        st.error(f"Error generating PDF: {str(e)}")
-# Add these functions AFTER generate_enhanced_pdf_report() and BEFORE get_env_characteristics()
+# Bulk upload and reporting functions
 def generate_bulk_template():
     """Downloadable CSV template for bulk upload."""
     import io
@@ -3990,7 +3613,6 @@ def generate_bulk_template():
         mime="text/csv"
     )
 
-        
 def render_bulk_upload_tab():
     """Render bulk upload tab."""
     st.markdown("### 📁 Bulk Workload Upload & Analysis")
@@ -4085,13 +3707,29 @@ def render_bulk_results():
     """Render bulk analysis results."""
     results = st.session_state.bulk_results
     
-    # ... (bulk results rendering) ...
     if 'error' in results:
         st.error(f"Error: {results['error']}")
         return
     
     st.markdown("---")
     st.markdown("### 📊 Bulk Analysis Results")    
+    
+    # Summary section
+    summary = results.get('summary', {})
+    if 'error' not in summary:
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            st.metric("Total Workloads", summary.get('total_workloads_analyzed', 0))
+        
+        with col2:
+            st.metric("Total Monthly Cost", f"${summary.get('total_monthly_cost', 0):,.0f}")
+        
+        with col3:
+            st.metric("Average Complexity", f"{summary.get('average_complexity_score', 0):.1f}/100")
+        
+        with col4:
+            st.metric("Most Common Instance", summary.get('most_common_instance_type', 'N/A'))
     
     # Add detailed tabs for bulk workloads
     if results['successful_analyses'] > 0:
@@ -4106,24 +3744,21 @@ def render_bulk_results():
                              if w['workload_name'] == selected_workload and w['status'] == 'success')
             
             # Create tabs for detailed analysis
-tabs = st.tabs(["Single Workload", "Bulk Upload"])
+            detailed_tabs = st.tabs(["Analysis", "Heat Map", "Recommendations"])
             
-            with tab1:
+            with detailed_tabs[0]:
                 render_workload_analysis(workload_data)
                 
-            with tab2:
+            with detailed_tabs[1]:
                 render_workload_heatmaps(workload_data)
                 
-            with tab3:
+            with detailed_tabs[2]:
                 render_workload_recommendations(workload_data)
 
 def render_workload_analysis(workload_data):
     """Render analysis for a specific workload."""
     st.markdown(f"### 📊 Analysis for {workload_data['workload_name']}")
     
-    prod_analysis = workload_data['analysis']['PROD']
-    claude_analysis = prod_analysis.get('claude_analysis', {})
-           
     try:
         prod_results = workload_data['analysis']['PROD']
         claude_analysis = prod_results.get('claude_analysis', {})
@@ -4178,143 +3813,13 @@ def render_workload_analysis(workload_data):
             </div>
             """, unsafe_allow_html=True)
         
-        # Claude AI Analysis
-        st.markdown("### 🤖 Claude AI Migration Analysis")
-        
-        if claude_analysis:
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                st.markdown("**Migration Strategy**")
-                strategy = claude_analysis.get('migration_strategy', {})
-                if strategy:
-                    st.markdown(f"**Approach:** {strategy.get('approach', 'N/A')}")
-                    st.markdown(f"**Methodology:** {strategy.get('methodology', 'N/A')}")
-                    st.markdown(f"**Timeline:** {strategy.get('timeline', 'N/A')}")
-                    st.markdown(f"**Risk Level:** {strategy.get('risk_level', 'N/A')}")
-            
-            with col2:
-                st.markdown("**Migration Steps**")
-                migration_steps = claude_analysis.get('migration_steps', [])
-                
-                for i, step in enumerate(migration_steps[:3], 1):
-                    if isinstance(step, dict):
-                        with st.expander(f"Phase {i}: {step.get('phase', 'N/A')}", expanded=False):
-                            st.markdown(f"**Duration:** {step.get('duration', 'N/A')}")
-                            
-                            tasks = step.get('tasks', [])
-                            if tasks:
-                                st.markdown("**Key Tasks:**")
-                                for task in tasks[:3]:
-                                    st.markdown(f"• {task}")
-        
-        # Risk Analysis
-        st.markdown("### ⚠️ Risk Analysis")
-        
-        risk_factors = claude_analysis.get('risk_factors', [])
-        if risk_factors:
-            risk_data = []
-            for risk in risk_factors[:5]:
-                if isinstance(risk, dict):
-                    risk_data.append({
-                        'Category': risk.get('category', 'N/A'),
-                        'Risk': risk.get('risk', 'N/A'),
-                        'Probability': risk.get('probability', 'N/A'),
-                        'Impact': risk.get('impact', 'N/A'),
-                        'Mitigation': risk.get('mitigation', 'N/A')
-                    })
-            
-            if risk_data:
-                df_risks = pd.DataFrame(risk_data)
-                st.dataframe(df_risks, use_container_width=True, hide_index=True)
-        
-        # Recommendations
+        # Show key recommendations
         st.markdown("### 💡 Key Recommendations")
-        
         recommendations = claude_analysis.get('recommendations', [])
         if recommendations:
-            for i, rec in enumerate(recommendations[:7], 1):
+            for i, rec in enumerate(recommendations[:5], 1):
                 st.markdown(f"{i}. {rec}")
-        
-        # Success Factors
-        st.markdown("### ✅ Success Factors")
-        
-        success_factors = claude_analysis.get('success_factors', [])
-        if success_factors:
-            for i, factor in enumerate(success_factors[:5], 1):
-                st.markdown(f"• {factor}")
-        
-        # Cost Analysis
-        st.markdown("### 💰 Cost Analysis")
-        
-        cost_breakdown = prod_results.get('cost_breakdown', {})
-        total_costs = cost_breakdown.get('total_costs', {})
-        
-        if total_costs:
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                st.markdown("**Instance Pricing Comparison**")
-                cost_data = []
-                for pricing_model, cost in total_costs.items():
-                    cost_data.append({
-                        'Pricing Model': pricing_model.replace('_', ' ').title(),
-                        'Monthly Cost': f"${cost:,.2f}",
-                        'Annual Cost': f"${cost*12:,.2f}"
-                    })
                 
-                df_costs = pd.DataFrame(cost_data)
-                st.dataframe(df_costs, use_container_width=True, hide_index=True)
-            
-            with col2:
-                st.markdown("**AWS Service Cost Breakdown (PROD)**")
-                
-                # Calculate detailed service costs
-                try:
-                    analyzer = EnhancedEnvironmentAnalyzer()
-                    tech_recs = analyzer.get_technical_recommendations('PROD', prod_results)
-                    cost_calculator = AWSCostCalculator()
-                    service_costs = cost_calculator.calculate_service_costs('PROD', tech_recs, prod_results.get('requirements', {}))
-                    
-                    service_cost_data = []
-                    categories = ['compute', 'network', 'storage', 'database', 'security', 'monitoring']
-                    for cat in categories:
-                        if cat in service_costs:
-                            service_cost_data.append({
-                                'Service Category': cat.title(),
-                                'Monthly Cost': f"${service_costs[cat]['total']:.2f}"
-                            })
-                    
-                    if service_cost_data:
-                        df_service_costs = pd.DataFrame(service_cost_data)
-                        st.dataframe(df_service_costs, use_container_width=True, hide_index=True)
-                        
-                        # Show total from service breakdown
-                        total_services = sum(service_costs[cat]['total'] for cat in categories if cat in service_costs)
-                        st.markdown(f"**Total Monthly AWS Services Cost: ${total_services:.2f}**")
-                    else:
-                        # Fallback to basic cost display
-                        basic_cost_data = [
-                            {'Cost Component': 'Instance Costs', 'Monthly Cost': f"${cost_breakdown.get('instance_costs', {}).get('on_demand', 0):.2f}"},
-                            {'Cost Component': 'Storage Costs', 'Monthly Cost': f"${cost_breakdown.get('storage_costs', {}).get('primary_storage', 0):.2f}"},
-                            {'Cost Component': 'Network Costs', 'Monthly Cost': f"${cost_breakdown.get('network_costs', {}).get('data_transfer', 0):.2f}"}
-                        ]
-                        
-                        df_basic_costs = pd.DataFrame(basic_cost_data)
-                        st.dataframe(df_basic_costs, use_container_width=True, hide_index=True)
-                
-                except Exception as e:
-                    logger.error(f"Error calculating detailed service costs: {e}")
-                    # Fallback to basic cost display
-                    basic_cost_data = [
-                        {'Cost Component': 'Instance Costs', 'Monthly Cost': f"${cost_breakdown.get('instance_costs', {}).get('on_demand', 0):.2f}"},
-                        {'Cost Component': 'Storage Costs', 'Monthly Cost': f"${cost_breakdown.get('storage_costs', {}).get('primary_storage', 0):.2f}"},
-                        {'Cost Component': 'Network Costs', 'Monthly Cost': f"${cost_breakdown.get('network_costs', {}).get('data_transfer', 0):.2f}"}
-                    ]
-                    
-                    df_basic_costs = pd.DataFrame(basic_cost_data)
-                    st.dataframe(df_basic_costs, use_container_width=True, hide_index=True)
-        
     except Exception as e:
         st.error(f"❌ Error displaying workload analysis: {str(e)}")
         logger.error(f"Error in render_workload_analysis: {e}")
@@ -4334,17 +3839,6 @@ def render_workload_recommendations(workload_data):
     """Render recommendations for a specific workload."""
     st.markdown(f"### 🔧 Technical Recommendations for {workload_data['workload_name']}")
     
-    analyzer = EnhancedEnvironmentAnalyzer()
-    env = 'PROD'  # Focus on production environment
-    env_results = workload_data['analysis'][env]
-    tech_recs = analyzer.get_technical_recommendations(env, env_results)
-    
-    # ... (recommendations rendering similar to single workload) ...
-
-def render_workload_recommendations(workload_data):
-    """Render comprehensive technical recommendations for a specific workload."""
-    st.markdown(f"### 🔧 Technical Recommendations for {workload_data['workload_name']}")
-    
     try:
         analyzer = EnhancedEnvironmentAnalyzer()
         env = 'PROD'  # Focus on production environment
@@ -4354,405 +3848,544 @@ def render_workload_recommendations(workload_data):
         requirements = env_results.get('requirements', {})
         service_costs = cost_calculator.calculate_service_costs(env, tech_recs, requirements)
         
-        # Cost summary at the top
-        st.markdown("### 💰 Cost Summary")
+        # Show key technical recommendations
+        st.markdown("#### 💻 Compute Recommendations")
+        compute_recs = tech_recs['compute']
+        primary_instance = compute_recs['primary_instance']
+        st.markdown(f"**Recommended Instance:** {primary_instance['type']} ({primary_instance['vcpus']} vCPUs, {primary_instance['memory_gb']} GB RAM)")
+        st.markdown(f"**Rationale:** {primary_instance['rationale']}")
         
-        col1, col2, col3, col4 = st.columns(4)
+        st.markdown("#### 🌐 Network Recommendations")
+        network_recs = tech_recs['network']
+        st.markdown(f"**VPC Design:** {network_recs['vpc_design']}")
+        st.markdown(f"**Load Balancer:** {network_recs['load_balancer']}")
         
-        with col1:
-            total_monthly = service_costs['summary']['total_monthly']
-            st.metric("Total Monthly Cost", f"${total_monthly:,.2f}")
+        st.markdown("#### 💾 Storage Recommendations")
+        storage_recs = tech_recs['storage']
+        st.markdown(f"**Primary Storage:** {storage_recs['primary_storage']}")
+        st.markdown(f"**Backup Strategy:** {storage_recs['backup_strategy']}")
         
-        with col2:
-            total_annual = service_costs['summary']['total_annual']
-            st.metric("Total Annual Cost", f"${total_annual:,.2f}")
-        
-        with col3:
-            largest_category = service_costs['summary']['largest_cost_category']
-            largest_cost = service_costs[largest_category]['total']
-            st.metric("Largest Cost Driver", f"{largest_category.title()}: ${largest_cost:.2f}")
-        
-        with col4:
-            # Calculate cost per vCPU
-            vcpus = requirements.get('vCPUs', 2)
-            cost_per_vcpu = total_monthly / vcpus if vcpus > 0 else 0
-            st.metric("Cost per vCPU/month", f"${cost_per_vcpu:.2f}")
-        
-        # Create tabs for different technical areas with costs
-tabs = st.tabs(["Single Workload", "Bulk Upload"])
-        
-        # Compute tab with costs
-    with tech_tabs[0]:
-    sw_subtabs = st.tabs(["Single Workload", "Heat Map", "Technical Recommendation"])
-            st.markdown("#### 💻 Compute Single Workload & Costs")
-            
-            compute_recs = tech_recs['compute']
-            compute_costs = service_costs['compute']
-            
-            # Cost overview
-            st.markdown(f"**Monthly Compute Cost: ${compute_costs['total']:.2f}**")
-            
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                st.markdown("**Primary Instance Recommendation**")
-                
-                primary_instance = compute_recs['primary_instance']
-                instance_data = [
-                    {'Specification': 'Instance Type', 'Value': primary_instance['type']},
-                    {'Specification': 'vCPUs', 'Value': str(primary_instance['vcpus'])},
-                    {'Specification': 'Memory (GB)', 'Value': str(primary_instance['memory_gb'])},
-                    {'Specification': 'Rationale', 'Value': primary_instance['rationale']}
-                ]
-                
-                df_instance = pd.DataFrame(instance_data)
-                st.dataframe(df_instance, use_container_width=True, hide_index=True)
-            
-            with col2:
-                st.markdown("**Compute Cost Breakdown**")
-                
-                cost_breakdown_data = []
-                for service, details in compute_costs.items():
-                    if service != 'total' and service != 'optimization_notes':
-                        cost_breakdown_data.append({
-                            'Service': service.replace('_', ' ').title(),
-                            'Monthly Cost': f"${details['cost']:.2f}",
-                            'Details': details['details']
-                        })
-                
-                df_compute_costs = pd.DataFrame(cost_breakdown_data)
-                st.dataframe(df_compute_costs, use_container_width=True, hide_index=True)
-            
-            # Deployment configuration
-            st.markdown("**Deployment Single Workload**")
-            
-            deployment_data = [
-                {'Single Workload': 'Placement Strategy', 'Recommendation': compute_recs['placement_strategy']},
-                {'Single Workload': 'Auto Scaling', 'Recommendation': compute_recs['auto_scaling']},
-                {'Single Workload': 'Pricing Optimization', 'Recommendation': compute_recs['pricing_optimization']}
-            ]
-            
-            df_deployment = pd.DataFrame(deployment_data)
-            st.dataframe(df_deployment, use_container_width=True, hide_index=True)
-            
-            # Cost optimization notes
-            st.markdown("**💡 Cost Optimization Recommendations**")
-            for note in compute_costs.get('optimization_notes', []):
-                st.markdown(note)
-        
-        # Network tab with costs
-        with tech_tabs[1]:
-    bu_subtabs = st.tabs(["Single Workload", "Heat Map", "Technical Recommendation"])
-            st.markdown("#### 🌐 Network Single Workload & Costs")
-            
-            network_recs = tech_recs['network']
-            network_costs = service_costs['network']
-            
-            # Cost overview
-            st.markdown(f"**Monthly Network Cost: ${network_costs['total']:.2f}**")
-            
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                st.markdown("**Core Network Components**")
-                
-                core_network_data = [
-                    {'Component': 'VPC Design', 'Single Workload': network_recs['vpc_design']},
-                    {'Component': 'Subnets', 'Single Workload': network_recs['subnets']},
-                    {'Component': 'Security Groups', 'Single Workload': network_recs['security_groups']},
-                    {'Component': 'Load Balancer', 'Single Workload': network_recs['load_balancer']}
-                ]
-                
-                df_core_network = pd.DataFrame(core_network_data)
-                st.dataframe(df_core_network, use_container_width=True, hide_index=True)
-            
-            with col2:
-                st.markdown("**Network Cost Breakdown**")
-                
-                network_cost_data = []
-                for service, details in network_costs.items():
-                    if service != 'total' and service != 'optimization_notes':
-                        network_cost_data.append({
-                            'Service': service.replace('_', ' ').title(),
-                            'Monthly Cost': f"${details['cost']:.2f}",
-                            'Details': details['details']
-                        })
-                
-                df_network_costs = pd.DataFrame(network_cost_data)
-                st.dataframe(df_network_costs, use_container_width=True, hide_index=True)
-            
-            # Advanced network services
-            st.markdown("**Advanced Network Services**")
-            
-            advanced_network_data = [
-                {'Service': 'CDN', 'Single Workload': network_recs['cdn']},
-                {'Service': 'DNS', 'Single Workload': network_recs['dns']},
-                {'Service': 'NAT Gateway', 'Single Workload': network_recs['nat_gateway']},
-                {'Service': 'VPN', 'Single Workload': network_recs['vpn']}
-            ]
-            
-            df_advanced_network = pd.DataFrame(advanced_network_data)
-            st.dataframe(df_advanced_network, use_container_width=True, hide_index=True)
-            
-            # Cost optimization notes
-            st.markdown("**💡 Network Cost Optimization**")
-            for note in network_costs.get('optimization_notes', []):
-                st.markdown(note)
-        
-        # Storage tab with costs
-        with tech_tabs[2]:
-            st.markdown("#### 💾 Storage Single Workload & Costs")
-            
-            storage_recs = tech_recs['storage']
-            storage_costs = service_costs['storage']
-            
-            # Cost overview
-            st.markdown(f"**Monthly Storage Cost: ${storage_costs['total']:.2f}**")
-            
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                st.markdown("**Primary Storage Single Workload**")
-                
-                storage_config_data = [
-                    {'Setting': 'Storage Type', 'Value': storage_recs['primary_storage']},
-                    {'Setting': 'Recommended Size', 'Value': storage_recs['recommended_size']},
-                    {'Setting': 'IOPS', 'Value': storage_recs['iops_recommendation']},
-                    {'Setting': 'Throughput', 'Value': storage_recs['throughput_recommendation']}
-                ]
-                
-                df_storage_config = pd.DataFrame(storage_config_data)
-                st.dataframe(df_storage_config, use_container_width=True, hide_index=True)
-            
-            with col2:
-                st.markdown("**Storage Cost Breakdown**")
-                
-                storage_cost_data = []
-                for service, details in storage_costs.items():
-                    if service != 'total' and service != 'optimization_notes':
-                        storage_cost_data.append({
-                            'Storage Type': service.replace('_', ' ').title(),
-                            'Monthly Cost': f"${details['cost']:.2f}",
-                            'Details': details['details']
-                        })
-                
-                df_storage_costs = pd.DataFrame(storage_cost_data)
-                st.dataframe(df_storage_costs, use_container_width=True, hide_index=True)
-            
-            # Data protection
-            st.markdown("**Data Protection & Management**")
-            
-            protection_data = [
-                {'Feature': 'Backup Strategy', 'Single Workload': storage_recs['backup_strategy']},
-                {'Feature': 'Encryption', 'Single Workload': storage_recs['encryption']},
-                {'Feature': 'Performance', 'Single Workload': storage_recs['performance']},
-                {'Feature': 'Lifecycle Policy', 'Single Workload': storage_recs['lifecycle_policy']}
-            ]
-            
-            df_protection = pd.DataFrame(protection_data)
-            st.dataframe(df_protection, use_container_width=True, hide_index=True)
-            
-            # Cost optimization notes
-            st.markdown("**💡 Storage Cost Optimization**")
-            for note in storage_costs.get('optimization_notes', []):
-                st.markdown(note)
-        
-        # Database tab with costs
-        with tech_tabs[3]:
-            st.markdown("#### 🗄️ Database Single Workload & Costs")
-            
-            db_recs = tech_recs['database']
-            db_costs = service_costs['database']
-            
-            # Cost overview
-            st.markdown(f"**Monthly Database Cost: ${db_costs['total']:.2f}**")
-            
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                st.markdown("**Database Engine & Instance**")
-                
-                db_config_data = [
-                    {'Setting': 'Database Engine', 'Value': db_recs['engine']},
-                    {'Setting': 'Instance Class', 'Value': db_recs['instance_class']},
-                    {'Setting': 'Multi-AZ', 'Value': 'Yes' if db_recs['multi_az'] else 'No'},
-                    {'Setting': 'Backup Retention', 'Value': db_recs['backup_retention']}
-                ]
-                
-                df_db_config = pd.DataFrame(db_config_data)
-                st.dataframe(df_db_config, use_container_width=True, hide_index=True)
-            
-            with col2:
-                st.markdown("**Database Cost Breakdown**")
-                
-                db_cost_data = []
-                for service, details in db_costs.items():
-                    if service != 'total' and service != 'optimization_notes':
-                        db_cost_data.append({
-                            'Database Component': service.replace('_', ' ').title(),
-                            'Monthly Cost': f"${details['cost']:.2f}",
-                            'Details': details['details']
-                        })
-                
-                df_db_costs = pd.DataFrame(db_cost_data)
-                st.dataframe(df_db_costs, use_container_width=True, hide_index=True)
-            
-            # Advanced database features
-            st.markdown("**Advanced Database Features**")
-            
-            db_advanced_data = [
-                {'Feature': 'Read Replicas', 'Single Workload': db_recs['read_replicas']},
-                {'Feature': 'Connection Pooling', 'Single Workload': db_recs['connection_pooling']},
-                {'Feature': 'Maintenance Window', 'Single Workload': db_recs['maintenance_window']},
-                {'Feature': 'Monitoring', 'Single Workload': db_recs['monitoring']}
-            ]
-            
-            df_db_advanced = pd.DataFrame(db_advanced_data)
-            st.dataframe(df_db_advanced, use_container_width=True, hide_index=True)
-            
-            # Cost optimization notes
-            st.markdown("**💡 Database Cost Optimization**")
-            for note in db_costs.get('optimization_notes', []):
-                st.markdown(note)
-        
-        # Security tab with costs
-        with tech_tabs[4]:
-            st.markdown("#### 🔒 Security Single Workload & Costs")
-            
-            security_recs = tech_recs['security']
-            security_costs = service_costs['security']
-            
-            # Cost overview
-            st.markdown(f"**Monthly Security Cost: ${security_costs['total']:.2f}**")
-            
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                st.markdown("**Security Services Single Workload**")
-                
-                security_data = []
-                for key, value in security_recs.items():
-                    security_data.append({'Security Area': key.replace('_', ' ').title(), 'Single Workload': value})
-                
-                df_security = pd.DataFrame(security_data)
-                st.dataframe(df_security, use_container_width=True, hide_index=True)
-            
-            with col2:
-                st.markdown("**Security Cost Breakdown**")
-                
-                security_cost_data = []
-                for service, details in security_costs.items():
-                    if service != 'total' and service != 'optimization_notes':
-                        security_cost_data.append({
-                            'Security Service': service.replace('_', ' ').title(),
-                            'Monthly Cost': f"${details['cost']:.2f}",
-                            'Details': details['details']
-                        })
-                
-                df_security_costs = pd.DataFrame(security_cost_data)
-                st.dataframe(df_security_costs, use_container_width=True, hide_index=True)
-            
-            # Security best practices
-            st.markdown("**Security Best Practices for this Environment:**")
-            
-            security_practices = [
-                "🔐 Implement least privilege access principles",
-                "🔍 Enable comprehensive audit logging",
-                "🛡️ Use AWS Config for compliance monitoring",
-                "🚨 Set up GuardDuty for threat detection",
-                "📊 Regular security assessments and penetration testing"
-            ]
-            
-            for practice in security_practices:
-                st.markdown(practice)
-            
-            # Cost optimization notes
-            st.markdown("**💡 Security Cost Optimization**")
-            for note in security_costs.get('optimization_notes', []):
-                st.markdown(note)
-        
-        # Monitoring tab with costs
-        with tech_tabs[5]:
-            st.markdown("#### 📊 Monitoring Single Workload & Costs")
-            
-            monitoring_recs = tech_recs['monitoring']
-            monitoring_costs = service_costs['monitoring']
-            
-            # Cost overview
-            st.markdown(f"**Monthly Monitoring Cost: ${monitoring_costs['total']:.2f}**")
-            
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                st.markdown("**Core Monitoring Setup**")
-                
-                monitoring_core_data = [
-                    {'Component': 'CloudWatch', 'Single Workload': monitoring_recs['cloudwatch']},
-                    {'Component': 'Alerting', 'Single Workload': monitoring_recs['alerting']},
-                    {'Component': 'Dashboards', 'Single Workload': monitoring_recs['dashboards']},
-                    {'Component': 'Log Retention', 'Single Workload': monitoring_recs['log_retention']}
-                ]
-                
-                df_monitoring_core = pd.DataFrame(monitoring_core_data)
-                st.dataframe(df_monitoring_core, use_container_width=True, hide_index=True)
-            
-            with col2:
-                st.markdown("**Monitoring Cost Breakdown**")
-                
-                monitoring_cost_data = []
-                for service, details in monitoring_costs.items():
-                    if service != 'total' and service != 'optimization_notes':
-                        monitoring_cost_data.append({
-                            'Monitoring Service': service.replace('_', ' ').title(),
-                            'Monthly Cost': f"${details['cost']:.2f}",
-                            'Details': details['details']
-                        })
-                
-                df_monitoring_costs = pd.DataFrame(monitoring_cost_data)
-                st.dataframe(df_monitoring_costs, use_container_width=True, hide_index=True)
-            
-            # Advanced monitoring services
-            st.markdown("**Advanced Monitoring Services**")
-            
-            monitoring_advanced_data = [
-                {'Service': 'APM (X-Ray)', 'Single Workload': monitoring_recs['apm']},
-                {'Service': 'Synthetic Monitoring', 'Single Workload': monitoring_recs['synthetic_monitoring']},
-                {'Service': 'Cost Monitoring', 'Single Workload': monitoring_recs['cost_monitoring']},
-                {'Service': 'Health Checks', 'Single Workload': monitoring_recs['health_checks']}
-            ]
-            
-            df_monitoring_advanced = pd.DataFrame(monitoring_advanced_data)
-            st.dataframe(df_monitoring_advanced, use_container_width=True, hide_index=True)
-            
-            # Cost optimization notes
-            st.markdown("**💡 Monitoring Cost Optimization**")
-            for note in monitoring_costs.get('optimization_notes', []):
-                st.markdown(note)
-        
-        # Summary recommendations
-        st.markdown("---")
-        st.markdown("### 📋 Implementation Summary")
-        
+        # Cost summary
+        st.markdown("#### 💰 Cost Summary")
         total_cost = service_costs['summary']['total_monthly']
-        annual_cost = service_costs['summary']['total_annual']
+        st.markdown(f"**Total Monthly Cost:** ${total_cost:,.2f}")
+        st.markdown(f"**Annual Cost:** ${total_cost * 12:,.2f}")
         
-        summary_recommendations = [
-            f"🏗️ **Architecture:** Deploy using {tech_recs['compute']['placement_strategy'].lower()}",
-            f"🔧 **Compute:** Use {tech_recs['compute']['primary_instance']['type']} instances (${compute_costs['total']:.2f}/month)",
-            f"🌐 **Network:** Implement {tech_recs['network']['vpc_design'].lower()} (${network_costs['total']:.2f}/month)",
-            f"💾 **Storage:** Configure {tech_recs['storage']['primary_storage']} (${storage_costs['total']:.2f}/month)",
-            f"🗄️ **Database:** Deploy {tech_recs['database']['engine']} (${db_costs['total']:.2f}/month)",
-            f"🔒 **Security:** Implement {len([k for k, v in security_costs.items() if isinstance(v, dict) and v.get('cost', 0) > 0])} security services (${security_costs['total']:.2f}/month)",
-            f"📊 **Monitoring:** Set up comprehensive monitoring (${monitoring_costs['total']:.2f}/month)",
-            f"💰 **Total Cost:** ${total_cost:.2f}/month (${annual_cost:,.2f}/year)"
-        ]
-        
-        for rec in summary_recommendations:
-            st.markdown(rec)
-            
     except Exception as e:
         st.error(f"❌ Error displaying technical recommendations: {str(e)}")
         logger.error(f"Error in render_workload_recommendations: {e}")
+
+def export_bulk_results_to_excel(results):
+    """Export bulk results to Excel."""
+    if not OPENPYXL_AVAILABLE:
+        st.error("📊 openpyxl not available. Please install with: `pip install openpyxl`")
+        return
+    
+    try:
+        # Create Excel workbook
+        wb = openpyxl.Workbook()
+        ws_summary = wb.active
+        ws_summary.title = "Summary"
+        
+        # Define styles
+        header_font = Font(bold=True, color="FFFFFF")
+        header_fill = PatternFill(start_color="2563EB", end_color="2563EB", fill_type="solid")
+        data_font = Font(size=11)
+        border = Border(
+            left=Side(style='thin'),
+            right=Side(style='thin'),
+            top=Side(style='thin'),
+            bottom=Side(style='thin')
+        )
+        
+        # Add summary data
+        ws_summary['A1'] = "Bulk Workload Analysis Summary"
+        ws_summary['A1'].font = Font(bold=True, size=16)
+        ws_summary.merge_cells('A1:D1')
+        
+        summary = results.get('summary', {})
+        if 'error' in summary:
+            ws_summary['A3'] = "Error: " + summary['error']
+            ws_summary['A3'].font = Font(color="FF0000")
+        else:
+            # Summary metrics
+            summary_data = [
+                ["Total Workloads", summary.get('total_workloads_analyzed', 0)],
+                ["Total Monthly Cost", f"${summary.get('total_monthly_cost', 0):,.2f}"],
+                ["Average Monthly Cost", f"${summary.get('average_monthly_cost', 0):,.2f}"],
+                ["Average Complexity", f"{summary.get('average_complexity_score', 0):.1f}/100"],
+                ["Most Common Instance", summary.get('most_common_instance_type', 'N/A')]
+            ]
+            
+            # Write summary data
+            for i, (metric, value) in enumerate(summary_data, 3):
+                ws_summary[f'A{i}'] = metric
+                ws_summary[f'B{i}'] = value
+                
+                if i == 3:  # Header row
+                    ws_summary[f'A{i}'].font = header_font
+                    ws_summary[f'A{i}'].fill = header_fill
+                    ws_summary[f'B{i}'].font = header_font
+                    ws_summary[f'B{i}'].fill = header_fill
+                else:
+                    ws_summary[f'A{i}'].font = data_font
+                    ws_summary[f'B{i}'].font = data_font
+                
+                ws_summary[f'A{i}'].border = border
+                ws_summary[f'B{i}'].border = border
+        
+        # Workloads sheet
+        ws_workloads = wb.create_sheet("Workloads")
+        
+        # Headers
+        headers = ["Workload", "Status", "Complexity", "Monthly Cost", "Instance Type", "Timeline (weeks)", "Migration Strategy"]
+        for col_idx, header in enumerate(headers, 1):
+            cell = ws_workloads.cell(row=1, column=col_idx, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.border = border
+            cell.alignment = Alignment(horizontal='center')
+        
+        # Workload data
+        for row_idx, workload in enumerate(results.get('workloads', []), 2):
+            if workload['status'] == 'success':
+                prod_analysis = workload['analysis']['PROD']
+                claude_analysis = prod_analysis.get('claude_analysis', {})
+                tco_analysis = prod_analysis.get('tco_analysis', {})
+                cost_breakdown = prod_analysis.get('cost_breakdown', {})
+                selected_instance = cost_breakdown.get('selected_instance', {})
+                
+                ws_workloads.cell(row=row_idx, column=1, value=workload['workload_name'])
+                ws_workloads.cell(row=row_idx, column=2, value="✅ Success")
+                ws_workloads.cell(row=row_idx, column=3, value=f"{claude_analysis.get('complexity_score', 0):.0f}/100")
+                ws_workloads.cell(row=row_idx, column=4, value=f"${tco_analysis.get('monthly_cost', 0):,.2f}")
+                ws_workloads.cell(row=row_idx, column=5, value=selected_instance.get('type', 'N/A'))
+                ws_workloads.cell(row=row_idx, column=6, value=claude_analysis.get('estimated_timeline', {}).get('max_weeks', 'N/A'))
+                ws_workloads.cell(row=row_idx, column=7, value=claude_analysis.get('migration_strategy', {}).get('approach', 'N/A'))
+            else:
+                ws_workloads.cell(row=row_idx, column=1, value=workload['workload_name'])
+                ws_workloads.cell(row=row_idx, column=2, value="❌ Failed")
+                ws_workloads.cell(row=row_idx, column=3, value="N/A")
+                ws_workloads.cell(row=row_idx, column=4, value="N/A")
+                ws_workloads.cell(row=row_idx, column=5, value="N/A")
+                ws_workloads.cell(row=row_idx, column=6, value="N/A")
+                ws_workloads.cell(row=row_idx, column=7, value=workload.get('error', 'Analysis failed'))
+            
+            # Apply formatting
+            for col_idx in range(1, len(headers) + 1):
+                cell = ws_workloads.cell(row=row_idx, column=col_idx)
+                cell.font = data_font
+                cell.border = border
+        
+        # Auto-adjust column widths
+        for sheet in wb:
+            for column in sheet.columns:
+                max_length = 0
+                column_letter = openpyxl.utils.get_column_letter(column[0].column)
+                for cell in column:
+                    try:
+                        if len(str(cell.value)) > max_length:
+                            max_length = len(str(cell.value))
+                    except:
+                        pass
+                adjusted_width = (max_length + 2) * 1.2
+                sheet.column_dimensions[column_letter].width = adjusted_width
+        
+        # Save to BytesIO buffer
+        buffer = io.BytesIO()
+        wb.save(buffer)
+        buffer.seek(0)
+        
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"bulk_workload_analysis_{timestamp}.xlsx"
+        
+        st.download_button(
+            label="⬇️ Download Excel Report",
+            data=buffer.getvalue(),
+            file_name=filename,
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key="bulk_excel_report_download"
+        )
+        
+        st.success("✅ Bulk Excel report generated successfully!")
+        
+    except Exception as e:
+        st.error(f"Error generating Excel report: {str(e)}")
+        logger.error(f"Error in bulk Excel generation: {e}")
+
+def export_bulk_results_to_pdf(results):
+    """Export enhanced bulk results to PDF with detailed analysis for each workload."""
+    if not REPORTLAB_AVAILABLE:
+        st.error("📄 ReportLab not available. Please install with: `pip install reportlab`")
+        return
+    
+    try:
+        # Create PDF content
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=1*inch, leftMargin=0.75*inch)
+        
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Title'],
+            fontSize=20,
+            spaceAfter=20,
+            alignment=TA_CENTER,
+            textColor=colors.HexColor('#1f2937'),
+            fontName='Helvetica-Bold'
+        )
+        
+        subtitle_style = ParagraphStyle(
+            'CustomSubtitle',
+            parent=styles['Heading1'],
+            fontSize=16,
+            spaceAfter=15,
+            textColor=colors.HexColor('#2563eb'),
+            fontName='Helvetica-Bold'
+        )
+        
+        story = []
+        
+        # Title
+        story.append(Paragraph("Bulk Workload Analysis Report", title_style))
+        story.append(Paragraph("Enterprise AWS Migration Analysis", styles['Normal']))
+        story.append(Paragraph(f"Generated: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}", styles['Normal']))
+        story.append(Spacer(1, 0.5*inch))
+        
+        # Executive Summary
+        story.append(Paragraph("Executive Summary", styles['Heading1']))
+        
+        summary = results.get('summary', {})
+        if 'error' in summary:
+            story.append(Paragraph(f"Error: {summary['error']}", styles['Normal']))
+        else:
+            summary_data = [
+                ['Metric', 'Value'],
+                ['Total Workloads Analyzed', str(summary.get('total_workloads_analyzed', 0))],
+                ['Total Monthly Cost', f"${summary.get('total_monthly_cost', 0):,.2f}"],
+                ['Total Annual Cost', f"${summary.get('total_annual_cost', 0):,.2f}"],
+                ['Average Monthly Cost', f"${summary.get('average_monthly_cost', 0):,.2f}"],
+                ['Average Complexity Score', f"{summary.get('average_complexity_score', 0):.1f}/100"],
+                ['Most Common Instance Type', summary.get('most_common_instance_type', 'N/A')]
+            ]
+            
+            summary_table = Table(summary_data, colWidths=[3*inch, 3*inch])
+            summary_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f3f4f6')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.HexColor('#1f2937')),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 11),
+                ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#e5e7eb')),
+                ('FONTSIZE', (0, 1), (-1, -1), 10)
+            ]))
+            
+            story.append(summary_table)
+            story.append(Spacer(1, 0.3*inch))
+        
+        # Overview Table
+        story.append(Paragraph("Workload Overview", styles['Heading1']))
+        
+        headers = ["Workload", "Status", "Complexity", "Monthly Cost", "Instance Type", "Timeline"]
+        workload_overview_data = [headers]
+        
+        successful_workloads = []
+        
+        for workload in results.get('workloads', []):
+            if workload['status'] == 'success':
+                prod_analysis = workload['analysis']['PROD']
+                claude_analysis = prod_analysis.get('claude_analysis', {})
+                tco_analysis = prod_analysis.get('tco_analysis', {})
+                cost_breakdown = prod_analysis.get('cost_breakdown', {})
+                selected_instance = cost_breakdown.get('selected_instance', {})
+                
+                workload_overview_data.append([
+                    workload['workload_name'],
+                    "✓ Success",
+                    f"{claude_analysis.get('complexity_score', 0):.0f}/100",
+                    f"${tco_analysis.get('monthly_cost', 0):,.2f}",
+                    selected_instance.get('type', 'N/A'),
+                    f"{claude_analysis.get('estimated_timeline', {}).get('max_weeks', 'N/A')} weeks"
+                ])
+                
+                successful_workloads.append(workload)
+            else:
+                workload_overview_data.append([
+                    workload['workload_name'],
+                    "✗ Failed",
+                    "N/A",
+                    "N/A",
+                    "N/A",
+                    "N/A"
+                ])
+        
+        workload_table = Table(workload_overview_data, colWidths=[1.5*inch, 0.8*inch, 0.8*inch, 1*inch, 1*inch, 0.9*inch])
+        workload_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2563eb')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 9),
+            ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#93c5fd')),
+            ('FONTSIZE', (0, 1), (-1, -1), 8)
+        ]))
+        
+        story.append(workload_table)
+        story.append(PageBreak())
+        
+        # Detailed Analysis for Each Workload
+        story.append(Paragraph("Detailed Workload Analysis", title_style))
+        
+        analyzer = EnhancedEnvironmentAnalyzer()
+        cost_calculator = AWSCostCalculator()
+        
+        for i, workload in enumerate(successful_workloads, 1):
+            if i > 1:  # Add page break between workloads (except first)
+                story.append(PageBreak())
+            
+            workload_name = workload['workload_name']
+            story.append(Paragraph(f"Workload {i}: {workload_name}", subtitle_style))
+            
+            # Get production analysis for this workload
+            prod_analysis = workload['analysis']['PROD']
+            claude_analysis = prod_analysis.get('claude_analysis', {})
+            tco_analysis = prod_analysis.get('tco_analysis', {})
+            requirements = prod_analysis.get('requirements', {})
+            
+            # Executive Summary for this workload
+            story.append(Paragraph("Executive Summary", styles['Heading2']))
+            
+            workload_summary_data = [
+                ['Metric', 'Value'],
+                ['Migration Complexity', f"{claude_analysis.get('complexity_level', 'MEDIUM')} ({claude_analysis.get('complexity_score', 50):.0f}/100)"],
+                ['Estimated Timeline', f"{claude_analysis.get('estimated_timeline', {}).get('max_weeks', 8)} weeks"],
+                ['Monthly Cost (PROD)', f"${tco_analysis.get('monthly_cost', 0):,.2f}"],
+                ['Annual Cost (PROD)', f"${tco_analysis.get('monthly_cost', 0) * 12:,.2f}"],
+                ['Best Pricing Option', tco_analysis.get('best_pricing_option', 'N/A').replace('_', ' ').title()],
+                ['Recommended Instance', prod_analysis.get('cost_breakdown', {}).get('selected_instance', {}).get('type', 'N/A')]
+            ]
+            
+            workload_summary_table = Table(workload_summary_data, colWidths=[2.5*inch, 3.5*inch])
+            workload_summary_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f3f4f6')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.HexColor('#1f2937')),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#e5e7eb')),
+                ('FONTSIZE', (0, 1), (-1, -1), 9)
+            ]))
+            
+            story.append(workload_summary_table)
+            story.append(Spacer(1, 0.2*inch))
+            
+            # Environment Analysis for this workload
+            story.append(Paragraph("Environment Analysis", styles['Heading2']))
+            
+            env_data = [['Environment', 'Complexity Score', 'Instance Type', 'Monthly Cost', 'Key Characteristics']]
+            
+            for env in ['DEV', 'QA', 'UAT', 'PREPROD', 'PROD']:
+                env_results = workload['analysis'].get(env, {})
+                if env_results:
+                    claude_env_analysis = env_results.get('claude_analysis', {})
+                    cost_breakdown = env_results.get('cost_breakdown', {})
+                    selected_instance = cost_breakdown.get('selected_instance', {})
+                    total_costs = cost_breakdown.get('total_costs', {})
+                    
+                    characteristics = get_env_characteristics(env)
+                    
+                    env_data.append([
+                        env,
+                        f"{claude_env_analysis.get('complexity_score', 50):.0f}/100",
+                        selected_instance.get('type', 'N/A'),
+                        f"${total_costs.get('on_demand', 0):,.0f}",
+                        characteristics[:50] + "..." if len(characteristics) > 50 else characteristics
+                    ])
+            
+            env_table = Table(env_data, colWidths=[0.8*inch, 1*inch, 1*inch, 0.8*inch, 2.4*inch])
+            env_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2563eb')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 8),
+                ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#93c5fd')),
+                ('FONTSIZE', (0, 1), (-1, -1), 7),
+                ('VALIGN', (0, 0), (-1, -1), 'TOP')
+            ]))
+            
+            story.append(env_table)
+            story.append(Spacer(1, 0.2*inch))
+            
+            # Migration Strategy for this workload
+            story.append(Paragraph("Migration Strategy", styles['Heading2']))
+            
+            strategy = claude_analysis.get('migration_strategy', {})
+            if strategy:
+                strategy_text = f"""
+                <b>Approach:</b> {strategy.get('approach', 'N/A')}<br/>
+                <b>Methodology:</b> {strategy.get('methodology', 'N/A')}<br/>
+                <b>Timeline:</b> {strategy.get('timeline', 'N/A')}<br/>
+                <b>Risk Level:</b> {strategy.get('risk_level', 'N/A')}
+                """
+                story.append(Paragraph(strategy_text, styles['Normal']))
+                story.append(Spacer(1, 0.1*inch))
+            
+            # Migration Steps
+            migration_steps = claude_analysis.get('migration_steps', [])
+            if migration_steps:
+                story.append(Paragraph("Migration Implementation Plan", styles['Heading3']))
+                
+                for step_num, step in enumerate(migration_steps[:3], 1):  # Limit to 3 steps for space
+                    if isinstance(step, dict):
+                        story.append(Paragraph(f"Phase {step_num}: {step.get('phase', 'N/A')} ({step.get('duration', 'N/A')})", 
+                                             ParagraphStyle('PhaseTitle', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=10)))
+                        
+                        tasks = step.get('tasks', [])
+                        if tasks:
+                            tasks_text = "<b>Key Tasks:</b><br/>" + "<br/>".join([f"• {task}" for task in tasks[:3]])
+                            story.append(Paragraph(tasks_text, ParagraphStyle('Tasks', parent=styles['Normal'], fontSize=9)))
+                        
+                        story.append(Spacer(1, 0.05*inch))
+            
+            # Cost Analysis for this workload (Production)
+            story.append(Paragraph("Production Cost Analysis", styles['Heading2']))
+            
+            try:
+                tech_recs = analyzer.get_technical_recommendations('PROD', prod_analysis)
+                service_costs = cost_calculator.calculate_service_costs('PROD', tech_recs, requirements)
+                
+                cost_analysis_data = [
+                    ['Service Category', 'Monthly Cost', 'Annual Cost', 'Key Components'],
+                    ['Compute', f"${service_costs['compute']['total']:.2f}", 
+                     f"${service_costs['compute']['total'] * 12:.2f}", 'EC2 instances, Auto Scaling'],
+                    ['Network', f"${service_costs['network']['total']:.2f}", 
+                     f"${service_costs['network']['total'] * 12:.2f}", 'Load balancers, NAT Gateway'],
+                    ['Storage', f"${service_costs['storage']['total']:.2f}", 
+                     f"${service_costs['storage']['total'] * 12:.2f}", 'EBS volumes, Snapshots'],
+                    ['Database', f"${service_costs['database']['total']:.2f}", 
+                     f"${service_costs['database']['total'] * 12:.2f}", 'RDS/Aurora, Backup'],
+                    ['Security', f"${service_costs['security']['total']:.2f}", 
+                     f"${service_costs['security']['total'] * 12:.2f}", 'KMS, Secrets Manager'],
+                    ['Monitoring', f"${service_costs['monitoring']['total']:.2f}", 
+                     f"${service_costs['monitoring']['total'] * 12:.2f}", 'CloudWatch, X-Ray'],
+                    ['TOTAL', f"${service_costs['summary']['total_monthly']:.2f}", 
+                     f"${service_costs['summary']['total_annual']:.2f}", 'All AWS services']
+                ]
+                
+                cost_analysis_table = Table(cost_analysis_data, colWidths=[1.3*inch, 1.1*inch, 1.1*inch, 2.5*inch])
+                cost_analysis_table.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1f2937')),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                    ('BACKGROUND', (-1, -1), (-1, -1), colors.HexColor('#059669')),
+                    ('TEXTCOLOR', (-1, -1), (-1, -1), colors.white),
+                    ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('FONTNAME', (-1, -1), (-1, -1), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0, 0), (-1, 0), 9),
+                    ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#6b7280')),
+                    ('FONTSIZE', (0, 1), (-1, -1), 8)
+                ]))
+                
+                story.append(cost_analysis_table)
+                story.append(Spacer(1, 0.2*inch))
+                
+            except Exception as e:
+                logger.error(f"Error calculating detailed costs for {workload_name}: {e}")
+                story.append(Paragraph(f"Cost analysis unavailable for this workload.", styles['Normal']))
+                story.append(Spacer(1, 0.1*inch))
+            
+            # Key Recommendations for this workload
+            recommendations = claude_analysis.get('recommendations', [])
+            if recommendations:
+                story.append(Paragraph("Key Recommendations", styles['Heading3']))
+                recs_text = "<br/>".join([f"{j}. {rec}" for j, rec in enumerate(recommendations[:4], 1)])
+                story.append(Paragraph(recs_text, styles['Normal']))
+                story.append(Spacer(1, 0.2*inch))
+        
+        # Consolidated Summary Section
+        if len(successful_workloads) > 1:
+            story.append(PageBreak())
+            story.append(Paragraph("Consolidated Analysis Summary", title_style))
+            
+            # Cost comparison across workloads
+            story.append(Paragraph("Cost Comparison Across Workloads", styles['Heading2']))
+            
+            cost_comparison_data = [['Workload', 'Monthly Cost', 'Annual Cost', 'Complexity Score', 'Primary Instance']]
+            
+            for workload in successful_workloads:
+                prod_analysis = workload['analysis']['PROD']
+                claude_analysis = prod_analysis.get('claude_analysis', {})
+                tco_analysis = prod_analysis.get('tco_analysis', {})
+                cost_breakdown = prod_analysis.get('cost_breakdown', {})
+                selected_instance = cost_breakdown.get('selected_instance', {})
+                
+                cost_comparison_data.append([
+                    workload['workload_name'],
+                    f"${tco_analysis.get('monthly_cost', 0):,.2f}",
+                    f"${tco_analysis.get('monthly_cost', 0) * 12:,.2f}",
+                    f"{claude_analysis.get('complexity_score', 0):.0f}/100",
+                    selected_instance.get('type', 'N/A')
+                ])
+            
+            cost_comparison_table = Table(cost_comparison_data, colWidths=[1.5*inch, 1.1*inch, 1.2*inch, 1*inch, 1.2*inch])
+            cost_comparison_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2563eb')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 9),
+                ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#93c5fd')),
+                ('FONTSIZE', (0, 1), (-1, -1), 8)
+            ]))
+            
+            story.append(cost_comparison_table)
+            story.append(Spacer(1, 0.3*inch))
+            
+            # Portfolio-level insights
+            story.append(Paragraph("Portfolio-Level Insights", styles['Heading2']))
+            
+            total_monthly = sum(workload['analysis']['PROD'].get('tco_analysis', {}).get('monthly_cost', 0) 
+                              for workload in successful_workloads)
+            avg_complexity = sum(workload['analysis']['PROD'].get('claude_analysis', {}).get('complexity_score', 0) 
+                               for workload in successful_workloads) / len(successful_workloads)
+            
+            insights_text = f"""
+            <b>Total Portfolio Monthly Cost:</b> ${total_monthly:,.2f}<br/>
+            <b>Total Portfolio Annual Cost:</b> ${total_monthly * 12:,.2f}<br/>
+            <b>Average Complexity Score:</b> {avg_complexity:.1f}/100<br/>
+            <b>Workloads Count:</b> {len(successful_workloads)}<br/>
+            <b>Estimated Total Migration Time:</b> {max(workload['analysis']['PROD'].get('claude_analysis', {}).get('estimated_timeline', {}).get('max_weeks', 8) for workload in successful_workloads)} weeks (parallel execution)
+            """
+            
+            story.append(Paragraph(insights_text, styles['Normal']))
+        
+        # Footer
+        story.append(Spacer(1, 0.3*inch))
+        footer_text = f"Bulk Analysis Report generated by Enhanced AWS Migration Platform v7.0 with Real Claude AI on {datetime.now().strftime('%B %d, %Y')}"
+        footer_style = ParagraphStyle('Footer', parent=styles['Normal'], fontSize=8, alignment=TA_CENTER, textColor=colors.HexColor('#6b7280'))
+        story.append(Paragraph(footer_text, footer_style))
+        
+        # Build PDF
+        doc.build(story)
+        buffer.seek(0)
+        
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"bulk_workload_analysis_detailed_{timestamp}.pdf"
+        
+        st.download_button(
+            label="⬇️ Download Detailed PDF Report",
+            data=buffer.getvalue(),
+            file_name=filename,
+            mime="application/pdf",
+            key="bulk_pdf_detailed_report_download"
+        )
+        
+        st.success("✅ Detailed bulk PDF report generated successfully!")
+        
+    except Exception as e:
+        st.error(f"Error generating detailed PDF: {str(e)}")
+        logger.error(f"Error in detailed bulk PDF generation: {e}")
 
 def generate_enhanced_excel_report():
     """Generate comprehensive Excel report with multiple sheets for enhanced analysis."""
@@ -4802,15 +4435,6 @@ def generate_enhanced_excel_report():
         ws_summary.merge_cells('A2:E2')
         ws_summary.append([])  # Empty row
         
-        # Workload information
-        inputs = results['inputs']
-        ws_summary.append(["Workload Information", ""])
-        ws_summary.append(["Workload Name", inputs.get('workload_name', 'Unknown')])
-        ws_summary.append(["Workload Type", inputs.get('workload_type', 'web_application')])
-        ws_summary.append(["Operating System", inputs.get('operating_system', 'linux')])
-        ws_summary.append(["AWS Region", inputs.get('region', 'us-east-1')])
-        ws_summary.append([])  # Empty row
-        
         # Summary data from analysis
         prod_results = results['recommendations']['PROD']
         claude_analysis = prod_results.get('claude_analysis', {})
@@ -4840,7 +4464,7 @@ def generate_enhanced_excel_report():
                 cell.border = border
                 if cell.row == 1:
                     cell.font = title_font
-                elif cell.row in [3, 9, 17]:  # Section headers
+                elif cell.row in [4, 11, 18]:  # Section headers
                     cell.font = Font(bold=True)
         
         # Auto-adjust column widths
@@ -5019,12 +4643,12 @@ def generate_enhanced_excel_report():
         
         # Technical sections
         sections = [
-            ("Compute Single Workload", tech_recs['compute']),
-            ("Network Single Workload", tech_recs['network']),
-            ("Storage Single Workload", tech_recs['storage']),
-            ("Database Single Workload", tech_recs['database']),
-            ("Security Single Workload", tech_recs['security']),
-            ("Monitoring Single Workload", tech_recs['monitoring'])
+            ("Compute Configuration", tech_recs['compute']),
+            ("Network Configuration", tech_recs['network']),
+            ("Storage Configuration", tech_recs['storage']),
+            ("Database Configuration", tech_recs['database']),
+            ("Security Configuration", tech_recs['security']),
+            ("Monitoring Configuration", tech_recs['monitoring'])
         ]
         
         current_row = 3
@@ -5079,159 +4703,27 @@ def generate_enhanced_excel_report():
         st.error(f"Error generating Excel report: {str(e)}")
         logger.error(f"Error in Excel generation: {e}")
 
-def export_bulk_results_to_excel(results):
-    """Export bulk results to Excel."""
-    if not OPENPYXL_AVAILABLE:
-        st.error("📊 openpyxl not available. Please install with: `pip install openpyxl`")
+def generate_enhanced_pdf_report():
+    """Generate enhanced PDF report."""
+    
+    if 'enhanced_results' not in st.session_state or not st.session_state.enhanced_results:
+        st.warning("No analysis results available for PDF generation.")
         return
     
-    try:
-        # Create Excel workbook
-        wb = openpyxl.Workbook()
-        ws_summary = wb.active
-        ws_summary.title = "Summary"
-        
-        # Define styles
-        header_font = Font(bold=True, color="FFFFFF")
-        header_fill = PatternFill(start_color="2563EB", end_color="2563EB", fill_type="solid")
-        data_font = Font(size=11)
-        border = Border(
-            left=Side(style='thin'),
-            right=Side(style='thin'),
-            top=Side(style='thin'),
-            bottom=Side(style='thin')
-        )
-        
-        # Add summary data
-        ws_summary['A1'] = "Bulk Workload Analysis Summary"
-        ws_summary['A1'].font = Font(bold=True, size=16)
-        ws_summary.merge_cells('A1:D1')
-        
-        summary = results.get('summary', {})
-        if 'error' in summary:
-            ws_summary['A3'] = "Error: " + summary['error']
-            ws_summary['A3'].font = Font(color="FF0000")
-        else:
-            # Summary metrics
-            summary_data = [
-                ["Total Workloads", summary.get('total_workloads_analyzed', 0)],
-                ["Successful Analyses", summary.get('successful_analyses', 0)],
-                ["Failed Analyses", summary.get('failed_analyses', 0)],
-                ["Total Monthly Cost", f"${summary.get('total_monthly_cost', 0):,.2f}"],
-                ["Total Annual Cost", f"${summary.get('total_annual_cost', 0):,.2f}"],
-                ["Average Monthly Cost", f"${summary.get('average_monthly_cost', 0):,.2f}"],
-                ["Average Complexity Score", f"{summary.get('average_complexity_score', 0):.1f}/100"],
-                ["Most Common Instance", summary.get('most_common_instance_type', 'N/A')]
-            ]
-            
-            # Write summary data
-            for i, (metric, value) in enumerate(summary_data, 3):
-                ws_summary[f'A{i}'] = metric
-                ws_summary[f'B{i}'] = value
-                
-                if i == 3:  # Header row
-                    ws_summary[f'A{i}'].font = header_font
-                    ws_summary[f'A{i}'].fill = header_fill
-                    ws_summary[f'B{i}'].font = header_font
-                    ws_summary[f'B{i}'].fill = header_fill
-                else:
-                    ws_summary[f'A{i}'].font = data_font
-                    ws_summary[f'B{i}'].font = data_font
-                
-                ws_summary[f'A{i}'].border = border
-                ws_summary[f'B{i}'].border = border
-        
-        # Workloads sheet
-        ws_workloads = wb.create_sheet("Workloads")
-        
-        # Headers
-        headers = ["Workload", "Status", "Complexity", "Monthly Cost", "Instance Type", "Timeline (weeks)", "Migration Strategy"]
-        for col_idx, header in enumerate(headers, 1):
-            cell = ws_workloads.cell(row=1, column=col_idx, value=header)
-            cell.font = header_font
-            cell.fill = header_fill
-            cell.border = border
-            cell.alignment = Alignment(horizontal='center')
-        
-        # Workload data
-        for row_idx, workload in enumerate(results.get('workloads', []), 2):
-            if workload['status'] == 'success':
-                prod_analysis = workload['analysis']['PROD']
-                claude_analysis = prod_analysis.get('claude_analysis', {})
-                tco_analysis = prod_analysis.get('tco_analysis', {})
-                cost_breakdown = prod_analysis.get('cost_breakdown', {})
-                selected_instance = cost_breakdown.get('selected_instance', {})
-                
-                ws_workloads.cell(row=row_idx, column=1, value=workload['workload_name'])
-                ws_workloads.cell(row=row_idx, column=2, value="✅ Success")
-                ws_workloads.cell(row=row_idx, column=3, value=f"{claude_analysis.get('complexity_score', 0):.0f}/100")
-                ws_workloads.cell(row=row_idx, column=4, value=f"${tco_analysis.get('monthly_cost', 0):,.2f}")
-                ws_workloads.cell(row=row_idx, column=5, value=selected_instance.get('type', 'N/A'))
-                ws_workloads.cell(row=row_idx, column=6, value=claude_analysis.get('estimated_timeline', {}).get('max_weeks', 'N/A'))
-                ws_workloads.cell(row=row_idx, column=7, value=claude_analysis.get('migration_strategy', {}).get('approach', 'N/A'))
-            else:
-                ws_workloads.cell(row=row_idx, column=1, value=workload['workload_name'])
-                ws_workloads.cell(row=row_idx, column=2, value="❌ Failed")
-                ws_workloads.cell(row=row_idx, column=3, value="N/A")
-                ws_workloads.cell(row=row_idx, column=4, value="N/A")
-                ws_workloads.cell(row=row_idx, column=5, value="N/A")
-                ws_workloads.cell(row=row_idx, column=6, value="N/A")
-                ws_workloads.cell(row=row_idx, column=7, value=workload.get('error', 'Analysis failed'))
-            
-            # Apply formatting
-            for col_idx in range(1, len(headers) + 1):
-                cell = ws_workloads.cell(row=row_idx, column=col_idx)
-                cell.font = data_font
-                cell.border = border
-        
-        # Auto-adjust column widths
-        for sheet in wb:
-            for column in sheet.columns:
-                max_length = 0
-                column_letter = openpyxl.utils.get_column_letter(column[0].column)
-                for cell in column:
-                    try:
-                        if len(str(cell.value)) > max_length:
-                            max_length = len(str(cell.value))
-                    except:
-                        pass
-                adjusted_width = (max_length + 2) * 1.2
-                sheet.column_dimensions[column_letter].width = adjusted_width
-        
-        # Save to BytesIO buffer
-        buffer = io.BytesIO()
-        wb.save(buffer)
-        buffer.seek(0)
-        
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"bulk_workload_analysis_{timestamp}.xlsx"
-        
-        st.download_button(
-            label="⬇️ Download Excel Report",
-            data=buffer.getvalue(),
-            file_name=filename,
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            key="bulk_excel_report_download"
-        )
-        
-        st.success("✅ Bulk Excel report generated successfully!")
-        
-    except Exception as e:
-        st.error(f"Error generating Excel report: {str(e)}")
-        logger.error(f"Error in bulk Excel generation: {e}")
-
-def export_bulk_results_to_pdf(results):
-    """Export bulk results to PDF."""
     if not REPORTLAB_AVAILABLE:
-        st.error("📄 ReportLab not available. Please install with: `pip install reportlab`")
+        st.warning("📄 ReportLab not available. Please install with: `pip install reportlab`")
         return
     
     try:
+        results = st.session_state.enhanced_results
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        
         # Create PDF content
         buffer = io.BytesIO()
         doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=1*inch, leftMargin=0.75*inch)
         
         styles = getSampleStyleSheet()
+        
         title_style = ParagraphStyle(
             'CustomTitle',
             parent=styles['Title'],
@@ -5245,88 +4737,168 @@ def export_bulk_results_to_pdf(results):
         story = []
         
         # Title
-        story.append(Paragraph("Bulk Workload Analysis Report", title_style))
+        story.append(Paragraph("Enhanced AWS Migration Analysis", title_style))
+        story.append(Paragraph("Enterprise Corporation", styles['Normal']))
         story.append(Paragraph(f"Generated: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}", styles['Normal']))
         story.append(Spacer(1, 0.5*inch))
         
-        # Summary
-        story.append(Paragraph("Analysis Summary", styles['Heading1']))
+        # Executive Summary
+        prod_results = results['recommendations']['PROD']
+        claude_analysis = prod_results.get('claude_analysis', {})
+        tco_analysis = prod_results.get('tco_analysis', {})
         
-        summary = results.get('summary', {})
-        if 'error' in summary:
-            story.append(Paragraph(f"Error: {summary['error']}", styles['Normal']))
-        else:
-            summary_data = [
-                ["Total Workloads", str(summary.get('total_workloads_analyzed', 0))],
-                ["Successful Analyses", str(summary.get('successful_analyses', 0))],
-                ["Failed Analyses", str(summary.get('failed_analyses', 0))],
-                ["Total Monthly Cost", f"${summary.get('total_monthly_cost', 0):,.2f}"],
-                ["Total Annual Cost", f"${summary.get('total_annual_cost', 0):,.2f}"],
-                ["Average Monthly Cost", f"${summary.get('average_monthly_cost', 0):,.2f}"],
-                ["Average Complexity", f"{summary.get('average_complexity_score', 0):.1f}/100"],
-                ["Most Common Instance", summary.get('most_common_instance_type', 'N/A')]
-            ]
+        story.append(Paragraph("Executive Summary", styles['Heading1']))
+        
+        summary_data = [
+            ['Metric', 'Value'],
+            ['Workload Name', results['inputs']['workload_name']],
+            ['Migration Complexity', f"{claude_analysis.get('complexity_level', 'MEDIUM')} ({claude_analysis.get('complexity_score', 50):.0f}/100)"],
+            ['Estimated Timeline', f"{claude_analysis.get('estimated_timeline', {}).get('max_weeks', 8)} weeks"],
+            ['Monthly Cost', f"${tco_analysis.get('monthly_cost', 0):,.2f}"],
+            ['Best Pricing Option', tco_analysis.get('best_pricing_option', 'N/A').replace('_', ' ').title()]
+        ]
+        
+        summary_table = Table(summary_data, colWidths=[3*inch, 3*inch])
+        summary_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f3f4f6')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.HexColor('#1f2937')),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 11),
+            ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#e5e7eb')),
+            ('FONTSIZE', (0, 1), (-1, -1), 10)
+        ]))
+        
+        story.append(summary_table)
+        story.append(PageBreak())
+        
+        # Environment Analysis Section
+        story.append(Paragraph("Environment Analysis Overview", styles['Heading1']))
+        
+        analyzer = EnhancedEnvironmentAnalyzer()
+        
+        # Environment comparison table
+        env_data = [['Environment', 'Complexity Score', 'Instance Type', 'Monthly Cost', 'Key Characteristics']]
+        
+        for env in ['DEV', 'QA', 'UAT', 'PREPROD', 'PROD']:
+            env_results = results['recommendations'].get(env, {})
+            claude_env_analysis = env_results.get('claude_analysis', {})
+            cost_breakdown = env_results.get('cost_breakdown', {})
+            selected_instance = cost_breakdown.get('selected_instance', {})
+            total_costs = cost_breakdown.get('total_costs', {})
             
-            summary_table = Table(summary_data, colWidths=[3*inch, 2*inch])
-            summary_table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f3f4f6')),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.HexColor('#1f2937')),
-                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 11),
-                ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#e5e7eb')),
-                ('FONTSIZE', (0, 1), (-1, -1), 10)
-            ]))
+            characteristics = get_env_characteristics(env)
             
-            story.append(summary_table)
-            story.append(Spacer(1, 0.3*inch))
+            env_data.append([
+                env,
+                f"{claude_env_analysis.get('complexity_score', 50):.0f}/100",
+                selected_instance.get('type', 'N/A'),
+                f"${total_costs.get('on_demand', 0):,.0f}",
+                characteristics
+            ])
         
-        # Workloads Table
-        story.append(Paragraph("Workload Analysis", styles['Heading1']))
-        
-        headers = ["Workload", "Status", "Complexity", "Monthly Cost", "Instance Type"]
-        workload_data = [headers]
-        
-        for workload in results.get('workloads', []):
-            if workload['status'] == 'success':
-                prod_analysis = workload['analysis']['PROD']
-                claude_analysis = prod_analysis.get('claude_analysis', {})
-                tco_analysis = prod_analysis.get('tco_analysis', {})
-                cost_breakdown = prod_analysis.get('cost_breakdown', {})
-                selected_instance = cost_breakdown.get('selected_instance', {})
-                
-                workload_data.append([
-                    workload['workload_name'],
-                    "Success",
-                    f"{claude_analysis.get('complexity_score', 0):.0f}/100",
-                    f"${tco_analysis.get('monthly_cost', 0):,.2f}",
-                    selected_instance.get('type', 'N/A')
-                ])
-            else:
-                workload_data.append([
-                    workload['workload_name'],
-                    "Failed",
-                    "N/A",
-                    "N/A",
-                    "N/A"
-                ])
-        
-        workload_table = Table(workload_data, colWidths=[2*inch, 1*inch, 1*inch, 1.2*inch, 1.5*inch])
-        workload_table.setStyle(TableStyle([
+        env_table = Table(env_data, colWidths=[1*inch, 1*inch, 1.2*inch, 1*inch, 2.8*inch])
+        env_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2563eb')),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
             ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('FONTSIZE', (0, 0), (-1, 0), 10),
             ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#93c5fd')),
-            ('FONTSIZE', (0, 1), (-1, -1), 9)
+            ('FONTSIZE', (0, 1), (-1, -1), 9),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP')
         ]))
         
-        story.append(workload_table)
+        story.append(env_table)
+        story.append(PageBreak())
+        
+        # Migration Strategy
+        story.append(Paragraph("Migration Strategy", styles['Heading1']))
+        
+        strategy = claude_analysis.get('migration_strategy', {})
+        if strategy:
+            strategy_text = f"""
+            <b>Approach:</b> {strategy.get('approach', 'N/A')}<br/>
+            <b>Methodology:</b> {strategy.get('methodology', 'N/A')}<br/>
+            <b>Timeline:</b> {strategy.get('timeline', 'N/A')}<br/>
+            <b>Risk Level:</b> {strategy.get('risk_level', 'N/A')}
+            """
+            story.append(Paragraph(strategy_text, styles['Normal']))
+        
+        # Migration Steps
+        migration_steps = claude_analysis.get('migration_steps', [])
+        if migration_steps:
+            story.append(Paragraph("Migration Implementation Plan", styles['Heading2']))
+            
+            for i, step in enumerate(migration_steps, 1):
+                if isinstance(step, dict):
+                    story.append(Paragraph(f"Phase {i}: {step.get('phase', 'N/A')} ({step.get('duration', 'N/A')})", styles['Heading3']))
+                    
+                    tasks = step.get('tasks', [])
+                    if tasks:
+                        tasks_text = "<b>Key Tasks:</b><br/>" + "<br/>".join([f"• {task}" for task in tasks])
+                        story.append(Paragraph(tasks_text, styles['Normal']))
+                    
+                    deliverables = step.get('deliverables', [])
+                    if deliverables:
+                        deliverables_text = f"<b>Deliverables:</b> {', '.join(deliverables)}"
+                        story.append(Paragraph(deliverables_text, styles['Normal']))
+                    
+                    story.append(Spacer(1, 0.1*inch))
+        
+        # Technical Recommendations Section
+        story.append(PageBreak())
+        story.append(Paragraph("Technical Recommendations & Cost Analysis", styles['Heading1']))
+        
+        # Production environment technical specs
+        prod_env_results = results['recommendations'].get('PROD', {})
+        if prod_env_results:
+            tech_recs = analyzer.get_technical_recommendations('PROD', prod_env_results)
+            requirements = prod_env_results.get('requirements', {})
+            service_costs = AWSCostCalculator().calculate_service_costs(
+                'PROD', tech_recs, requirements)
+            
+            # Cost Summary Section
+            story.append(Paragraph("Production Environment Cost Summary", styles['Heading2']))
+            
+            cost_summary_data = [
+                ['Service Category', 'Monthly Cost', 'Annual Cost', 'Key Components'],
+                ['Compute', f"${service_costs['compute']['total']:.2f}", f"${service_costs['compute']['total'] * 12:.2f}", 'EC2 instances, Auto Scaling'],
+                ['Network', f"${service_costs['network']['total']:.2f}", f"${service_costs['network']['total'] * 12:.2f}", 'Load balancers, NAT Gateway, CloudFront'],
+                ['Storage', f"${service_costs['storage']['total']:.2f}", f"${service_costs['storage']['total'] * 12:.2f}", 'EBS volumes, Snapshots, S3'],
+                ['Database', f"${service_costs['database']['total']:.2f}", f"${service_costs['database']['total'] * 12:.2f}", 'RDS/Aurora, Backup storage'],
+                ['Security', f"${service_costs['security']['total']:.2f}", f"${service_costs['security']['total'] * 12:.2f}", 'KMS, Secrets Manager, GuardDuty'],
+                ['Monitoring', f"${service_costs['monitoring']['total']:.2f}", f"${service_costs['monitoring']['total'] * 12:.2f}", 'CloudWatch, X-Ray, Synthetics'],
+                ['TOTAL', f"${service_costs['summary']['total_monthly']:.2f}", f"${service_costs['summary']['total_annual']:.2f}", 'All AWS services']
+            ]
+            
+            cost_summary_table = Table(cost_summary_data, colWidths=[1.5*inch, 1.2*inch, 1.2*inch, 2.1*inch])
+            cost_summary_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1f2937')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('BACKGROUND', (-1, -1), (-1, -1), colors.HexColor('#059669')),
+                ('TEXTCOLOR', (-1, -1), (-1, -1), colors.white),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTNAME', (-1, -1), (-1, -1), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#6b7280')),
+                ('FONTSIZE', (0, 1), (-1, -1), 9)
+            ]))
+            
+            story.append(cost_summary_table)
+            story.append(Spacer(1, 0.3*inch))
+        
+        # Recommendations
+        recommendations = claude_analysis.get('recommendations', [])
+        if recommendations:
+            story.append(Paragraph("Key Recommendations", styles['Heading2']))
+            recs_text = "<br/>".join([f"{i}. {rec}" for i, rec in enumerate(recommendations, 1)])
+            story.append(Paragraph(recs_text, styles['Normal']))
         
         # Footer
         story.append(Spacer(1, 0.3*inch))
-        footer_text = f"Report generated by Enhanced AWS Migration Platform v7.0 on {datetime.now().strftime('%B %d, %Y')}"
+        footer_text = f"Report generated by Enhanced AWS Migration Platform v7.0 with Real Claude AI on {datetime.now().strftime('%B %d, %Y')}"
         footer_style = ParagraphStyle('Footer', parent=styles['Normal'], fontSize=8, alignment=TA_CENTER, textColor=colors.HexColor('#6b7280'))
         story.append(Paragraph(footer_text, footer_style))
         
@@ -5334,24 +4906,34 @@ def export_bulk_results_to_pdf(results):
         doc.build(story)
         buffer.seek(0)
         
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"bulk_workload_analysis_{timestamp}.pdf"
+        filename = f"Enhanced_AWS_Migration_Report_{timestamp}.pdf"
         
         st.download_button(
-            label="⬇️ Download PDF Report",
+            label="⬇️ Download Enhanced PDF Report",
             data=buffer.getvalue(),
             file_name=filename,
             mime="application/pdf",
-            key="bulk_pdf_report_download"
+            key="pdf_report_download"
         )
         
-        st.success("✅ Bulk PDF report generated successfully!")
+        st.success("✅ Enhanced PDF report generated successfully!")
         
     except Exception as e:
         st.error(f"Error generating PDF: {str(e)}")
 
+def get_env_characteristics(env: str) -> str:
+    """Get environment characteristics for PDF report."""
+    characteristics = {
+        'DEV': 'Development, experimentation, low availability requirements',
+        'QA': 'Testing, validation, automated test integration',
+        'UAT': 'User acceptance, business validation, stakeholder testing',
+        'PREPROD': 'Production simulation, disaster recovery testing',
+        'PROD': 'Business critical, high availability, 24/7 operations'
+    }
+    return characteristics.get(env, 'Standard environment characteristics')
+
 def main():
-    """Enhanced main application."""
+    """Enhanced main application with nested tab structure."""
     
     # Initialize session state
     initialize_enhanced_session_state()
@@ -5374,7 +4956,7 @@ def main():
     
     # Enhanced sidebar
     with st.sidebar:
-        st.markdown("### 🔑 Claude AI Single Workload")
+        st.markdown("### 🔑 Claude AI Configuration")
         
         # Claude API Key configuration
         api_key_placeholder = st.empty()
@@ -5478,59 +5060,94 @@ def main():
             st.metric("Complexity Score", f"{complexity_score:.0f}/100")
             st.metric("Monthly Cost", f"${monthly_cost:,.0f}")
     
-    # Main tabs - CORRECTED SECTION
-tabs = st.tabs(["Single Workload", "Bulk Upload"])
+    # MAIN TABS - Updated structure with nested tabs
+    main_tabs = st.tabs(["Single Workload", "Bulk Layout", "Reports"])
     
-    with tabs[0]:
-    sw_subtabs = st.tabs(["Single Workload", "Heat Map", "Technical Recommendation"])
-        render_enhanced_configuration()
+    # SINGLE WORKLOAD TAB with nested sub-tabs
+    with main_tabs[0]:
+        st.markdown("### 🖥️ Single Workload Analysis")
+        
+        # Create sub-tabs under Single Workload
+        single_workload_subtabs = st.tabs(["Configuration", "Results", "Heat Map", "Technical Reports"])
+        
+        # Configuration sub-tab
+        with single_workload_subtabs[0]:
+            render_enhanced_configuration()
+        
+        # Results sub-tab
+        with single_workload_subtabs[1]:
+            render_enhanced_results()
+        
+        # Heat Map sub-tab
+        with single_workload_subtabs[2]:
+            render_enhanced_environment_heatmap_tab()
+        
+        # Technical Reports sub-tab
+        with single_workload_subtabs[3]:
+            render_technical_recommendations_tab()
     
-    with tabs[1]:
-    bu_subtabs = st.tabs(["Single Workload", "Heat Map", "Technical Recommendation"])
+    # BULK LAYOUT TAB
+    with main_tabs[1]:
+        st.markdown("### 📁 Bulk Workload Analysis")
         render_bulk_upload_tab()
     
-    with tabs[2]:
-        render_enhanced_results()
-    
-    with tabs[3]:
-        render_enhanced_environment_heatmap_tab()
-    
-    with tabs[4]:
-        render_technical_recommendations_tab()
-    
-    with tabs[5]:
+    # REPORTS TAB (kept separate for global reports)
+    with main_tabs[2]:
         st.markdown("### 📋 Enhanced Reports")
         
-        if st.session_state.enhanced_results:
-            st.markdown("#### Available Reports")
+        # Add note about report context
+        st.info("💡 Reports will be generated based on your current analysis context (Single Workload or Bulk Analysis)")
+        
+        # Check which type of results we have
+        has_single_results = st.session_state.enhanced_results is not None
+        has_bulk_results = ('bulk_results' in st.session_state and 
+                           st.session_state.bulk_results is not None and 
+                           'error' not in st.session_state.bulk_results)
+        
+        if has_single_results or has_bulk_results:
+            # Show report type selector
+            if has_single_results and has_bulk_results:
+                report_type = st.radio(
+                    "Select Report Type:",
+                    ["Single Workload Reports", "Bulk Analysis Reports"],
+                    help="Choose which analysis results to include in your reports"
+                )
+            elif has_single_results:
+                report_type = "Single Workload Reports"
+                st.info("📊 Single workload analysis available for reporting")
+            else:
+                report_type = "Bulk Analysis Reports"
+                st.info("📊 Bulk workload analysis available for reporting")
             
-            col1, col2, col3 = st.columns(3)
-            
-            with col1:
-                if st.button("📄 Generate PDF Report", type="primary", key="reports_pdf_generate"):
-                    generate_enhanced_pdf_report()
-            
-            with col2:
-                if st.button("📊 Export to Excel", key="reports_tab_excel"):
-                    generate_enhanced_excel_report()
-            
-            with col3:
-                if st.button("📈 Generate Heat Map CSV", key="reports_heatmap_csv"):
-                    if 'heat_map_data' in st.session_state.enhanced_results:
-                        csv_data = st.session_state.enhanced_results['heat_map_data'].to_csv(index=False)
-                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                        st.download_button(
-                            "⬇️ Download Heat Map CSV",
-                            csv_data,
-                            f"environment_heatmap_{timestamp}.csv",
-                            "text/csv",
-                            key="heatmap_csv_download"
-                        )
-            
-            # Report preview
-            st.markdown("#### Report Preview")
-            
-            if st.session_state.enhanced_results:
+            # Single Workload Reports
+            if report_type == "Single Workload Reports" and has_single_results:
+                st.markdown("#### Single Workload Reports")
+                
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    if st.button("📄 Generate PDF Report", type="primary", key="reports_pdf_generate"):
+                        generate_enhanced_pdf_report()
+                
+                with col2:
+                    if st.button("📊 Export to Excel", key="reports_tab_excel"):
+                        generate_enhanced_excel_report()
+                
+                with col3:
+                    if st.button("📈 Generate Heat Map CSV", key="reports_heatmap_csv"):
+                        if 'heat_map_data' in st.session_state.enhanced_results:
+                            csv_data = st.session_state.enhanced_results['heat_map_data'].to_csv(index=False)
+                            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                            st.download_button(
+                                "⬇️ Download Heat Map CSV",
+                                csv_data,
+                                f"environment_heatmap_{timestamp}.csv",
+                                "text/csv",
+                                key="heatmap_csv_download"
+                            )
+                
+                # Report preview for single workload
+                st.markdown("#### Report Preview")
                 prod_results = st.session_state.enhanced_results['recommendations']['PROD']
                 claude_analysis = prod_results.get('claude_analysis', {})
                 
@@ -5556,8 +5173,41 @@ tabs = st.tabs(["Single Workload", "Bulk Upload"])
                 
                 if len(recommendations) > 3:
                     st.markdown(f"... and {len(recommendations) - 3} more recommendations in the full report")
+            
+            # Bulk Analysis Reports
+            elif report_type == "Bulk Analysis Reports" and has_bulk_results:
+                st.markdown("#### Bulk Analysis Reports")
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.button("📊 Export to Excel", key="bulk_excel_export_reports"):
+                        export_bulk_results_to_excel(st.session_state.bulk_results)
+                with col2:
+                    if st.button("📄 Generate PDF Report", key="bulk_pdf_export_reports"):
+                        export_bulk_results_to_pdf(st.session_state.bulk_results)
+                
+                # Show bulk summary
+                bulk_results = st.session_state.bulk_results
+                summary = bulk_results.get('summary', {})
+                
+                if 'error' not in summary:
+                    st.markdown("#### Bulk Analysis Summary")
+                    
+                    col1, col2, col3, col4 = st.columns(4)
+                    
+                    with col1:
+                        st.metric("Total Workloads", summary.get('total_workloads_analyzed', 0))
+                    
+                    with col2:
+                        st.metric("Total Monthly Cost", f"${summary.get('total_monthly_cost', 0):,.0f}")
+                    
+                    with col3:
+                        st.metric("Average Complexity", f"{summary.get('average_complexity_score', 0):.1f}/100")
+                    
+                    with col4:
+                        st.metric("Most Common Instance", summary.get('most_common_instance_type', 'N/A'))
         else:
-            st.info("💡 Run an enhanced analysis to generate comprehensive reports.")
+            st.info("💡 Run an analysis (Single Workload or Bulk Upload) to generate comprehensive reports.")
     
     # Enhanced footer
     st.markdown("---")
@@ -5568,5 +5218,8 @@ tabs = st.tabs(["Single Workload", "Bulk Upload"])
         <em>🤖 Real AI-Enhanced • ☁️ AWS-Native • 📊 Data-Driven • 🔧 Technical-Complete • 📋 Excel/PDF Reports</em>
     </div>
     """, unsafe_allow_html=True)
+
 if __name__ == "__main__":
     main()
+        
+      
