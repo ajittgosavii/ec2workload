@@ -361,7 +361,7 @@ class ClaudeAIMigrationAnalyzer:
             ]
         }
 
-cclass AWSCostCalculator:
+class AWSCostCalculator:
     """AWS service cost calculator with detailed pricing breakdown."""
     
     def __init__(self, region='us-east-1'):
