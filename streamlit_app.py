@@ -2876,7 +2876,7 @@ def render_technical_recommendations_tab():
         st.warning("No cost data available for visualization.")
     
     # Create tabs for different technical areas with costs
-tabs = st.tabs(["Single Workload", "Bulk Upload"])
+    tabs = st.tabs(["Single Workload", "Bulk Upload"])
     
     # Compute tab with costs
     with tech_tabs[0]:
@@ -2891,7 +2891,7 @@ tabs = st.tabs(["Single Workload", "Bulk Upload"])
         
         col1, col2 = st.columns(2)
         
-        with col1:
+    with col1:
             st.markdown("**Primary Instance Recommendation**")
             
             primary_instance = compute_recs['primary_instance']
@@ -2905,7 +2905,7 @@ tabs = st.tabs(["Single Workload", "Bulk Upload"])
             df_instance = pd.DataFrame(instance_data)
             st.dataframe(df_instance, use_container_width=True, hide_index=True)
         
-        with col2:
+    with col2:
             st.markdown("**Compute Cost Breakdown**")
             
             cost_breakdown_data = []
@@ -2937,9 +2937,9 @@ tabs = st.tabs(["Single Workload", "Bulk Upload"])
         for note in compute_costs.get('optimization_notes', []):
             st.markdown(note)
     
-    # Network tab with costs
+        # Network tab with costs
     with tech_tabs[1]:
-    bu_subtabs = st.tabs(["Single Workload", "Heat Map", "Technical Recommendation"])
+        bu_subtabs = st.tabs(["Single Workload", "Heat Map", "Technical Recommendation"])
         st.markdown("#### 🌐 Network Single Workload & Costs")
         
         network_recs = tech_recs['network']
@@ -2950,7 +2950,7 @@ tabs = st.tabs(["Single Workload", "Bulk Upload"])
         
         col1, col2 = st.columns(2)
         
-        with col1:
+    with col1:
             st.markdown("**Core Network Components**")
             
             core_network_data = [
@@ -2963,7 +2963,7 @@ tabs = st.tabs(["Single Workload", "Bulk Upload"])
             df_core_network = pd.DataFrame(core_network_data)
             st.dataframe(df_core_network, use_container_width=True, hide_index=True)
         
-        with col2:
+    with col2:
             st.markdown("**Network Cost Breakdown**")
             
             network_cost_data = []
@@ -3008,7 +3008,7 @@ tabs = st.tabs(["Single Workload", "Bulk Upload"])
         
         col1, col2 = st.columns(2)
         
-        with col1:
+    with col1:
             st.markdown("**Primary Storage Single Workload**")
             
             storage_config_data = [
@@ -3021,7 +3021,7 @@ tabs = st.tabs(["Single Workload", "Bulk Upload"])
             df_storage_config = pd.DataFrame(storage_config_data)
             st.dataframe(df_storage_config, use_container_width=True, hide_index=True)
         
-        with col2:
+    with col2:
             st.markdown("**Storage Cost Breakdown**")
             
             storage_cost_data = []
@@ -3066,7 +3066,7 @@ tabs = st.tabs(["Single Workload", "Bulk Upload"])
         
         col1, col2 = st.columns(2)
         
-        with col1:
+    with col1:
             st.markdown("**Database Engine & Instance**")
             
             db_config_data = [
@@ -3079,7 +3079,7 @@ tabs = st.tabs(["Single Workload", "Bulk Upload"])
             df_db_config = pd.DataFrame(db_config_data)
             st.dataframe(df_db_config, use_container_width=True, hide_index=True)
         
-        with col2:
+    with col2:
             st.markdown("**Database Cost Breakdown**")
             
             db_cost_data = []
@@ -3124,7 +3124,7 @@ tabs = st.tabs(["Single Workload", "Bulk Upload"])
         
         col1, col2 = st.columns(2)
         
-        with col1:
+    with col1:
             st.markdown("**Security Services Single Workload**")
             
             security_data = []
@@ -3134,7 +3134,7 @@ tabs = st.tabs(["Single Workload", "Bulk Upload"])
             df_security = pd.DataFrame(security_data)
             st.dataframe(df_security, use_container_width=True, hide_index=True)
         
-        with col2:
+    with col2:
             st.markdown("**Security Cost Breakdown**")
             
             security_cost_data = []
@@ -3160,12 +3160,12 @@ tabs = st.tabs(["Single Workload", "Bulk Upload"])
             "📊 Regular security assessments and penetration testing"
         ]
         
-        for practice in security_practices:
+    for practice in security_practices:
             st.markdown(practice)
         
         # Cost optimization notes
         st.markdown("**💡 Security Cost Optimization**")
-        for note in security_costs.get('optimization_notes', []):
+    for note in security_costs.get('optimization_notes', []):
             st.markdown(note)
     
     # Monitoring tab with costs
@@ -3180,7 +3180,7 @@ tabs = st.tabs(["Single Workload", "Bulk Upload"])
         
         col1, col2 = st.columns(2)
         
-        with col1:
+    with col1:
             st.markdown("**Core Monitoring Setup**")
             
             monitoring_core_data = [
@@ -3193,7 +3193,7 @@ tabs = st.tabs(["Single Workload", "Bulk Upload"])
             df_monitoring_core = pd.DataFrame(monitoring_core_data)
             st.dataframe(df_monitoring_core, use_container_width=True, hide_index=True)
         
-        with col2:
+    with col2:
             st.markdown("**Monitoring Cost Breakdown**")
             
             monitoring_cost_data = []
@@ -3223,7 +3223,7 @@ tabs = st.tabs(["Single Workload", "Bulk Upload"])
         
         # Cost optimization notes
         st.markdown("**💡 Monitoring Cost Optimization**")
-        for note in monitoring_costs.get('optimization_notes', []):
+    for note in monitoring_costs.get('optimization_notes', []):
             st.markdown(note)
     
     # Cost comparison across environments
