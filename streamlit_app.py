@@ -1571,6 +1571,44 @@ class ClaudeAIMigrationAnalyzer:
 class AWSCostCalculator:
     """Enhanced AWS service cost calculator with real API integration and better error handling."""
     
+    def _get_ec2_pricing_with_os(self, instance_type: str, operating_system: str = 'linux') -> dict:
+    """Get EC2 pricing with OS-specific adjustments."""
+    
+    # Get base Linux pricing
+    base_pricing = self._get_ec2_pricing(instance_type)
+    
+    # Windows licensing adds approximately 20-40% to the cost
+    if operating_system.lower() == 'windows':
+        windows_multiplier = 1.3  # 30% increase for Windows licensing
+        
+        for pricing_model in base_pricing:
+            if pricing_model not in ['source', 'last_updated']:
+                base_pricing[pricing_model] = base_pricing[pricing_model] * windows_multiplier
+        
+        # Update metadata
+        base_pricing['source'] = base_pricing.get('source', 'fallback') + '_windows'
+    
+    return base_pricing
+
+# Update your _calculate_compute_costs method to use OS-specific pricing
+def _calculate_compute_costs(self, env: str, compute_recs: Dict, requirements: Dict, operating_system: str = 'linux') -> Dict[str, Any]:
+    """Calculate compute-related costs with OS-specific pricing."""
+    
+    instance_type = compute_recs['primary_instance']['type']
+    instance_count = self._get_instance_count(env)
+    
+    # EC2 instance costs with OS-specific pricing
+    instance_pricing = self._get_ec2_pricing_with_os(instance_type, operating_system)
+    
+    # Determine pricing model
+    pricing_model = 'on_demand'
+    if env in ['PROD', 'PREPROD']:
+        pricing_model = 'ri_1y'
+    
+    monthly_instance_cost = instance_pricing[pricing_model] * instance_count * 730  # hours per month
+    
+    
+    
     def __init__(self, region='us-east-1'):
         self.region = region
         self.pricing_client = None
@@ -1668,7 +1706,22 @@ class AWSCostCalculator:
                 'synthetics': 0.0012  # per canary run
             }
         }
-
+        return{
+        'ec2_instances': {
+            'cost': monthly_instance_cost,
+            'details': f"{instance_count}x {instance_type} ({pricing_model}) - {operating_system.title()}",
+            'breakdown': {
+                'instance_type': instance_type,
+                'instance_count': instance_count,
+                'pricing_model': pricing_model,
+                'operating_system': operating_system,
+                'unit_cost': instance_pricing[pricing_model],
+                'monthly_hours': 730,
+                'os_multiplier': 1.3 if operating_system.lower() == 'windows' else 1.0
+            }
+        },
+    }
+        
     def get_real_ec2_pricing(self, instance_type: str) -> Optional[Dict[str, float]]:
         """Get real EC2 pricing from AWS API."""
         if not self.aws_connected:
@@ -3048,21 +3101,58 @@ class EnhancedEnterpriseEC2Calculator:
             # Standard requirements calculation
             requirements = self._calculate_standard_requirements(env)
             
-            # Claude AI migration analysis with vROPS data
-            claude_analysis = self.claude_analyzer.analyze_workload_complexity(self.inputs, env, vrops_data)
+            # Pass operating system to cost calculations
+            operating_system = self.inputs.get('operating_system', 'linux')
             
-            # Enhanced results
-            enhanced_results = {
-                **requirements,
-                'claude_analysis': claude_analysis,
-                'environment': env,
-                'vrops_data': vrops_data if vrops_data and vrops_data.get('status') == 'success' else None
-            }
+             # Update cost calculation to include OS
+        if 'cost_breakdown' in requirements:
+            # Recalculate with OS-specific pricing
+            vcpus = requirements['requirements']['vCPUs']
+            ram_gb = requirements['requirements']['RAM_GB'] 
+            storage_gb = requirements['requirements']['storage_GB']
             
-            return enhanced_results
-        except Exception as e:
-            logger.error(f"Error in enhanced requirements calculation: {e}")
-            return self._get_fallback_requirements(env)
+            # Get OS-specific cost breakdown
+            selected_instance = self._select_best_instance(vcpus, ram_gb)
+            instance_type = selected_instance['type']
+            
+            os_pricing = self._get_ec2_pricing_with_os(instance_type, operating_system)
+            
+            # Update the cost breakdown
+            requirements['cost_breakdown']['os_pricing'] = os_pricing
+            requirements['cost_breakdown']['operating_system'] = operating_system
+            
+            # Recalculate total costs with OS pricing
+            monthly_instance_cost = {}
+            for pricing_model, hourly_rate in os_pricing.items():
+                if pricing_model not in ['source', 'last_updated', 'os_multiplier']:
+                    monthly_instance_cost[pricing_model] = hourly_rate * 730
+            
+            storage_monthly = storage_gb * 0.08
+            network_monthly = 50
+            
+            total_costs = {}
+            for pricing_model, instance_cost in monthly_instance_cost.items():
+                total_costs[pricing_model] = instance_cost + storage_monthly + network_monthly
+            
+            requirements['cost_breakdown']['total_costs'] = total_costs
+            requirements['cost_breakdown']['instance_costs'] = monthly_instance_cost
+        
+        # Claude AI migration analysis with vROPS data and OS info
+        claude_analysis = self.claude_analyzer.analyze_workload_complexity(self.inputs, env, vrops_data)
+        
+        # Enhanced results
+        enhanced_results = {
+            **requirements,
+            'claude_analysis': claude_analysis,
+            'environment': env,
+            'operating_system': operating_system,
+            'vrops_data': vrops_data if vrops_data and vrops_data.get('status') == 'success' else None
+        }
+        
+        return enhanced_results
+    except Exception as e:
+        logger.error(f"Error in enhanced requirements calculation: {e}")
+        return self._get_fallback_requirements(env)
 
     def _enhance_inputs_with_vrops(self, vrops_data: Dict):
         """Enhance workload inputs with vROPS sizing recommendations."""
@@ -4031,7 +4121,7 @@ def render_vm_metrics_summary():
         st.rerun()
 
 def render_enhanced_configuration():
-    """Render enhanced configuration with vROPS integration."""
+    """Render enhanced configuration with change detection and auto-refresh."""
     
     st.markdown("### ⚙️ Enhanced Enterprise Workload Configuration")
     
@@ -4041,6 +4131,10 @@ def render_enhanced_configuration():
         return
         
     calculator = st.session_state.enhanced_calculator
+    
+    # Store original inputs to detect changes
+    if 'original_inputs' not in st.session_state:
+        st.session_state.original_inputs = calculator.inputs.copy()
     
     # vROPS Data Status
     if st.session_state.selected_vm_metrics:
@@ -4057,6 +4151,15 @@ def render_enhanced_configuration():
     else:
         st.info("💡 Connect to vROPS in the 'vROPS Connection' tab to import real performance metrics for more accurate sizing.")
     
+    # Detect if configuration has changed
+    config_changed = st.session_state.original_inputs != calculator.inputs
+    
+    if config_changed and st.session_state.enhanced_results:
+        st.warning("⚠️ Configuration has changed since last analysis. Click 'Run Enhanced Analysis' to see updated results.")
+        if st.button("🔄 Clear Outdated Results", key="clear_outdated"):
+            st.session_state.enhanced_results = None
+            st.rerun()
+    
     # Basic workload information
     with st.expander("📋 Workload Information", expanded=True):
         col1, col2 = st.columns(2)
@@ -4065,7 +4168,8 @@ def render_enhanced_configuration():
             calculator.inputs["workload_name"] = st.text_input(
                 "Workload Name",
                 value=calculator.inputs["workload_name"],
-                help="Descriptive name for this workload"
+                help="Descriptive name for this workload",
+                key="workload_name_input"
             )
             
             workload_types = {
@@ -4080,63 +4184,231 @@ def render_enhanced_configuration():
             calculator.inputs["workload_type"] = st.selectbox(
                 "Workload Type",
                 list(workload_types.keys()),
+                index=list(workload_types.keys()).index(calculator.inputs["workload_type"]),
                 format_func=lambda x: workload_types[x],
-                help="Select the primary workload pattern"
+                help="Select the primary workload pattern",
+                key="workload_type_input"
             )
         
         with col2:
             calculator.inputs["region"] = st.selectbox(
                 "Primary AWS Region",
                 ["us-east-1", "us-west-2", "eu-west-1", "ap-southeast-1"],
-                help="Primary AWS region for deployment"
+                index=["us-east-1", "us-west-2", "eu-west-1", "ap-southeast-1"].index(calculator.inputs["region"]),
+                help="Primary AWS region for deployment",
+                key="region_input"
             )
             
             calculator.inputs["operating_system"] = st.selectbox(
                 "Operating System",
                 ["linux", "windows"],
-                format_func=lambda x: "Linux (Amazon Linux, Ubuntu, RHEL)" if x == "linux" else "Windows Server"
+                index=["linux", "windows"].index(calculator.inputs["operating_system"]),
+                format_func=lambda x: "Linux (Amazon Linux, Ubuntu, RHEL)" if x == "linux" else "Windows Server",
+                key="os_input"
             )
     
-    # Infrastructure metrics
+    # Infrastructure metrics with change detection
     with st.expander("🖥️ Current Infrastructure Metrics", expanded=True):
         col1, col2, col3 = st.columns(3)
         
         with col1:
             st.markdown("**Compute Resources**")
             calculator.inputs["on_prem_cores"] = st.number_input(
-                "CPU Cores", min_value=1, max_value=128, value=calculator.inputs["on_prem_cores"]
+                "CPU Cores", 
+                min_value=1, 
+                max_value=128, 
+                value=int(calculator.inputs["on_prem_cores"]),
+                key="cpu_cores_input"
             )
             calculator.inputs["peak_cpu_percent"] = st.slider(
-                "Peak CPU %", 0, 100, calculator.inputs["peak_cpu_percent"]
+                "Peak CPU %", 
+                0, 
+                100, 
+                int(calculator.inputs["peak_cpu_percent"]),
+                key="peak_cpu_input"
             )
         
         with col2:
             st.markdown("**Memory Resources**")
             calculator.inputs["on_prem_ram_gb"] = st.number_input(
-                "RAM (GB)", min_value=1, max_value=1024, value=calculator.inputs["on_prem_ram_gb"]
+                "RAM (GB)", 
+                min_value=1, 
+                max_value=1024, 
+                value=int(calculator.inputs["on_prem_ram_gb"]),
+                key="ram_gb_input"
             )
             calculator.inputs["peak_ram_percent"] = st.slider(
-                "Peak RAM %", 0, 100, calculator.inputs["peak_ram_percent"]
+                "Peak RAM %", 
+                0, 
+                100, 
+                int(calculator.inputs["peak_ram_percent"]),
+                key="peak_ram_input"
             )
         
         with col3:
             st.markdown("**Storage & I/O**")
             calculator.inputs["storage_current_gb"] = st.number_input(
-                "Storage (GB)", min_value=1, value=calculator.inputs["storage_current_gb"]
+                "Storage (GB)", 
+                min_value=1, 
+                value=int(calculator.inputs["storage_current_gb"]),
+                key="storage_gb_input"
             )
             calculator.inputs["peak_iops"] = st.number_input(
-                "Peak IOPS", min_value=1, value=calculator.inputs["peak_iops"]
+                "Peak IOPS", 
+                min_value=1, 
+                value=int(calculator.inputs["peak_iops"]),
+                key="peak_iops_input"
             )
+    
+    # Business Context
+    with st.expander("🏢 Business Context", expanded=False):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            calculator.inputs["business_criticality"] = st.selectbox(
+                "Business Criticality",
+                ["low", "medium", "high", "critical"],
+                index=["low", "medium", "high", "critical"].index(calculator.inputs["business_criticality"]),
+                help="Business impact level of this workload",
+                key="criticality_input"
+            )
+        
+        with col2:
+            calculator.inputs["infrastructure_age_years"] = st.number_input(
+                "Infrastructure Age (Years)",
+                min_value=0,
+                max_value=15,
+                value=int(calculator.inputs["infrastructure_age_years"]),
+                help="Age of current infrastructure",
+                key="infra_age_input"
+            )
+    
+    # Check for changes after all inputs
+    current_inputs = calculator.inputs.copy()
+    inputs_changed = st.session_state.original_inputs != current_inputs
     
     # Analysis buttons
     st.markdown("---")
-    if st.button("🚀 Run Enhanced Analysis", type="primary", key="main_enhanced_analysis_button"):
-        run_enhanced_analysis()
-        
+    
+    # Auto-refresh option
+    col1, col2, col3 = st.columns([2, 1, 1])
+    
+    with col1:
+        if st.button("🚀 Run Enhanced Analysis", type="primary", key="main_enhanced_analysis_button"):
+            # Update original inputs to current state
+            st.session_state.original_inputs = current_inputs.copy()
+            run_enhanced_analysis()
+    
+    with col2:
+        auto_refresh = st.checkbox("Auto-refresh", value=False, help="Automatically refresh when configuration changes")
+    
+    with col3:
+        if inputs_changed and st.button("🔄 Reset Config", help="Reset to last analyzed configuration"):
+            calculator.inputs.update(st.session_state.original_inputs)
+            st.rerun()
+    
+    # Auto-refresh logic
+    if auto_refresh and inputs_changed:
+        st.session_state.original_inputs = current_inputs.copy()
+        with st.spinner("🔄 Auto-refreshing analysis..."):
+            run_enhanced_analysis()
+        st.rerun()
+    
+    # Status indicators
+    if inputs_changed:
+        st.info("💡 Configuration has changed. Click 'Run Enhanced Analysis' to see updated results.")
+    
     # Success message with navigation hint
-    if st.session_state.enhanced_results:
-        st.success("✅ Analysis completed! Check the 'Results', 'Heat Map', and 'Technical Reports' tabs above for detailed analysis.")
-        st.info("💡 Visit the 'Reports' tab to generate PDF and Excel reports.")
+    if st.session_state.enhanced_results and not inputs_changed:
+        st.success("✅ Analysis completed! Results are up-to-date with current configuration.")
+        st.info("💡 Visit the 'Results', 'Heat Map', and 'Technical Reports' tabs for detailed analysis.")
+    elif st.session_state.enhanced_results and inputs_changed:
+        st.warning("⚠️ Results shown are based on previous configuration. Re-run analysis to see current results.")
+        
+def run_enhanced_analysis():
+    """Run enhanced analysis with improved error handling and status updates."""
+    
+    with st.spinner("🔄 Running enhanced analysis with Claude AI and vROPS data..."):
+        try:
+            calculator = st.session_state.enhanced_calculator
+            
+            if calculator is None:
+                st.error("Calculator not available. Please refresh the page.")
+                return
+            
+            # Get vROPS data if available
+            vrops_data = None
+            if st.session_state.selected_vm_metrics:
+                vrops_data = st.session_state.selected_vm_metrics['processed_metrics']
+            
+            # Show progress
+            progress_bar = st.progress(0)
+            status_text = st.empty()
+            
+            # Calculate for all environments
+            results = {}
+            environments = list(calculator.ENV_MULTIPLIERS.keys())
+            
+            for i, env in enumerate(environments):
+                status_text.text(f"Analyzing {env} environment...")
+                progress_bar.progress((i + 1) / len(environments))
+                
+                results[env] = calculator.calculate_enhanced_requirements(env, vrops_data)
+            
+            status_text.text("Generating heat map and finalizing results...")
+            
+            # Generate heat map data
+            heat_map_generator = EnvironmentHeatMapGenerator()
+            heat_map_data = heat_map_generator.generate_heat_map_data(results)
+            heat_map_fig = heat_map_generator.create_heat_map_visualization(heat_map_data)
+            
+            # Store results
+            st.session_state.enhanced_results = {
+                'inputs': calculator.inputs.copy(),
+                'recommendations': results,
+                'heat_map_data': heat_map_data,
+                'heat_map_fig': heat_map_fig,
+                'vrops_enhanced': vrops_data is not None,
+                'timestamp': datetime.now()
+            }
+            
+            # Clear progress indicators
+            progress_bar.empty()
+            status_text.empty()
+            
+            success_message = "✅ Enhanced analysis completed successfully!"
+            if vrops_data:
+                success_message += " 📊 Analysis enhanced with real vROPS performance data!"
+            
+            st.success(success_message)
+            
+            # Show quick summary
+            prod_results = results.get('PROD', {})
+            claude_analysis = prod_results.get('claude_analysis', {})
+            tco_analysis = prod_results.get('tco_analysis', {})
+            
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                complexity = claude_analysis.get('complexity_score', 50)
+                st.metric("Complexity", f"{complexity:.0f}/100")
+            with col2:
+                cost = tco_analysis.get('monthly_cost', 0)
+                st.metric("Monthly Cost", f"${cost:,.0f}")
+            with col3:
+                timeline = claude_analysis.get('estimated_timeline', {}).get('max_weeks', 8)
+                st.metric("Timeline", f"{timeline} weeks")
+            
+        except Exception as e:
+            st.error(f"❌ Error during enhanced analysis: {str(e)}")
+            logger.error(f"Error in enhanced analysis: {e}")
+            # Show detailed error for debugging
+            st.error(f"Debug info: {type(e).__name__}: {str(e)}")
+            
+            # Clear progress indicators on error
+            if 'progress_bar' in locals():
+                progress_bar.empty()
+            if 'status_text' in locals():
+                status_text.empty()
         
 def show_pricing_source_indicator(pricing_data: Dict[str, Any]):
     """Show pricing source indicator in the main interface."""
@@ -4201,12 +4473,60 @@ def render_enhanced_results():
     """Render enhanced analysis results with vROPS insights."""
     
     if 'enhanced_results' not in st.session_state or st.session_state.enhanced_results is None:
-        st.info("💡 Run an enhanced analysis to see results here.")
+        st.markdown("""
+        <div style="text-align: center; padding: 3rem; background: #f8fafc; border-radius: 12px; border: 2px dashed #cbd5e1;">
+            <h3 style="color: #64748b; margin-bottom: 1rem;">🔍 No Analysis Results</h3>
+            <p style="color: #64748b; margin-bottom: 1.5rem;">Configure your workload in the "Configuration" tab and click "Run Enhanced Analysis" to see detailed results here.</p>
+            <div style="font-size: 0.9rem; color: #94a3b8;">
+                💡 <strong>Tip:</strong> Connect to vROPS first for enhanced accuracy with real performance data
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
         return
     
     try:
         results = st.session_state.enhanced_results
-        st.markdown("### 📊 Enhanced Analysis Results")
+        #st.markdown("### 📊 Enhanced Analysis Results")
+        
+        # Check if configuration has changed since analysis
+        calculator = st.session_state.enhanced_calculator
+        current_inputs = calculator.inputs.copy() if calculator else {}
+        analysis_inputs = results.get('inputs', {})
+        config_changed = current_inputs != analysis_inputs
+        
+        # Staleness warning
+        if config_changed:
+            st.markdown("""
+            <div style="background: #fef3c7; border: 2px solid #f59e0b; border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
+                <h4 style="color: #92400e; margin: 0;">⚠️ Results May Be Outdated</h4>
+                <p style="color: #92400e; margin: 0.5rem 0 0 0;">
+                    Configuration has changed since this analysis was run. 
+                    <strong>Re-run the analysis</strong> to see updated results.
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            col1, col2 = st.columns([1, 4])
+            with col1:
+                if st.button("🔄 Re-run Analysis", type="primary", key="rerun_from_results"):
+                    run_enhanced_analysis()
+                    st.rerun()
+        else:
+            # Fresh results indicator
+            analysis_time = results.get('timestamp', datetime.now())
+            time_ago = datetime.now() - analysis_time
+            if time_ago.total_seconds() < 60:
+                time_str = "just now"
+            elif time_ago.total_seconds() < 3600:
+                time_str = f"{int(time_ago.total_seconds() / 60)} minutes ago"
+            else:
+                time_str = f"{int(time_ago.total_seconds() / 3600)} hours ago"
+            
+            st.markdown(f"""
+            <div style="background: #dcfce7; border: 2px solid #16a34a; border-radius: 8px; padding: 0.75rem; margin-bottom: 1rem;">
+                <div style="color: #166534; font-weight: 600;">✅ Results are up-to-date (analyzed {time_str})</div>
+            </div>
+            """, unsafe_allow_html=True)
         
         # vROPS Enhancement Indicator
         if results.get('vrops_enhanced'):
@@ -4234,6 +4554,17 @@ def render_enhanced_results():
         with col1:
             complexity_score = claude_analysis.get('complexity_score', 50)
             complexity_level = claude_analysis.get('complexity_level', 'MEDIUM')
+            # Color coding for complexity
+            if complexity_score >= 80:
+                complexity_color = "#dc2626"  # Red
+            elif complexity_score >= 60:
+                complexity_color = "#f59e0b"  # Orange
+            elif complexity_score >= 40:
+                complexity_color = "#3b82f6"  # Blue
+            else:
+                complexity_color = "#10b981"  # Green
+            
+            
             
             st.markdown(f"""
             <div class="metric-card">
@@ -4276,6 +4607,27 @@ def render_enhanced_results():
                 <div style="font-size: 0.75rem; color: #9ca3af;">Recommended</div>
             </div>
             """, unsafe_allow_html=True)
+            
+        # Show configuration that was analyzed
+        if config_changed:
+            with st.expander("⚙️ Configuration Used for This Analysis", expanded=False):
+                config_display = analysis_inputs.copy()
+                # Remove sensitive or irrelevant fields
+                display_config = {
+                    'Workload Name': config_display.get('workload_name', 'N/A'),
+                    'Workload Type': config_display.get('workload_type', 'N/A'),
+                    'Operating System': config_display.get('operating_system', 'N/A'),
+                    'CPU Cores': config_display.get('on_prem_cores', 'N/A'),
+                    'RAM (GB)': config_display.get('on_prem_ram_gb', 'N/A'),
+                    'Storage (GB)': config_display.get('storage_current_gb', 'N/A'),
+                    'Peak CPU %': config_display.get('peak_cpu_percent', 'N/A'),
+                    'Peak RAM %': config_display.get('peak_ram_percent', 'N/A'),
+                    'Business Criticality': config_display.get('business_criticality', 'N/A'),
+                    'AWS Region': config_display.get('region', 'N/A')
+                }
+                
+                config_df = pd.DataFrame(list(display_config.items()), columns=['Setting', 'Value'])
+                st.dataframe(config_df, use_container_width=True, hide_index=True)    
         
         # Claude AI Analysis with vROPS insights
         st.markdown("### 🤖 Claude AI Migration Analysis")
@@ -4421,6 +4773,12 @@ def render_enhanced_results():
     except Exception as e:
         st.error(f"❌ Error displaying results: {str(e)}")
         logger.error(f"Error in render_enhanced_results: {e}")
+        
+        # Show debug information in development
+        if st.checkbox("Show debug information", key="debug_results"):
+            st.code(f"Error details: {type(e).__name__}: {str(e)}")
+            if 'enhanced_results' in st.session_state:
+                st.json(st.session_state.enhanced_results)
 
 def render_enhanced_environment_heatmap_tab():
     """Render enhanced environment heat map tab with detailed explanations."""
