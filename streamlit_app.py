@@ -3138,19 +3138,19 @@ class EnhancedEnterpriseEC2Calculator:
             requirements['cost_breakdown']['instance_costs'] = monthly_instance_cost
         
         # Claude AI migration analysis with vROPS data and OS info
-        claude_analysis = self.claude_analyzer.analyze_workload_complexity(self.inputs, env, vrops_data)
+            claude_analysis = self.claude_analyzer.analyze_workload_complexity(self.inputs, env, vrops_data)
         
         # Enhanced results
-        enhanced_results = {
-            **requirements,
-            'claude_analysis': claude_analysis,
-            'environment': env,
-            'operating_system': operating_system,
-            'vrops_data': vrops_data if vrops_data and vrops_data.get('status') == 'success' else None
-        }
+            enhanced_results = {
+                **requirements,
+                'claude_analysis': claude_analysis,
+                'environment': env,
+                'operating_system': operating_system,
+                'vrops_data': vrops_data if vrops_data and vrops_data.get('status') == 'success' else None
+            }
         
         return enhanced_results
-    except Exception as e:
+        except Exception as e:
         logger.error(f"Error in enhanced requirements calculation: {e}")
         return self._get_fallback_requirements(env)
 
