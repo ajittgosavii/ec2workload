@@ -1570,14 +1570,6 @@ class ClaudeAIMigrationAnalyzer:
 
 class AWSCostCalculator:
     """Enhanced AWS service cost calculator with real API integration and better error handling."""
-# Enhanced AWS Pricing API Connection Fix
-# Add this to your existing AWSCostCalculator class or replace the existing __init__ method
-
-# REPLACE your existing AWSCostCalculator class with this corrected version
-# This fixes the syntax error and improves error handling
-
-class AWSCostCalculator:
-    """Enhanced AWS service cost calculator with real API integration and better error handling."""
     
     def __init__(self, region='us-east-1'):
         self.region = region
@@ -1849,6 +1841,114 @@ class AWSCostCalculator:
         
         return pricing
 
+    def _select_best_instance(self, required_vcpus: int, required_ram_gb: int) -> Dict[str, Any]:
+        """Select the best matching instance type."""
+        try:
+            best_instance = None
+            best_score = 0
+            
+            for instance in self.INSTANCE_TYPES:
+                if instance['vCPU'] >= required_vcpus and instance['RAM'] >= required_ram_gb:
+                    cpu_efficiency = required_vcpus / instance['vCPU']
+                    ram_efficiency = required_ram_gb / instance['RAM']
+                    overall_efficiency = (cpu_efficiency + ram_efficiency) / 2
+                    
+                    if overall_efficiency > best_score:
+                        best_score = overall_efficiency
+                        best_instance = instance.copy()
+                        best_instance['efficiency_score'] = overall_efficiency
+            
+            if best_instance is None:
+                best_instance = {
+                    'type': 'm6i.large',
+                    'vCPU': 2,
+                    'RAM': 8,
+                    'family': 'general',
+                    'efficiency_score': 0.5
+                }
+            
+            return best_instance
+        except Exception as e:
+            logger.error(f"Error selecting best instance: {e}")
+            return {'type': 'm6i.large', 'vCPU': 2, 'RAM': 8, 'family': 'general'}
+
+    def _calculate_tco(self, vcpus: int, ram_gb: int, env: str) -> Dict[str, Any]:
+        """Calculate TCO analysis with OS-specific pricing."""
+        try:
+            selected_instance = self._select_best_instance(vcpus, ram_gb)
+            operating_system = self.inputs.get('operating_system', 'linux')
+            pricing = self._get_ec2_pricing_with_os(selected_instance['type'], operating_system)
+            
+            on_demand_monthly = pricing['on_demand'] * 730
+            ri_1y_monthly = pricing['ri_1y_no_upfront'] * 730
+            ri_3y_monthly = pricing['ri_3y_no_upfront'] * 730
+            
+            storage_monthly = max(self.inputs.get('storage_current_gb', 500), 100) * 0.08
+            network_monthly = 50
+            
+            total_on_demand = on_demand_monthly + storage_monthly + network_monthly
+            total_ri_1y = ri_1y_monthly + storage_monthly + network_monthly
+            total_ri_3y = ri_3y_monthly + storage_monthly + network_monthly
+            
+            costs = {
+                'on_demand': total_on_demand,
+                'ri_1y_no_upfront': total_ri_1y,
+                'ri_3y_no_upfront': total_ri_3y
+            }
+            
+            best_option = min(costs.keys(), key=lambda k: costs[k])
+            best_cost = costs[best_option]
+            savings = total_on_demand - best_cost
+            
+            return {
+                "monthly_cost": best_cost,
+                "monthly_savings": savings,
+                "best_pricing_option": best_option,
+                "roi_3_years": (savings * 36 / total_on_demand) * 100 if total_on_demand > 0 else 0,
+                "operating_system": operating_system,
+                "os_impact": f"{'30% Windows licensing surcharge applied' if operating_system.lower() == 'windows' else 'Linux pricing (no additional licensing)'}"
+            }
+        except Exception as e:
+            logger.error(f"Error calculating TCO: {e}")
+            return {
+                "monthly_cost": 1000, 
+                "monthly_savings": 200, 
+                "best_pricing_option": "ri_1y_no_upfront",
+                "operating_system": self.inputs.get('operating_system', 'linux')
+            }
+
+    def _get_fallback_requirements(self, env: str) -> Dict[str, Any]:
+        """Fallback requirements when calculation fails."""
+        return {
+            'requirements': {
+                'vCPUs': 2, 
+                'RAM_GB': 8, 
+                'storage_GB': 100,
+                'operating_system': self.inputs.get('operating_system', 'linux')
+            },
+            'cost_breakdown': {
+                'total_costs': {'on_demand': 500},
+                'operating_system': self.inputs.get('operating_system', 'linux')
+            },
+            'tco_analysis': {
+                'monthly_cost': 500, 
+                'monthly_savings': 150,
+                'operating_system': self.inputs.get('operating_system', 'linux')
+            },
+            'claude_analysis': self.claude_analyzer._get_fallback_analysis(),
+            'environment': env,
+            'vrops_data': None
+        }on_demand': 0.1, 'ri_1y_no_upfront': 0.07, 'ri_3y_no_upfront': 0.05, 'spot': 0.03
+        })
+        
+        # Add metadata
+        pricing.update({
+            'source': 'fallback',
+            'last_updated': datetime.now().isoformat()
+        })
+        
+        return pricing
+
     def _get_region_name(self, region_code: str) -> str:
         """Map AWS region code to full name."""
         region_map = {
@@ -1941,7 +2041,6 @@ class AWSCostCalculator:
             'optimization_notes': self._get_compute_optimization_notes(env, instance_type, pricing_model)
         }
     
-    
     def _calculate_network_costs(self, env: str, network_recs: Dict, requirements: Dict) -> Dict[str, Any]:
         """Calculate network-related costs."""
         
@@ -1949,15 +2048,15 @@ class AWSCostCalculator:
         lb_cost = 0
         lb_type = network_recs.get('load_balancer', '')
         if 'ALB' in lb_type:
-            lb_cost = self.pricing['network']['alb']
+            lb_cost = self.pricing['network']['alb'] * 730
         elif 'NLB' in lb_type:
-            lb_cost = self.pricing['network']['nlb']
+            lb_cost = self.pricing['network']['nlb'] * 730
         
         # NAT Gateway costs
         nat_cost = 0
         if network_recs.get('nat_gateway') == 'Required':
             nat_count = 2 if env in ['PROD', 'PREPROD'] else 1
-            nat_cost = self.pricing['network']['nat_gateway'] * nat_count
+            nat_cost = self.pricing['network']['nat_gateway'] * nat_count * 730
         
         # CloudFront costs (estimated)
         cdn_cost = 0
@@ -1976,7 +2075,7 @@ class AWSCostCalculator:
         # VPN costs
         vpn_cost = 0
         if 'VPN' in network_recs.get('vpn', ''):
-            vpn_cost = self.pricing['network']['vpn_gateway']
+            vpn_cost = self.pricing['network']['vpn_gateway'] * 730
         
         total_network = lb_cost + nat_cost + cdn_cost + dns_cost + data_transfer_cost + vpn_cost
         
@@ -1987,7 +2086,7 @@ class AWSCostCalculator:
             },
             'nat_gateway': {
                 'cost': nat_cost,
-                'details': f"{int(nat_cost / self.pricing['network']['nat_gateway'])} NAT Gateways" if nat_cost > 0 else "No NAT Gateway"
+                'details': f"{int(nat_cost / (self.pricing['network']['nat_gateway'] * 730)) if nat_cost > 0 else 0} NAT Gateways" if nat_cost > 0 else "No NAT Gateway"
             },
             'cloudfront_cdn': {
                 'cost': cdn_cost,
@@ -2072,9 +2171,9 @@ class AWSCostCalculator:
         
         # Determine pricing based on engine
         if 'Aurora' in engine:
-            db_instance_cost = self.pricing['database']['aurora_mysql'].get(instance_class, self.pricing['database']['aurora_mysql']['db.r6g.large'])
+            db_instance_cost = self.pricing['database']['aurora_mysql'].get(instance_class, self.pricing['database']['aurora_mysql']['db.r6g.large']) * 730
         else:
-            db_instance_cost = self.pricing['database']['rds_mysql'].get(instance_class, self.pricing['database']['rds_mysql']['db.r6g.large'])
+            db_instance_cost = self.pricing['database']['rds_mysql'].get(instance_class, self.pricing['database']['rds_mysql']['db.r6g.large']) * 730
         
         # Multi-AZ costs (double the instance cost)
         if db_recs.get('multi_az'):
@@ -2226,7 +2325,7 @@ class AWSCostCalculator:
         # X-Ray (if enabled)
         xray_cost = 0
         if monitoring_recs.get('apm') == 'X-Ray':
-            trace_volume = 1
+            trace_volume = 1000000
             xray_cost = trace_volume * self.pricing['monitoring']['xray']
         
         # Synthetics (if enabled)
