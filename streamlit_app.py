@@ -5754,6 +5754,26 @@ def get_env_characteristics(env: str) -> str:
     }
     return characteristics.get(env, 'Standard environment characteristics')
 
+def show_aws_connection_status():
+    """Show AWS connection status in the sidebar."""
+    try:
+        # Check AWS connection status through the cost calculator
+        cost_calculator = AWSCostCalculator()
+        
+        if cost_calculator.aws_connected:
+            aws_status = "🟢 Connected"
+            aws_help = "AWS Pricing API connected for real-time pricing"
+        else:
+            aws_status = "🟡 Using Fallback"
+            aws_help = "Using fallback pricing data. Configure AWS credentials for real-time pricing"
+        
+        st.markdown(f"**AWS Pricing API:** {aws_status}")
+        st.markdown(f"*{aws_help}*")
+        
+    except Exception as e:
+        st.markdown("**AWS Pricing API:** 🔴 Error")
+        st.markdown("*Error checking AWS connection*")
+
 def main():
     """Enhanced main application with vROPS integration and nested tab structure."""
     
