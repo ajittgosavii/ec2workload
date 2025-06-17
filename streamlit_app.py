@@ -1938,8 +1938,8 @@ class AWSCostCalculator:
             'claude_analysis': self.claude_analyzer._get_fallback_analysis(),
             'environment': env,
             'vrops_data': None
-        }on_demand': 0.1, 'ri_1y_no_upfront': 0.07, 'ri_3y_no_upfront': 0.05, 'spot': 0.03
-        })
+        }
+       
         
         # Add metadata
         pricing.update({
@@ -3271,7 +3271,7 @@ def _enhance_inputs_with_vrops(self, vrops_data: Dict):
     except Exception as e:
         logger.error(f"Error enhancing inputs with vROPS data: {e}")
         
-    def _enhance_inputs_with_vrops(self, vrops_data: Dict):
+def _enhance_inputs_with_vrops(self, vrops_data: Dict):
         """Enhance workload inputs with vROPS sizing recommendations."""
         try:
             aws_sizing = vrops_data.get('aws_sizing', {})
