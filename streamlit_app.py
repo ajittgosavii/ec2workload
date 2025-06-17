@@ -1673,8 +1673,8 @@ class AWSCostCalculator:
                 except Exception as e:
                     logger.warning(f"Streamlit secrets AWS connection failed: {e}")
                     self.connection_error = f"Secrets config error: {str(e)}"
-def _test_aws_connection(self):
-        """Test AWS connection with minimal API call."""
+    def _test_aws_connection(self):
+            """Test AWS connection with minimal API call."""
         try:
             # Test with a minimal API call
             test_response = self.pricing_client.get_products(
@@ -1690,16 +1690,16 @@ def _test_aws_connection(self):
             logger.warning(f"⚠️ AWS API test failed: {e}")
             raise
     
-def get_connection_status(self):
-        """Get detailed connection status for display."""
-        return {
-            'connected': self.aws_connected,
-            'error': self.connection_error,
-            'client_available': self.pricing_client is not None
-        }
-    # Enhanced connection status display function
-def show_aws_connection_status():
-    """Show enhanced AWS connection status in the sidebar."""
+    def get_connection_status(self):
+            """Get detailed connection status for display."""
+            return {
+                'connected': self.aws_connected,
+                'error': self.connection_error,
+                'client_available': self.pricing_client is not None
+            }
+        # Enhanced connection status display function
+    def show_aws_connection_status():
+        """Show enhanced AWS connection status in the sidebar."""
     try:
         # Check AWS connection status through the cost calculator
         cost_calculator = AWSCostCalculator()
@@ -1719,29 +1719,29 @@ def show_aws_connection_status():
         st.markdown(f"*{aws_help}*")
     
     
-def _get_ec2_pricing_with_os(self, instance_type: str, operating_system: str = 'linux') -> dict:
-        """Get EC2 pricing with OS-specific adjustments."""
-    
-    # Get base Linux pricing
-    base_pricing = self._get_ec2_pricing(instance_type)
-    
-    # Windows licensing adds approximately 20-40% to the cost
-    if operating_system.lower() == 'windows':
-        windows_multiplier = 1.3  # 30% increase for Windows licensing
+    def _get_ec2_pricing_with_os(self, instance_type: str, operating_system: str = 'linux') -> dict:
+            """Get EC2 pricing with OS-specific adjustments."""
         
-        for pricing_model in base_pricing:
-            if pricing_model not in ['source', 'last_updated']:
-                base_pricing[pricing_model] = base_pricing[pricing_model] * windows_multiplier
+        # Get base Linux pricing
+        base_pricing = self._get_ec2_pricing(instance_type)
         
-        # Update metadata
-        base_pricing['source'] = base_pricing.get('source', 'fallback') + '_windows'
-    
-    return base_pricing
+        # Windows licensing adds approximately 20-40% to the cost
+        if operating_system.lower() == 'windows':
+            windows_multiplier = 1.3  # 30% increase for Windows licensing
+            
+            for pricing_model in base_pricing:
+                if pricing_model not in ['source', 'last_updated']:
+                    base_pricing[pricing_model] = base_pricing[pricing_model] * windows_multiplier
+            
+            # Update metadata
+            base_pricing['source'] = base_pricing.get('source', 'fallback') + '_windows'
+        
+        return base_pricing
 
-# Update your _calculate_compute_costs method to use OS-specific pricing
-def _calculate_compute_costs(self, env: str, compute_recs: Dict, requirements: Dict, operating_system: str = 'linux') -> Dict[str, Any]:
-    """Calculate compute-related costs with OS-specific pricing."""
-    
+    # Update your _calculate_compute_costs method to use OS-specific pricing
+    def _calculate_compute_costs(self, env: str, compute_recs: Dict, requirements: Dict, operating_system: str = 'linux') -> Dict[str, Any]:
+        """Calculate compute-related costs with OS-specific pricing."""
+        
     instance_type = compute_recs['primary_instance']['type']
     instance_count = self._get_instance_count(env)
     
