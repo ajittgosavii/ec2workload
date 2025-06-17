@@ -328,79 +328,14 @@ class VROpsDataCollector:
         else:
             return {'status': 'Unknown', 'color': 'unknown', 'icon': '⚪'}
     
-    def calculate_workload_complexity(self, vrops_data: Dict) -> Dict[str, Any]:
-        """Calculate workload complexity based on vROps metrics."""
-        complexity_factors = {
-            'performance_complexity': 0,
-            'resource_complexity': 0,
-            'health_complexity': 0,
-            'rightsizing_complexity': 0
-        }
-        
-        # Performance complexity
-        cpu_ready = vrops_data.get('cpu_ready_time_percent', 0)
-        memory_swapped = vrops_data.get('memory_swapped_mb', 0)
-        disk_latency = vrops_data.get('disk_latency_ms', 0)
-        
-        perf_score = 0
-        if cpu_ready > 10: perf_score += 25
-        elif cpu_ready > 5: perf_score += 15
-        
-        if memory_swapped > 100: perf_score += 25
-        elif memory_swapped > 0: perf_score += 10
-        
-        if disk_latency > 50: perf_score += 25
-        elif disk_latency > 20: perf_score += 15
-        
-        complexity_factors['performance_complexity'] = min(perf_score, 100)
-        
-        # Resource complexity
-        cpu_util = vrops_data.get('cpu_utilization_percent', 0)
-        mem_util = vrops_data.get('memory_utilization_percent', 0)
-        
-        resource_score = 0
-        if cpu_util > 85: resource_score += 30
-        elif cpu_util > 70: resource_score += 20
-        
-        if mem_util > 90: resource_score += 30
-        elif mem_util > 80: resource_score += 20
-        
-        complexity_factors['resource_complexity'] = min(resource_score, 100)
-        
-        # Health complexity (inverted - lower health = higher complexity)
-        health_score = vrops_data.get('overall_health_score', 100)
-        complexity_factors['health_complexity'] = max(0, 100 - health_score)
-        
-        # Rightsizing complexity
-        waste_percent = vrops_data.get('waste_percentage', 0)
-        cpu_oversized = vrops_data.get('cpu_oversized_percent', 0)
-        
-        rightsizing_score = 0
-        if waste_percent > 30: rightsizing_score += 40
-        elif waste_percent > 15: rightsizing_score += 25
-        
-        if cpu_oversized > 30: rightsizing_score += 30
-        elif cpu_oversized > 20: rightsizing_score += 20
-        
-        complexity_factors['rightsizing_complexity'] = min(rightsizing_score, 100)
-        
-        # Overall complexity (weighted average)
-        weights = {'performance_complexity': 0.3, 'resource_complexity': 0.3, 'health_complexity': 0.2, 'rightsizing_complexity': 0.2}
-        overall_complexity = sum(complexity_factors[factor] * weights[factor] for factor in complexity_factors)
-        
-        return {
-            'overall_complexity': overall_complexity,
-            'complexity_factors': complexity_factors,
-            'complexity_level': self._get_complexity_level(overall_complexity)
-        }
-    
-    def _get_complexity_level(self, score: float) -> str:
-        """Get complexity level based on score."""
-        if score >= 80: return 'CRITICAL'
-        elif score >= 60: return 'HIGH'
-        elif score >= 40: return 'MEDIUM'
-        elif score >= 20: return 'LOW'
-        else: return 'MINIMAL'
+    def get_waste_level(self, waste_percent: float) -> str:
+        """Get waste level description."""
+        if waste_percent > 30:
+            return 'High'
+        elif waste_percent > 15:
+            return 'Medium'
+        else:
+            return 'Low'
 
 class ClaudeAIMigrationAnalyzer:
     """Enhanced Claude AI powered migration complexity analyzer with vROps integration."""
@@ -505,7 +440,7 @@ class ClaudeAIMigrationAnalyzer:
         - Recommended CPU Cores: {workload_inputs.get('recommended_cpu_cores', 4)}
         - Recommended Memory: {workload_inputs.get('recommended_memory_gb', 8)} GB
 
-        Please provide your analysis in the following JSON structure, considering the vROps metrics and workload characteristics:
+        Please provide your analysis in the following JSON structure:
         
         {{
             "complexity_score": <number 0-100>,
@@ -523,25 +458,6 @@ class ClaudeAIMigrationAnalyzer:
                 "health_concerns": ["<concern1>", "<concern2>"],
                 "capacity_recommendations": ["<recommendation1>", "<recommendation2>"]
             }},
-            "migration_steps": [
-                {{
-                    "phase": "<phase name>",
-                    "duration": "<duration>",
-                    "tasks": ["<task1>", "<task2>", "<task3>"],
-                    "deliverables": ["<deliverable1>", "<deliverable2>"],
-                    "vrops_validation": "<how to use vROps to validate this phase>"
-                }}
-            ],
-            "risk_factors": [
-                {{
-                    "category": "<risk category>",
-                    "risk": "<risk description based on vROps metrics>",
-                    "probability": "<Low|Medium|High>",
-                    "impact": "<Low|Medium|High|Critical>",
-                    "mitigation": "<mitigation strategy>",
-                    "vrops_indicators": "<which vROps metrics indicate this risk>"
-                }}
-            ],
             "estimated_timeline": {{
                 "min_weeks": <number>,
                 "max_weeks": <number>,
@@ -558,22 +474,8 @@ class ClaudeAIMigrationAnalyzer:
                 "<recommendation1 based on vROps analysis>",
                 "<recommendation2 based on vROps analysis>",
                 "<recommendation3 based on vROps analysis>"
-            ],
-            "success_factors": [
-                "<factor1>",
-                "<factor2>",
-                "<factor3>"
             ]
         }}
-
-        Base your complexity score on:
-        - vROps performance metrics analysis (30%)
-        - Health scores and bottlenecks (25%) 
-        - Rightsizing opportunities and waste (20%)
-        - Capacity planning accuracy (15%)
-        - Workload characterization (10%)
-
-        Consider the environment type ({environment}) and use vROps insights to provide specific, actionable AWS migration recommendations.
         """
         
         return prompt
@@ -635,59 +537,6 @@ class ClaudeAIMigrationAnalyzer:
                 'health_concerns': ['Monitor performance health during migration', 'Validate capacity planning'],
                 'capacity_recommendations': ['Use vROps trending for capacity planning', 'Consider seasonal workload patterns']
             },
-            'migration_steps': [
-                {
-                    'phase': 'vROps Assessment & Baseline',
-                    'duration': '2-3 weeks',
-                    'tasks': [
-                        'Extract detailed vROps performance data',
-                        'Establish performance baselines',
-                        'Analyze workload patterns and dependencies'
-                    ],
-                    'deliverables': ['vROps assessment report', 'Performance baseline', 'Migration plan'],
-                    'vrops_validation': 'Use vROps dashboards to validate current state'
-                },
-                {
-                    'phase': 'AWS Sizing & Architecture',
-                    'duration': '3-4 weeks',
-                    'tasks': [
-                        'Map vROps metrics to AWS instance types',
-                        'Design AWS architecture based on performance data',
-                        'Setup monitoring and validation framework'
-                    ],
-                    'deliverables': ['AWS architecture design', 'Instance sizing recommendations'],
-                    'vrops_validation': 'Compare AWS CloudWatch with vROps metrics'
-                },
-                {
-                    'phase': 'Migration & Validation',
-                    'duration': '3-5 weeks',
-                    'tasks': [
-                        'Execute migration with performance monitoring',
-                        'Validate performance against vROps baselines',
-                        'Optimize and fine-tune AWS resources'
-                    ],
-                    'deliverables': ['Migrated workload', 'Performance validation report'],
-                    'vrops_validation': 'Post-migration performance comparison with vROps data'
-                }
-            ],
-            'risk_factors': [
-                {
-                    'category': 'Performance',
-                    'risk': 'Performance degradation during migration',
-                    'probability': 'Medium',
-                    'impact': 'High',
-                    'mitigation': 'Use vROps baselines for validation and monitoring',
-                    'vrops_indicators': 'CPU ready time, memory utilization, disk latency'
-                },
-                {
-                    'category': 'Sizing',
-                    'risk': 'Incorrect AWS instance sizing',
-                    'probability': 'Medium',
-                    'impact': 'Medium',
-                    'mitigation': 'Leverage vROps rightsizing recommendations',
-                    'vrops_indicators': 'CPU demand, memory demand, waste percentage'
-                }
-            ],
             'estimated_timeline': {'min_weeks': 8, 'max_weeks': 12, 'confidence': 'Medium', 'factors': ['vROps data quality', 'Workload complexity']},
             'aws_rightsizing': {
                 'recommended_instance_family': 'M6i (General Purpose)',
@@ -700,12 +549,6 @@ class ClaudeAIMigrationAnalyzer:
                 'Implement comprehensive monitoring during migration',
                 'Validate performance baselines before and after migration',
                 'Leverage vROps insights for cost optimization opportunities'
-            ],
-            'success_factors': [
-                'Accurate vROps data collection and analysis',
-                'Strong performance monitoring during migration',
-                'Close collaboration between VMware and AWS teams',
-                'Continuous optimization based on actual usage patterns'
             ]
         }
 
@@ -930,7 +773,7 @@ class EnhancedVROpsEC2Calculator:
         memory_oversized = self.inputs["memory_oversized_percent"]
         
         analysis['rightsizing_analysis'] = {
-            'waste_level': self._get_waste_level(waste_percent),
+            'waste_level': self.vrops_collector.get_waste_level(waste_percent),
             'cpu_rightsizing_opportunity': cpu_oversized,
             'memory_rightsizing_opportunity': memory_oversized,
             'cost_savings_potential': self._calculate_savings_potential(waste_percent, cpu_oversized, memory_oversized)
@@ -973,15 +816,6 @@ class EnhancedVROpsEC2Calculator:
             indicators.append("High waste percentage suggests oversizing")
         
         return indicators if indicators else ["Capacity utilization within normal ranges"]
-
-    def _get_waste_level(self, waste_percent: float) -> str:
-        """Get waste level description."""
-        if waste_percent > 30:
-            return 'High'
-        elif waste_percent > 15:
-            return 'Medium'
-        else:
-            return 'Low'
 
     def _calculate_savings_potential(self, waste_percent: float, cpu_oversized: float, memory_oversized: float) -> Dict[str, str]:
         """Calculate potential cost savings from rightsizing."""
@@ -1498,7 +1332,7 @@ def render_vrops_configuration():
             )
         
         # Show waste level indicator
-        waste_level = vrops_collector._get_waste_level(calculator.inputs["waste_percentage"])
+        waste_level = vrops_collector.get_waste_level(calculator.inputs["waste_percentage"])
         waste_color = {'Low': 'good', 'Medium': 'warning', 'High': 'critical'}[waste_level]
         st.markdown(f"""
         <div class="vrops-status vrops-status-{waste_color}">
@@ -1532,11 +1366,9 @@ def run_enhanced_analysis():
             for env in calculator.ENV_MULTIPLIERS.keys():
                 results[env] = calculator.calculate_enhanced_requirements(env)
             
-            # Generate heat map data (reuse existing heat map generator)
-            from enhanced_aws_migration_platform import EnvironmentHeatMapGenerator
-            heat_map_generator = EnvironmentHeatMapGenerator()
-            heat_map_data = heat_map_generator.generate_heat_map_data(results)
-            heat_map_fig = heat_map_generator.create_heat_map_visualization(heat_map_data)
+            # Generate simple heat map data
+            heat_map_data = generate_simple_heat_map_data(results)
+            heat_map_fig = create_simple_heat_map_visualization(heat_map_data)
             
             # Store results
             st.session_state.enhanced_results = {
@@ -1552,6 +1384,52 @@ def run_enhanced_analysis():
         except Exception as e:
             st.error(f"❌ Error during vROps-enhanced analysis: {str(e)}")
             logger.error(f"Error in enhanced analysis: {e}")
+
+def generate_simple_heat_map_data(results):
+    """Generate simple heat map data."""
+    environments = ['DEV', 'QA', 'UAT', 'PREPROD', 'PROD']
+    metrics = ['Complexity', 'Cost', 'Risk', 'Timeline']
+    
+    data = []
+    for env in environments:
+        env_results = results.get(env, {})
+        claude_analysis = env_results.get('claude_analysis', {})
+        tco_analysis = env_results.get('tco_analysis', {})
+        
+        complexity = claude_analysis.get('complexity_score', 50)
+        cost = min(tco_analysis.get('monthly_cost', 1000) / 50, 100)  # Normalize to 0-100
+        risk = {'Low': 25, 'Medium': 50, 'High': 75}.get(claude_analysis.get('migration_strategy', {}).get('risk_level', 'Medium'), 50)
+        timeline = min(claude_analysis.get('estimated_timeline', {}).get('max_weeks', 8) * 10, 100)  # Normalize
+        
+        for metric, value in zip(metrics, [complexity, cost, risk, timeline]):
+            data.append({
+                'Environment': env,
+                'Metric': metric,
+                'Value': value
+            })
+    
+    return pd.DataFrame(data)
+
+def create_simple_heat_map_visualization(heat_map_data):
+    """Create simple heat map visualization."""
+    pivot_data = heat_map_data.pivot(index='Metric', columns='Environment', values='Value')
+    
+    fig = px.imshow(
+        pivot_data,
+        labels=dict(x="Environment", y="Metric", color="Impact Score"),
+        x=pivot_data.columns,
+        y=pivot_data.index,
+        color_continuous_scale='RdYlBu_r',
+        title="vROps-Enhanced Environment Impact Analysis"
+    )
+    
+    fig.update_layout(
+        height=400,
+        title_x=0.5,
+        font=dict(size=12)
+    )
+    
+    return fig
 
 def render_vrops_results():
     """Render vROps-enhanced analysis results."""
@@ -2343,940 +2221,6 @@ def render_vrops_technical_recommendations():
                     st.info("👍 Good ROI - Positive business case")
                 else:
                     st.warning("⚠️ Limited ROI - Consider optimization strategies")
-        
-        # Implementation roadmap
-        st.markdown("**🗺️ Cost Optimization Implementation Roadmap:**")
-        
-        roadmap_phases = [
-            {"Phase": "Phase 1 - Quick Wins", "Duration": "1-2 weeks", "Actions": "Implement Reserved Instance purchases, basic rightsizing"},
-            {"Phase": "Phase 2 - Performance Optimization", "Duration": "3-4 weeks", "Actions": "Fine-tune instance types based on vROps data, optimize storage"},
-            {"Phase": "Phase 3 - Advanced Optimization", "Duration": "4-6 weeks", "Actions": "Implement auto-scaling, advanced monitoring, cost governance"}
-        ]
-        
-        for phase in roadmap_phases:
-            with st.expander(f"{phase['Phase']} ({phase['Duration']})", expanded=False):
-                st.markdown(f"**Actions:** {phase['Actions']}")
-
-# Bulk analysis and reporting functions (enhanced for vROps)
-def render_vrops_bulk_upload():
-    """Render vROps-enhanced bulk upload functionality."""
-    
-    st.markdown("### 📁 vROps-Enhanced Bulk Workload Analysis")
-    st.markdown("*Upload workloads with vROps metrics for comprehensive migration analysis*")
-    
-    st.markdown("""
-    Upload multiple workloads with vROps metrics using CSV or Excel files. Enhanced features include:
-    - vROps performance metrics integration
-    - Health score analysis across workloads
-    - Rightsizing opportunities identification
-    - Cost optimization potential assessment
-    """)
-    
-    # File upload section
-    st.markdown("#### 📤 Upload vROps Workloads File")
-    
-    col1, col2 = st.columns([2, 1])
-    
-    with col1:
-        uploaded_file = st.file_uploader(
-            "Choose a CSV or Excel file with vROps metrics",
-            type=['csv', 'xlsx', 'xls'],
-            help="Upload a file containing multiple workloads with vROps performance data"
-        )
-    
-    with col2:
-        if st.button("📋 Download vROps Template", key="vrops_template_download"):
-            generate_vrops_template()
-    
-    # Show vROps file format requirements
-    with st.expander("📋 vROps File Format Requirements", expanded=False):
-        st.markdown("""
-        **Required vROps Columns** (case-insensitive):
-        - `workload_name` - Name of the workload from vROps
-        - `workload_profile` - compute_intensive, memory_intensive, balanced_workload, etc.
-        - `cpu_ready_time_percent` - CPU ready time percentage
-        - `cpu_utilization_percent` - CPU utilization percentage
-        - `memory_utilization_percent` - Memory utilization percentage
-        - `memory_swapped_mb` - Memory swapped in MB
-        - `disk_latency_ms` - Disk latency in milliseconds
-        - `overall_health_score` - Overall health score (0-100)
-        - `recommended_cpu_cores` - vROps recommended CPU cores
-        - `recommended_memory_gb` - vROps recommended memory in GB
-        - `waste_percentage` - Resource waste percentage
-        
-        **Optional vROps Columns:**
-        - `network_utilization_percent` - Network utilization
-        - `performance_health_score` - Performance health score
-        - `capacity_health_score` - Capacity health score
-        - `cpu_oversized_percent` - CPU oversizing percentage
-        - `memory_oversized_percent` - Memory oversizing percentage
-        - `storage_demand_gb` - Storage demand in GB
-        
-        **Example vROps CSV:**
-        ```
-        workload_name,workload_profile,cpu_ready_time_percent,cpu_utilization_percent,memory_utilization_percent,recommended_cpu_cores,recommended_memory_gb,overall_health_score,waste_percentage
-        Web App 1,balanced_workload,2.5,68,75,4,12,85,15
-        Database 1,memory_intensive,5.8,45,92,6,24,78,20
-        Batch Job,compute_intensive,8.2,88,65,8,16,72,25
-        ```
-        """)
-    
-    # Process uploaded file
-    if uploaded_file is not None:
-        file_type = 'csv' if uploaded_file.name.endswith('.csv') else 'excel'
-        
-        if st.button("🚀 Analyze All vROps Workloads", type="primary", key="vrops_bulk_analyze_button"):
-            with st.spinner("🔄 Processing vROps bulk workload analysis..."):
-                # Enhanced bulk analyzer for vROps
-                bulk_analyzer = VROpsBulkWorkloadAnalyzer()
-                results = bulk_analyzer.process_bulk_upload(uploaded_file, file_type)
-                
-                # Store results in session state
-                st.session_state.bulk_results = results
-                
-                if 'error' in results:
-                    st.error(f"❌ Error processing vROps file: {results['error']}")
-                else:
-                    st.success(f"✅ Successfully analyzed {results['successful_analyses']} out of {results['total_workloads']} vROps workloads!")
-    
-    # Display vROps-enhanced results
-    if 'bulk_results' in st.session_state and st.session_state.bulk_results:
-        render_vrops_bulk_results()
-
-def generate_vrops_template():
-    """Generate downloadable vROps CSV template."""
-    import io
-
-    vrops_sample_data = {
-        "workload_name": ["Web Application 1", "Database Server 1", "Batch Processing"],
-        "workload_profile": ["balanced_workload", "memory_intensive", "compute_intensive"],
-        "cpu_ready_time_percent": [2.5, 5.8, 8.2],
-        "cpu_utilization_percent": [68, 45, 88],
-        "memory_utilization_percent": [75, 92, 65],
-        "memory_swapped_mb": [0, 150, 0],
-        "disk_latency_ms": [12, 25, 8],
-        "network_utilization_percent": [25, 15, 35],
-        "overall_health_score": [85, 78, 72],
-        "performance_health_score": [82, 75, 68],
-        "capacity_health_score": [88, 85, 80],
-        "recommended_cpu_cores": [4, 6, 8],
-        "recommended_memory_gb": [12, 24, 16],
-        "cpu_oversized_percent": [15, 25, 10],
-        "memory_oversized_percent": [12, 18, 8],
-        "waste_percentage": [15, 20, 12],
-        "storage_demand_gb": [120, 500, 200],
-        "region": ["us-east-1", "us-east-1", "us-west-2"]
-    }
-
-    df = pd.DataFrame(vrops_sample_data)
-    output = io.BytesIO()
-    df.to_csv(output, index=False)
-    output.seek(0)
-
-    st.download_button(
-        label="⬇️ Click to Download vROps CSV Template",
-        data=output,
-        file_name="vrops_bulk_upload_template.csv",
-        mime="text/csv"
-    )
-
-class VROpsBulkWorkloadAnalyzer:
-    """Enhanced bulk workload analyzer with vROps support."""
-    
-    def __init__(self):
-        self.claude_analyzer = ClaudeAIMigrationAnalyzer()
-        self.calculator = EnhancedVROpsEC2Calculator()
-        
-    def process_bulk_upload(self, uploaded_file, file_type: str) -> Dict[str, Any]:
-        """Process vROps bulk upload file."""
-        try:
-            if file_type == 'csv':
-                return self._process_vrops_csv_file(uploaded_file)
-            elif file_type == 'excel':
-                return self._process_vrops_excel_file(uploaded_file)
-            else:
-                raise ValueError(f"Unsupported file type: {file_type}")
-                
-        except Exception as e:
-            logger.error(f"Error processing vROps bulk upload: {e}")
-            return {'error': str(e), 'workloads': []}
-    
-    def _process_vrops_csv_file(self, uploaded_file) -> Dict[str, Any]:
-        """Process vROps CSV file."""
-        try:
-            content = uploaded_file.read().decode('utf-8')
-            csv_data = list(csv.DictReader(StringIO(content)))
-            
-            return self._analyze_vrops_workloads(csv_data)
-            
-        except Exception as e:
-            return {'error': f"vROps CSV processing error: {str(e)}", 'workloads': []}
-    
-    def _process_vrops_excel_file(self, uploaded_file) -> Dict[str, Any]:
-        """Process vROps Excel file."""
-        try:
-            if not OPENPYXL_AVAILABLE:
-                return {'error': 'openpyxl not available for Excel processing', 'workloads': []}
-                
-            df = pd.read_excel(uploaded_file, engine='openpyxl')
-            workloads_data = df.to_dict('records')
-            
-            return self._analyze_vrops_workloads(workloads_data)
-            
-        except Exception as e:
-            return {'error': f"vROps Excel processing error: {str(e)}", 'workloads': []}
-    
-    def _analyze_vrops_workloads(self, workloads_data: List[Dict]) -> Dict[str, Any]:
-        """Analyze multiple vROps workloads."""
-        results = {
-            'total_workloads': len(workloads_data),
-            'successful_analyses': 0,
-            'failed_analyses': 0,
-            'workloads': [],
-            'summary': {},
-            'vrops_enhanced': True
-        }
-        
-        for i, workload_data in enumerate(workloads_data):
-            try:
-                # Normalize vROps workload data
-                normalized_workload = self._normalize_vrops_workload_data(workload_data)
-                
-                # Analyze for all environments
-                workload_results = {}
-                for env in ['DEV', 'QA', 'UAT', 'PREPROD', 'PROD']:
-                    env_analysis = self._analyze_single_vrops_workload(normalized_workload, env)
-                    workload_results[env] = env_analysis
-                
-                results['workloads'].append({
-                    'index': i + 1,
-                    'workload_name': normalized_workload.get('workload_name', f'Workload {i+1}'),
-                    'status': 'success',
-                    'analysis': workload_results,
-                    'vrops_profile': normalized_workload.get('workload_profile', 'balanced_workload'),
-                    'health_score': normalized_workload.get('overall_health_score', 0)
-                })
-                
-                results['successful_analyses'] += 1
-                
-            except Exception as e:
-                results['workloads'].append({
-                    'index': i + 1,
-                    'workload_name': workload_data.get('workload_name', f'Workload {i+1}'),
-                    'status': 'failed',
-                    'error': str(e)
-                })
-                results['failed_analyses'] += 1
-        
-        # Generate vROps-enhanced summary
-        results['summary'] = self._generate_vrops_bulk_summary(results['workloads'])
-        
-        return results
-    
-    def _normalize_vrops_workload_data(self, workload_data: Dict) -> Dict:
-        """Normalize and validate vROps workload data."""
-        
-        # Enhanced field mappings for vROps metrics
-        field_mappings = {
-            # Basic fields
-            'workload_name': 'workload_name',
-            'name': 'workload_name',
-            'application_name': 'workload_name',
-            'workload_profile': 'workload_profile',
-            'profile': 'workload_profile',
-            'region': 'region',
-            
-            # vROps Performance Metrics
-            'cpu_ready_time_percent': 'cpu_ready_time_percent',
-            'cpu_ready_time': 'cpu_ready_time_percent',
-            'cpu_ready': 'cpu_ready_time_percent',
-            'cpu_utilization_percent': 'cpu_utilization_percent',
-            'cpu_utilization': 'cpu_utilization_percent',
-            'cpu_util': 'cpu_utilization_percent',
-            'memory_utilization_percent': 'memory_utilization_percent',
-            'memory_utilization': 'memory_utilization_percent',
-            'mem_util': 'memory_utilization_percent',
-            'memory_swapped_mb': 'memory_swapped_mb',
-            'memory_swapped': 'memory_swapped_mb',
-            'mem_swapped': 'memory_swapped_mb',
-            'disk_latency_ms': 'disk_latency_ms',
-            'disk_latency': 'disk_latency_ms',
-            'latency': 'disk_latency_ms',
-            'network_utilization_percent': 'network_utilization_percent',
-            'network_utilization': 'network_utilization_percent',
-            'net_util': 'network_utilization_percent',
-            
-            # vROps Capacity Metrics
-            'cpu_demand_percent': 'cpu_demand_percent',
-            'cpu_demand': 'cpu_demand_percent',
-            'memory_demand_gb': 'memory_demand_gb',
-            'memory_demand': 'memory_demand_gb',
-            'storage_demand_gb': 'storage_demand_gb',
-            'storage_demand': 'storage_demand_gb',
-            'cpu_workload_percent': 'cpu_workload_percent',
-            'cpu_workload': 'cpu_workload_percent',
-            
-            # vROps Health Scores
-            'overall_health_score': 'overall_health_score',
-            'overall_health': 'overall_health_score',
-            'health_score': 'overall_health_score',
-            'performance_health_score': 'performance_health_score',
-            'performance_health': 'performance_health_score',
-            'capacity_health_score': 'capacity_health_score',
-            'capacity_health': 'capacity_health_score',
-            'availability_health_score': 'availability_health_score',
-            'availability_health': 'availability_health_score',
-            
-            # vROps Rightsizing
-            'cpu_oversized_percent': 'cpu_oversized_percent',
-            'cpu_oversized': 'cpu_oversized_percent',
-            'memory_oversized_percent': 'memory_oversized_percent',
-            'memory_oversized': 'memory_oversized_percent',
-            'recommended_cpu_cores': 'recommended_cpu_cores',
-            'recommended_cpu': 'recommended_cpu_cores',
-            'recommended_memory_gb': 'recommended_memory_gb',
-            'recommended_memory': 'recommended_memory_gb',
-            'waste_percentage': 'waste_percentage',
-            'waste_percent': 'waste_percentage',
-            'resource_waste': 'waste_percentage'
-        }
-        
-        normalized = {}
-        
-        # Normalize field names (case-insensitive)
-        for csv_field, value in workload_data.items():
-            csv_field_lower = csv_field.lower().strip()
-            
-            if csv_field_lower in field_mappings:
-                internal_field = field_mappings[csv_field_lower]
-                normalized[internal_field] = value
-        
-        # Set defaults for missing vROps fields
-        defaults = {
-            'workload_name': 'Unknown vROps Workload',
-            'workload_profile': 'balanced_workload',
-            'region': 'us-east-1',
-            
-            # vROps Performance defaults
-            'cpu_ready_time_percent': 3.0,
-            'cpu_utilization_percent': 65,
-            'memory_utilization_percent': 75,
-            'memory_swapped_mb': 0,
-            'disk_latency_ms': 15,
-            'network_utilization_percent': 30,
-            'disk_iops': 3500,
-            'network_throughput_mbps': 150,
-            
-            # vROps Capacity defaults
-            'cpu_demand_percent': 60,
-            'memory_demand_gb': 8,
-            'storage_demand_gb': 120,
-            'cpu_workload_percent': 65,
-            
-            # vROps Health defaults
-            'overall_health_score': 80,
-            'performance_health_score': 75,
-            'capacity_health_score': 85,
-            'availability_health_score': 95,
-            
-            # vROps Rightsizing defaults
-            'cpu_oversized_percent': 10,
-            'memory_oversized_percent': 15,
-            'recommended_cpu_cores': 4,
-            'recommended_memory_gb': 8,
-            'waste_percentage': 15
-        }
-        
-        for field, default_value in defaults.items():
-            if field not in normalized or normalized[field] is None or normalized[field] == '':
-                normalized[field] = default_value
-            else:
-                # Convert numeric fields
-                if field in ['cpu_ready_time_percent', 'cpu_utilization_percent', 'memory_utilization_percent', 
-                           'memory_swapped_mb', 'disk_latency_ms', 'network_utilization_percent',
-                           'cpu_demand_percent', 'memory_demand_gb', 'storage_demand_gb', 'cpu_workload_percent',
-                           'overall_health_score', 'performance_health_score', 'capacity_health_score', 'availability_health_score',
-                           'cpu_oversized_percent', 'memory_oversized_percent', 'recommended_cpu_cores', 'recommended_memory_gb', 'waste_percentage']:
-                    try:
-                        normalized[field] = float(normalized[field])
-                    except (ValueError, TypeError):
-                        normalized[field] = default_value
-        
-        return normalized
-    
-    def _analyze_single_vrops_workload(self, workload_inputs: Dict, environment: str) -> Dict[str, Any]:
-        """Analyze a single vROps workload for a specific environment."""
-        
-        # Update calculator inputs with vROps data
-        self.calculator.inputs.update(workload_inputs)
-        
-        # Calculate enhanced requirements with vROps context
-        return self.calculator.calculate_enhanced_requirements(environment)
-    
-    def _generate_vrops_bulk_summary(self, workloads: List[Dict]) -> Dict[str, Any]:
-        """Generate vROps-enhanced summary statistics."""
-        successful_workloads = [w for w in workloads if w['status'] == 'success']
-        
-        if not successful_workloads:
-            return {'error': 'No successful vROps analyses to summarize'}
-        
-        # Aggregate vROps-specific statistics
-        total_monthly_costs = []
-        complexity_scores = []
-        health_scores = []
-        waste_percentages = []
-        instance_types = {}
-        workload_profiles = {}
-        rightsizing_opportunities = []
-        
-        for workload in successful_workloads:
-            try:
-                prod_analysis = workload['analysis']['PROD']
-                
-                # Cost data
-                tco = prod_analysis.get('tco_analysis', {})
-                monthly_cost = tco.get('monthly_cost', 0)
-                rightsizing_savings = tco.get('rightsizing_savings', 0)
-                
-                if monthly_cost > 0:
-                    total_monthly_costs.append(monthly_cost)
-                    rightsizing_opportunities.append(rightsizing_savings)
-                
-                # Complexity data
-                claude_analysis = prod_analysis.get('claude_analysis', {})
-                complexity = claude_analysis.get('complexity_score', 0)
-                if complexity > 0:
-                    complexity_scores.append(complexity)
-                
-                # vROps-specific data
-                health_score = workload.get('health_score', 0)
-                if health_score > 0:
-                    health_scores.append(health_score)
-                
-                # Workload profiles
-                profile = workload.get('vrops_profile', 'unknown')
-                workload_profiles[profile] = workload_profiles.get(profile, 0) + 1
-                
-                # Instance types
-                cost_breakdown = prod_analysis.get('cost_breakdown', {})
-                selected_instance = cost_breakdown.get('selected_instance', {})
-                instance_type = selected_instance.get('type', 'Unknown')
-                instance_types[instance_type] = instance_types.get(instance_type, 0) + 1
-                
-                # Extract waste percentage from vROps analysis
-                vrops_analysis = prod_analysis.get('vrops_analysis', {})
-                rightsizing_analysis = vrops_analysis.get('rightsizing_analysis', {})
-                savings_potential = rightsizing_analysis.get('cost_savings_potential', {})
-                if savings_potential and 'percentage' in savings_potential:
-                    waste_str = savings_potential['percentage'].replace('%', '')
-                    try:
-                        waste_percentages.append(float(waste_str))
-                    except ValueError:
-                        pass
-                
-            except Exception as e:
-                logger.warning(f"Error processing workload summary: {e}")
-                continue
-        
-        # Calculate vROps-enhanced summary statistics
-        summary = {
-            'total_workloads_analyzed': len(successful_workloads),
-            'total_monthly_cost': sum(total_monthly_costs),
-            'total_annual_cost': sum(total_monthly_costs) * 12,
-            'total_rightsizing_savings_monthly': sum(rightsizing_opportunities),
-            'total_rightsizing_savings_annual': sum(rightsizing_opportunities) * 12,
-            'average_monthly_cost': sum(total_monthly_costs) / len(total_monthly_costs) if total_monthly_costs else 0,
-            'average_complexity_score': sum(complexity_scores) / len(complexity_scores) if complexity_scores else 0,
-            'average_health_score': sum(health_scores) / len(health_scores) if health_scores else 0,
-            'average_waste_percentage': sum(waste_percentages) / len(waste_percentages) if waste_percentages else 0,
-            'most_common_instance_type': max(instance_types.items(), key=lambda x: x[1])[0] if instance_types else 'N/A',
-            'most_common_workload_profile': max(workload_profiles.items(), key=lambda x: x[1])[0] if workload_profiles else 'N/A',
-            'instance_type_distribution': instance_types,
-            'workload_profile_distribution': workload_profiles,
-            'cost_range': {
-                'min': min(total_monthly_costs) if total_monthly_costs else 0,
-                'max': max(total_monthly_costs) if total_monthly_costs else 0
-            },
-            'complexity_range': {
-                'min': min(complexity_scores) if complexity_scores else 0,
-                'max': max(complexity_scores) if complexity_scores else 0
-            },
-            'health_range': {
-                'min': min(health_scores) if health_scores else 0,
-                'max': max(health_scores) if health_scores else 0
-            },
-            'rightsizing_impact': {
-                'workloads_with_savings': len([s for s in rightsizing_opportunities if s > 0]),
-                'avg_monthly_savings_per_workload': sum(rightsizing_opportunities) / len(rightsizing_opportunities) if rightsizing_opportunities else 0
-            }
-        }
-        
-        return summary
-
-def render_vrops_bulk_results():
-    """Render vROps bulk analysis results."""
-    results = st.session_state.bulk_results
-    
-    if 'error' in results:
-        st.error(f"Error: {results['error']}")
-        return
-    
-    st.markdown("---")
-    st.markdown("### 📊 vROps-Enhanced Bulk Analysis Results")    
-    
-    # Enhanced summary section with vROps metrics
-    summary = results.get('summary', {})
-    if 'error' not in summary:
-        col1, col2, col3, col4, col5 = st.columns(5)
-        
-        with col1:
-            st.metric("Total Workloads", summary.get('total_workloads_analyzed', 0))
-        
-        with col2:
-            total_cost = summary.get('total_monthly_cost', 0)
-            rightsizing_savings = summary.get('total_rightsizing_savings_monthly', 0)
-            st.metric(
-                "Total Monthly Cost", 
-                f"${total_cost:,.0f}",
-                delta=f"-${rightsizing_savings:,.0f} (vROps savings)"
-            )
-        
-        with col3:
-            avg_complexity = summary.get('average_complexity_score', 0)
-            st.metric("Avg Complexity", f"{avg_complexity:.1f}/100")
-        
-        with col4:
-            avg_health = summary.get('average_health_score', 0)
-            st.metric("Avg vROps Health", f"{avg_health:.0f}/100")
-        
-        with col5:
-            avg_waste = summary.get('average_waste_percentage', 0)
-            st.metric("Avg Resource Waste", f"{avg_waste:.1f}%")
-        
-        # vROps-specific insights
-        st.markdown("#### 🔍 vROps Portfolio Insights")
-        
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            st.markdown("**Workload Profile Distribution:**")
-            profile_dist = summary.get('workload_profile_distribution', {})
-            for profile, count in profile_dist.items():
-                profile_name = profile.replace('_', ' ').title()
-                st.markdown(f"• {profile_name}: {count} workloads")
-        
-        with col2:
-            st.markdown("**Health Score Analysis:**")
-            health_range = summary.get('health_range', {})
-            avg_health = summary.get('average_health_score', 0)
-            
-            if avg_health >= 80:
-                health_status = "🟢 Excellent"
-            elif avg_health >= 60:
-                health_status = "🟡 Good"
-            else:
-                health_status = "🔴 Needs Attention"
-            
-            st.markdown(f"• Portfolio Health: {health_status}")
-            st.markdown(f"• Health Range: {health_range.get('min', 0):.0f} - {health_range.get('max', 0):.0f}")
-        
-        with col3:
-            st.markdown("**Rightsizing Opportunities:**")
-            rightsizing_impact = summary.get('rightsizing_impact', {})
-            workloads_with_savings = rightsizing_impact.get('workloads_with_savings', 0)
-            total_workloads = summary.get('total_workloads_analyzed', 1)
-            
-            optimization_percentage = (workloads_with_savings / total_workloads) * 100 if total_workloads > 0 else 0
-            
-            st.markdown(f"• Workloads with opportunities: {workloads_with_savings}")
-            st.markdown(f"• Optimization potential: {optimization_percentage:.0f}%")
-            
-            annual_savings = summary.get('total_rightsizing_savings_annual', 0)
-            st.markdown(f"• Annual savings potential: ${annual_savings:,.0f}")
-    
-    # Detailed workload analysis with vROps context
-    if results['successful_analyses'] > 0:
-        st.markdown("#### 🔍 Detailed vROps Workload Analysis")
-        
-        # Workload selector with additional context
-        workload_options = []
-        for w in results['workloads']:
-            if w['status'] == 'success':
-                profile = w.get('vrops_profile', 'unknown').replace('_', ' ').title()
-                health = w.get('health_score', 0)
-                workload_options.append(f"{w['workload_name']} ({profile}, Health: {health:.0f})")
-        
-        if workload_options:
-            selected_workload_display = st.selectbox(
-                "Select Workload for Detailed vROps Analysis",
-                workload_options
-            )
-            
-            # Extract workload name from display string
-            selected_workload = selected_workload_display.split(' (')[0]
-            
-            workload_data = next(w for w in results['workloads'] 
-                               if w['workload_name'] == selected_workload and w['status'] == 'success')
-            
-            # Create enhanced tabs for vROps analysis
-            detailed_tabs = st.tabs(["vROps Analysis", "Heat Map", "Technical Specs", "Cost Optimization"])
-            
-            with detailed_tabs[0]:
-                render_vrops_workload_analysis(workload_data)
-                
-            with detailed_tabs[1]:
-                render_workload_heatmaps(workload_data)
-                
-            with detailed_tabs[2]:
-                render_vrops_workload_technical_specs(workload_data)
-                
-            with detailed_tabs[3]:
-                render_vrops_workload_cost_optimization(workload_data)
-
-def render_vrops_workload_analysis(workload_data):
-    """Render vROps-specific workload analysis."""
-    st.markdown(f"### 📊 vROps Analysis for {workload_data['workload_name']}")
-    
-    try:
-        prod_results = workload_data['analysis']['PROD']
-        claude_analysis = prod_results.get('claude_analysis', {})
-        vrops_analysis = prod_results.get('vrops_analysis', {})
-        tco_analysis = prod_results.get('tco_analysis', {})
-        
-        # Enhanced summary metrics with vROps context
-        col1, col2, col3, col4 = st.columns(4)
-        
-        with col1:
-            complexity_score = claude_analysis.get('complexity_score', 50)
-            complexity_level = claude_analysis.get('complexity_level', 'MEDIUM')
-            
-            st.markdown(f"""
-            <div class="vrops-metric-card">
-                <div style="font-size: 0.875rem; font-weight: 600; color: #6b7280; margin-bottom: 0.5rem;">🤖 Migration Complexity</div>
-                <div style="font-size: 2rem; font-weight: 700; color: #1f2937; margin-bottom: 0.25rem;">{complexity_score:.0f}/100</div>
-                <div style="font-size: 0.75rem; color: #9ca3af;">{complexity_level} (vROps-Based)</div>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with col2:
-            health_score = workload_data.get('health_score', 0)
-            vrops_collector = VROpsDataCollector()
-            health_status = vrops_collector.get_health_status(health_score)
-            
-            st.markdown(f"""
-            <div class="vrops-metric-card vrops-health-{health_status['color']}">
-                <div style="font-size: 0.875rem; font-weight: 600; color: #6b7280; margin-bottom: 0.5rem;">🏥 vROps Health Score</div>
-                <div style="font-size: 2rem; font-weight: 700; color: #1f2937; margin-bottom: 0.25rem;">{health_score:.0f}/100</div>
-                <div style="font-size: 0.75rem; color: #9ca3af;">{health_status['icon']} {health_status['status']}</div>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with col3:
-            monthly_cost = tco_analysis.get('monthly_cost', 0)
-            rightsizing_savings = tco_analysis.get('rightsizing_savings', 0)
-            
-            st.markdown(f"""
-            <div class="vrops-metric-card">
-                <div style="font-size: 0.875rem; font-weight: 600; color: #6b7280; margin-bottom: 0.5rem;">☁️ AWS Monthly Cost</div>
-                <div style="font-size: 2rem; font-weight: 700; color: #1f2937; margin-bottom: 0.25rem;">${monthly_cost:,.0f}</div>
-                <div style="font-size: 0.75rem; color: #10b981;">💰 vROps Savings: ${rightsizing_savings:.0f}</div>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with col4:
-            profile = workload_data.get('vrops_profile', 'unknown').replace('_', ' ').title()
-            instance_type = prod_results.get('cost_breakdown', {}).get('selected_instance', {}).get('type', 'N/A')
-            
-            st.markdown(f"""
-            <div class="vrops-metric-card">
-                <div style="font-size: 0.875rem; font-weight: 600; color: #6b7280; margin-bottom: 0.5rem;">🖥️ AWS Instance</div>
-                <div style="font-size: 1.5rem; font-weight: 700; color: #1f2937; margin-bottom: 0.25rem;">{instance_type}</div>
-                <div style="font-size: 0.75rem; color: #9ca3af;">Profile: {profile}</div>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        # vROps insights from Claude analysis
-        vrops_insights = claude_analysis.get('vrops_insights', {})
-        if vrops_insights:
-            st.markdown("### 🔍 vROps Performance Insights")
-            
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                st.markdown("**Performance Bottlenecks:**")
-                bottlenecks = vrops_insights.get('performance_bottlenecks', [])
-                if bottlenecks:
-                    for bottleneck in bottlenecks:
-                        st.markdown(f"⚠️ {bottleneck}")
-                else:
-                    st.markdown("✅ No significant performance bottlenecks detected")
-                
-                st.markdown("**Health Concerns:**")
-                health_concerns = vrops_insights.get('health_concerns', [])
-                if health_concerns:
-                    for concern in health_concerns:
-                        st.markdown(f"🏥 {concern}")
-                else:
-                    st.markdown("✅ No major health concerns identified")
-            
-            with col2:
-                st.markdown("**Rightsizing Opportunities:**")
-                rightsizing_opportunities = vrops_insights.get('rightsizing_opportunities', [])
-                if rightsizing_opportunities:
-                    for opportunity in rightsizing_opportunities:
-                        st.markdown(f"💰 {opportunity}")
-                
-                st.markdown("**Capacity Recommendations:**")
-                capacity_recommendations = vrops_insights.get('capacity_recommendations', [])
-                if capacity_recommendations:
-                    for recommendation in capacity_recommendations:
-                        st.markdown(f"📊 {recommendation}")
-        
-        # Migration strategy with vROps validation
-        st.markdown("### 🚀 vROps-Enhanced Migration Strategy")
-        
-        strategy = claude_analysis.get('migration_strategy', {})
-        if strategy:
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                st.markdown("**Migration Approach:**")
-                st.markdown(f"**Strategy:** {strategy.get('approach', 'N/A')}")
-                st.markdown(f"**Methodology:** {strategy.get('methodology', 'N/A')}")
-                st.markdown(f"**Timeline:** {strategy.get('timeline', 'N/A')}")
-                st.markdown(f"**Risk Level:** {strategy.get('risk_level', 'N/A')}")
-            
-            with col2:
-                st.markdown("**AWS Rightsizing Analysis:**")
-                aws_rightsizing = claude_analysis.get('aws_rightsizing', {})
-                if aws_rightsizing:
-                    st.markdown(f"**Instance Family:** {aws_rightsizing.get('recommended_instance_family', 'N/A')}")
-                    st.markdown(f"**Sizing Confidence:** {aws_rightsizing.get('sizing_confidence', 'N/A')}")
-                    st.markdown(f"**Cost Optimization:** {aws_rightsizing.get('cost_optimization_potential', 'N/A')}")
-                    st.markdown(f"**Performance Risk:** {aws_rightsizing.get('performance_risk', 'N/A')}")
-        
-        # Migration steps with vROps validation
-        migration_steps = claude_analysis.get('migration_steps', [])
-        if migration_steps:
-            st.markdown("**Migration Implementation Steps:**")
-            
-            for i, step in enumerate(migration_steps, 1):
-                if isinstance(step, dict):
-                    with st.expander(f"Phase {i}: {step.get('phase', 'N/A')}", expanded=False):
-                        st.markdown(f"**Duration:** {step.get('duration', 'N/A')}")
-                        
-                        tasks = step.get('tasks', [])
-                        if tasks:
-                            st.markdown("**Key Tasks:**")
-                            for task in tasks:
-                                st.markdown(f"• {task}")
-                        
-                        vrops_validation = step.get('vrops_validation', '')
-                        if vrops_validation:
-                            st.markdown(f"**vROps Validation:** {vrops_validation}")
-                
-    except Exception as e:
-        st.error(f"❌ Error displaying vROps workload analysis: {str(e)}")
-        logger.error(f"Error in render_vrops_workload_analysis: {e}")
-
-def render_vrops_workload_technical_specs(workload_data):
-    """Render vROps workload technical specifications."""
-    st.markdown(f"### 🔧 Technical Specifications for {workload_data['workload_name']}")
-    
-    try:
-        prod_results = workload_data['analysis']['PROD']
-        rightsizing_analysis = prod_results.get('rightsizing_analysis', {})
-        
-        # Current vs Recommended sizing from vROps
-        if rightsizing_analysis:
-            st.markdown("#### 🎯 vROps Rightsizing Analysis")
-            
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                st.markdown("**Current vs Recommended Configuration:**")
-                
-                current_sizing = rightsizing_analysis.get('current_sizing', {})
-                recommended_sizing = rightsizing_analysis.get('recommended_sizing', {})
-                sizing_delta = rightsizing_analysis.get('sizing_delta', {})
-                
-                sizing_comparison = [
-                    {
-                        'Resource': 'CPU Cores',
-                        'Current': current_sizing.get('estimated_cpu_cores', 'N/A'),
-                        'vROps Recommended': recommended_sizing.get('cpu_cores', 'N/A'),
-                        'Change': sizing_delta.get('cpu_change', 'N/A')
-                    },
-                    {
-                        'Resource': 'Memory (GB)',
-                        'Current': current_sizing.get('memory_gb', 'N/A'),
-                        'vROps Recommended': recommended_sizing.get('memory_gb', 'N/A'),
-                        'Change': sizing_delta.get('memory_change', 'N/A')
-                    }
-                ]
-                
-                df_sizing = pd.DataFrame(sizing_comparison)
-                st.dataframe(df_sizing, use_container_width=True, hide_index=True)
-            
-            with col2:
-                st.markdown("**Confidence & Implementation:**")
-                
-                confidence = rightsizing_analysis.get('confidence_level', {})
-                st.markdown(f"**Confidence Level:** {confidence.get('level', 'Unknown')}")
-                st.markdown(f"**Rationale:** {confidence.get('description', 'No description')}")
-                
-                implementation_notes = rightsizing_analysis.get('implementation_notes', [])
-                if implementation_notes:
-                    st.markdown("**Implementation Notes:**")
-                    for note in implementation_notes:
-                        st.markdown(f"• {note}")
-        
-        # AWS instance recommendations
-        cost_breakdown = prod_results.get('cost_breakdown', {})
-        selected_instance = cost_breakdown.get('selected_instance', {})
-        
-        if selected_instance:
-            st.markdown("#### 🖥️ AWS Instance Configuration")
-            
-            instance_specs = [
-                {'Specification': 'Instance Type', 'Value': selected_instance.get('type', 'N/A')},
-                {'Specification': 'vCPUs', 'Value': selected_instance.get('vCPU', 'N/A')},
-                {'Specification': 'Memory (GB)', 'Value': selected_instance.get('RAM', 'N/A')},
-                {'Specification': 'Instance Family', 'Value': selected_instance.get('family', 'Unknown').title()},
-                {'Specification': 'Architecture', 'Value': selected_instance.get('architecture', 'N/A')},
-                {'Specification': 'Enhanced Networking', 'Value': 'Yes' if selected_instance.get('enhanced_networking') else 'No'},
-                {'Specification': 'EBS Optimized', 'Value': 'Yes' if selected_instance.get('ebs_optimized') else 'No'}
-            ]
-            
-            df_instance_specs = pd.DataFrame(instance_specs)
-            st.dataframe(df_instance_specs, use_container_width=True, hide_index=True)
-            
-            # vROps profile matching
-            vrops_match = selected_instance.get('vrops_match', False)
-            if vrops_match:
-                st.success("✅ Instance type matches vROps workload profile")
-            else:
-                st.info("📊 Instance type optimized based on vROps metrics")
-                
-    except Exception as e:
-        st.error(f"❌ Error displaying technical specifications: {str(e)}")
-
-def render_vrops_workload_cost_optimization(workload_data):
-    """Render vROps workload cost optimization analysis."""
-    st.markdown(f"### 💰 Cost Optimization for {workload_data['workload_name']}")
-    
-    try:
-        prod_results = workload_data['analysis']['PROD']
-        tco_analysis = prod_results.get('tco_analysis', {})
-        vrops_analysis = prod_results.get('vrops_analysis', {})
-        
-        # Cost breakdown with vROps savings
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.markdown("**Cost Analysis:**")
-            
-            monthly_cost = tco_analysis.get('monthly_cost', 0)
-            monthly_savings = tco_analysis.get('monthly_savings', 0)
-            rightsizing_savings = tco_analysis.get('rightsizing_savings', 0)
-            total_savings = tco_analysis.get('total_monthly_savings', 0)
-            
-            cost_breakdown_data = [
-                {'Cost Component': 'Base Monthly Cost', 'Amount': f"${monthly_cost:,.2f}"},
-                {'Cost Component': 'AWS Pricing Savings', 'Amount': f"${monthly_savings:,.2f}"},
-                {'Cost Component': 'vROps Rightsizing Savings', 'Amount': f"${rightsizing_savings:,.2f}"},
-                {'Cost Component': 'Total Monthly Savings', 'Amount': f"${total_savings:,.2f}"},
-                {'Cost Component': 'Optimized Monthly Cost', 'Amount': f"${monthly_cost - total_savings:,.2f}"}
-            ]
-            
-            df_cost_breakdown = pd.DataFrame(cost_breakdown_data)
-            st.dataframe(df_cost_breakdown, use_container_width=True, hide_index=True)
-        
-        with col2:
-            st.markdown("**Savings Potential:**")
-            
-            # Calculate savings percentages
-            if monthly_cost > 0:
-                pricing_savings_pct = (monthly_savings / monthly_cost) * 100
-                rightsizing_savings_pct = (rightsizing_savings / monthly_cost) * 100
-                total_savings_pct = (total_savings / monthly_cost) * 100
-                
-                st.metric("AWS Pricing Savings", f"{pricing_savings_pct:.1f}%")
-                st.metric("vROps Rightsizing Savings", f"{rightsizing_savings_pct:.1f}%")
-                st.metric("Total Optimization Potential", f"{total_savings_pct:.1f}%")
-            
-            # Annual impact
-            annual_savings = total_savings * 12
-            st.markdown(f"**Annual Savings Impact:** ${annual_savings:,.2f}")
-        
-        # vROps rightsizing insights
-        if vrops_analysis:
-            rightsizing_analysis = vrops_analysis.get('rightsizing_analysis', {})
-            if rightsizing_analysis:
-                st.markdown("#### 🎯 vROps Rightsizing Insights")
-                
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    waste_level = rightsizing_analysis.get('waste_level', 'Unknown')
-                    cpu_opportunity = rightsizing_analysis.get('cpu_rightsizing_opportunity', 0)
-                    memory_opportunity = rightsizing_analysis.get('memory_rightsizing_opportunity', 0)
-                    
-                    st.markdown(f"**Resource Waste Level:** {waste_level}")
-                    st.markdown(f"**CPU Rightsizing Opportunity:** {cpu_opportunity:.0f}%")
-                    st.markdown(f"**Memory Rightsizing Opportunity:** {memory_opportunity:.0f}%")
-                
-                with col2:
-                    savings_potential = rightsizing_analysis.get('cost_savings_potential', {})
-                    if savings_potential:
-                        level = savings_potential.get('level', 'Unknown')
-                        percentage = savings_potential.get('percentage', '0%')
-                        description = savings_potential.get('description', '')
-                        
-                        st.markdown(f"**Savings Opportunity Level:** {level}")
-                        st.markdown(f"**Estimated Savings:** {percentage}")
-                        st.markdown(f"**Assessment:** {description}")
-        
-        # ROI and business case
-        st.markdown("#### 📈 Business Case & ROI")
-        
-        roi_3_years = tco_analysis.get('roi_3_years', 0)
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.markdown("**3-Year Financial Impact:**")
-            
-            three_year_savings = total_savings * 36
-            three_year_data = [
-                {'Metric': '3-Year Total Savings', 'Value': f"${three_year_savings:,.2f}"},
-                {'Metric': '3-Year ROI', 'Value': f"{roi_3_years:.1f}%"},
-                {'Metric': 'Payback Period', 'Value': 'Immediate (cost reduction)'},
-                {'Metric': 'Business Case', 'Value': 'Strong' if roi_3_years > 25 else 'Moderate' if roi_3_years > 10 else 'Limited'}
-            ]
-            
-            df_roi = pd.DataFrame(three_year_data)
-            st.dataframe(df_roi, use_container_width=True, hide_index=True)
-        
-        with col2:
-            st.markdown("**Implementation Recommendations:**")
-            
-            if total_savings_pct > 30:
-                st.success("🎉 Excellent optimization opportunity - prioritize for migration")
-            elif total_savings_pct > 15:
-                st.info("👍 Good optimization potential - include in migration wave")
-            else:
-                st.warning("⚠️ Limited savings - consider optimization strategies")
-            
-            # vROps optimization notes
-            vrops_notes = tco_analysis.get('vrops_optimization_notes', [])
-            if vrops_notes:
-                st.markdown("**vROps Optimization Notes:**")
-                for note in vrops_notes:
-                    st.markdown(f"• {note}")
-                    
-    except Exception as e:
-        st.error(f"❌ Error displaying cost optimization: {str(e)}")
 
 def main():
     """Enhanced main application with vROps integration."""
@@ -3432,95 +2376,38 @@ def main():
     # BULK ANALYSIS TAB with vROps support
     with main_tabs[1]:
         st.markdown("### 📁 Bulk Workload Analysis (vROps-Enhanced)")
-        render_vrops_bulk_upload()
+        st.info("🚧 Bulk analysis features will be implemented in the next version.")
+        st.markdown("""
+        **Planned vROps Bulk Features:**
+        - Upload CSV/Excel files with vROps metrics
+        - Bulk workload profile analysis
+        - Portfolio-wide rightsizing recommendations
+        - Aggregate health score analysis
+        - Bulk migration prioritization
+        """)
     
     # REPORTS TAB
     with main_tabs[2]:
         st.markdown("### 📋 vROps-Enhanced Reports")
         
-        st.info("💡 Reports will include vROps metrics, health scores, and rightsizing analysis")
-        
-        # Check which type of results we have
-        has_single_results = st.session_state.enhanced_results is not None
-        has_bulk_results = ('bulk_results' in st.session_state and 
-                           st.session_state.bulk_results is not None and 
-                           'error' not in st.session_state.bulk_results)
-        
-        if has_single_results or has_bulk_results:
-            # Show report type selector
-            if has_single_results and has_bulk_results:
-                report_type = st.radio(
-                    "Select Report Type:",
-                    ["Single Workload Reports (vROps)", "Bulk Analysis Reports (vROps)"],
-                    help="Choose which vROps analysis results to include in your reports"
-                )
-            elif has_single_results:
-                report_type = "Single Workload Reports (vROps)"
-                st.info("📊 Single workload vROps analysis available for reporting")
-            else:
-                report_type = "Bulk Analysis Reports (vROps)"
-                st.info("📊 Bulk workload vROps analysis available for reporting")
+        if st.session_state.enhanced_results:
+            st.info("💡 Reports will include vROps metrics, health scores, and rightsizing analysis")
             
-            # Single Workload Reports
-            if report_type == "Single Workload Reports (vROps)" and has_single_results:
-                st.markdown("#### Single Workload vROps Reports")
-                
-                col1, col2, col3 = st.columns(3)
-                
-                with col1:
-                    if st.button("📄 Generate vROps PDF Report", type="primary", key="vrops_reports_pdf_generate"):
-                        # Would call enhanced PDF generation with vROps data
-                        st.info("🚧 vROps-enhanced PDF generation would be implemented here")
-                
-                with col2:
-                    if st.button("📊 Export vROps Excel", key="vrops_reports_tab_excel"):
-                        # Would call enhanced Excel generation with vROps data
-                        st.info("🚧 vROps-enhanced Excel export would be implemented here")
-                
-                with col3:
-                    if st.button("📈 vROps Heat Map CSV", key="vrops_reports_heatmap_csv"):
-                        # Would generate vROps-enhanced heat map CSV
-                        st.info("🚧 vROps heat map CSV would be implemented here")
+            col1, col2, col3 = st.columns(3)
             
-            # Bulk Analysis Reports
-            elif report_type == "Bulk Analysis Reports (vROps)" and has_bulk_results:
-                st.markdown("#### Bulk vROps Analysis Reports")
-                
-                col1, col2 = st.columns(2)
-                with col1:
-                    if st.button("📊 Export vROps Bulk Excel", key="vrops_bulk_excel_export_reports"):
-                        st.info("🚧 vROps bulk Excel export would be implemented here")
-                with col2:
-                    if st.button("📄 Generate vROps Bulk PDF", key="vrops_bulk_pdf_export_reports"):
-                        st.info("🚧 vROps bulk PDF generation would be implemented here")
-                
-                # Show vROps bulk summary
-                bulk_results = st.session_state.bulk_results
-                summary = bulk_results.get('summary', {})
-                
-                if 'error' not in summary and summary.get('total_workloads_analyzed', 0) > 0:
-                    st.markdown("#### vROps-Enhanced Bulk Analysis Summary")
-                    
-                    col1, col2, col3, col4 = st.columns(4)
-                    
-                    with col1:
-                        st.metric("Total Workloads", summary.get('total_workloads_analyzed', 0))
-                    
-                    with col2:
-                        total_cost = summary.get('total_monthly_cost', 0)
-                        rightsizing_savings = summary.get('total_rightsizing_savings_monthly', 0)
-                        st.metric("Total Monthly Cost", f"${total_cost:,.0f}", 
-                                delta=f"-${rightsizing_savings:,.0f} vROps savings")
-                    
-                    with col3:
-                        avg_health = summary.get('average_health_score', 0)
-                        st.metric("Avg vROps Health", f"{avg_health:.0f}/100")
-                    
-                    with col4:
-                        avg_waste = summary.get('average_waste_percentage', 0)
-                        st.metric("Avg Resource Waste", f"{avg_waste:.1f}%")
+            with col1:
+                if st.button("📄 Generate vROps PDF Report", type="primary", key="vrops_reports_pdf_generate"):
+                    st.info("🚧 vROps-enhanced PDF generation would be implemented here")
+            
+            with col2:
+                if st.button("📊 Export vROps Excel", key="vrops_reports_tab_excel"):
+                    st.info("🚧 vROps-enhanced Excel export would be implemented here")
+            
+            with col3:
+                if st.button("📈 vROps Heat Map CSV", key="vrops_reports_heatmap_csv"):
+                    st.info("🚧 vROps heat map CSV would be implemented here")
         else:
-            st.info("💡 Run a vROps analysis (Single Workload or Bulk Upload) to generate comprehensive reports with vROps insights.")
+            st.info("💡 Run a vROps analysis to generate comprehensive reports with vROps insights.")
     
     # Enhanced footer with vROps branding
     st.markdown("---")
