@@ -3300,7 +3300,7 @@ def _get_ec2_pricing_with_os(self, instance_type: str, operating_system: str = '
                 "selected_instance": {'type': 'm6i.large', 'vCPU': 2, 'RAM': 8}
             }
 
-    def _select_best_instance(self, required_vcpus: int, required_ram_gb: int) -> Dict[str, Any]:
+def _select_best_instance(self, required_vcpus: int, required_ram_gb: int) -> Dict[str, Any]:
     """Select the best matching instance type."""
     try:
         best_instance = None
@@ -3331,7 +3331,7 @@ def _get_ec2_pricing_with_os(self, instance_type: str, operating_system: str = '
         logger.error(f"Error selecting best instance: {e}")
         return {'type': 'm6i.large', 'vCPU': 2, 'RAM': 8, 'family': 'general'}
 
-    def _calculate_tco(self, vcpus: int, ram_gb: int, env: str) -> Dict[str, Any]:
+def _calculate_tco(self, vcpus: int, ram_gb: int, env: str) -> Dict[str, Any]:
     """Calculate TCO analysis with OS-specific pricing."""
     try:
         selected_instance = self._select_best_instance(vcpus, ram_gb)
@@ -3377,7 +3377,7 @@ def _get_ec2_pricing_with_os(self, instance_type: str, operating_system: str = '
         }
 
     def _get_fallback_requirements(self, env: str) -> Dict[str, Any]:
-    """Fallback requirements when calculation fails."""
+        """Fallback requirements when calculation fails."""
     return {
         'requirements': {'vCPUs': 2, 'RAM_GB': 8, 'storage_GB': 100},
         'cost_breakdown': {
