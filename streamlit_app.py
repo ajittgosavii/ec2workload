@@ -3105,11 +3105,11 @@ class EnhancedEnterpriseEC2Calculator:
             operating_system = self.inputs.get('operating_system', 'linux')
             
              # Update cost calculation to include OS
-        if 'cost_breakdown' in requirements:
-            # Recalculate with OS-specific pricing
-            vcpus = requirements['requirements']['vCPUs']
-            ram_gb = requirements['requirements']['RAM_GB'] 
-            storage_gb = requirements['requirements']['storage_GB']
+            if 'cost_breakdown' in requirements:
+                # Recalculate with OS-specific pricing
+                vcpus = requirements['requirements']['vCPUs']
+                ram_gb = requirements['requirements']['RAM_GB'] 
+                storage_gb = requirements['requirements']['storage_GB']
             
             # Get OS-specific cost breakdown
             selected_instance = self._select_best_instance(vcpus, ram_gb)
