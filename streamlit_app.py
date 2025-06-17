@@ -1573,8 +1573,11 @@ class AWSCostCalculator:
 # Enhanced AWS Pricing API Connection Fix
 # Add this to your existing AWSCostCalculator class or replace the existing __init__ method
 
+# REPLACE your existing AWSCostCalculator class with this corrected version
+# This fixes the syntax error and improves error handling
+
 class AWSCostCalculator:
-    """Enhanced AWS service cost calculator with improved error handling and connection status."""
+    """Enhanced AWS service cost calculator with real API integration and better error handling."""
     
     def __init__(self, region='us-east-1'):
         self.region = region
@@ -1584,212 +1587,6 @@ class AWSCostCalculator:
         
         # Try to initialize AWS client with multiple credential sources
         self._initialize_aws_connection()
-        
-        # Enhanced pricing data with more instance types (keeping your existing structure)
-        self.pricing = {
-            'compute': {
-                'ec2_instances': {},
-                'elastic_ip': 0.005  # per hour
-            },
-            'network': {
-                'alb': 0.0225,  # per ALB per hour
-                'nlb': 0.0225,  # per NLB per hour
-                'nat_gateway': 0.045,  # per NAT per hour
-                'cloudfront': {'per_gb': 0.085},
-                'route53': {'hosted_zone': 0.50},
-                'data_transfer': {'out_to_internet_up_to_10tb': 0.09},
-                'vpn_gateway': 0.05  # per hour
-            },
-            'storage': {
-                'ebs': {
-                    'gp3': 0.08,  # per GB-month
-                    'io2': 0.125,  # per GB-month
-                    'io2_iops': 0.065,  # per provisioned IOPS
-                    'snapshots': 0.05  # per GB-month
-                },
-                's3': {
-                    'standard': 0.023,  # per GB-month
-                    'standard_ia': 0.0125,  # per GB-month
-                    'glacier': 0.004  # per GB-month
-                }
-            },
-            'database': {
-                'aurora_mysql': {
-                    'db.r6g.large': 0.274,  # per hour
-                    'db.r6g.xlarge': 0.548
-                },
-                'rds_mysql': {
-                    'db.r6g.large': 0.252,  # per hour
-                    'db.r6g.xlarge': 0.504
-                },
-                'storage': {
-                    'aurora_storage': 0.10,  # per GB-month
-                    'aurora_io': 0.20,  # per million requests
-                    'rds_gp2': 0.115  # per GB-month
-                },
-                'backup_storage': 0.095,  # per GB-month
-                'rds_proxy': 0.015  # per vCPU-hour
-            },
-            'security': {
-                'secrets_manager': 0.40,  # per secret per month
-                'kms': 1.00,  # per key per month
-                'config': 0.003,  # per configuration item
-                'cloudtrail': 0.10,  # per 100,000 events
-                'guardduty': 0.10,  # per GB analyzed
-                'security_hub': 0.0010,  # per security check
-                'waf': 0.60  # per web ACL per month
-            },
-            'monitoring': {
-                'cloudwatch': {
-                    'metrics': 0.30,  # per custom metric
-                    'dashboards': 3.00,  # per dashboard
-                    'alarms': 0.10,  # per alarm
-                    'logs_ingestion': 0.50,  # per GB
-                    'logs_storage': 0.03  # per GB-month
-                },
-                'xray': 0.000005,  # per trace
-                'synthetics': 0.0012  # per canary run
-            }
-        }
-    def _initialize_aws_connection(self):
-        """Initialize AWS connection with enhanced error handling."""
-        try:
-            import boto3
-            from botocore.exceptions import NoCredentialsError, PartialCredentialsError, ClientError
-            
-            # Option 1: Try Streamlit secrets first
-            if hasattr(st, 'secrets') and 'aws' in st.secrets:
-                try:
-                    self.pricing_client = boto3.client(
-                        'pricing',
-                        region_name='us-east-1',  # Pricing API only available in us-east-1
-                        aws_access_key_id=st.secrets['aws']['access_key_id'],
-                        aws_secret_access_key=st.secrets['aws']['secret_access_key']
-                    )
-                    # Test the connection
-                    self._test_aws_connection()
-                    logger.info("✅ Using AWS credentials from Streamlit secrets")
-                    return
-                except Exception as e:
-                    logger.warning(f"Streamlit secrets AWS connection failed: {e}")
-                    self.connection_error = f"Secrets config error: {str(e)}"
-    def _test_aws_connection(self):
-            """Test AWS connection with minimal API call."""
-        try:
-            # Test with a minimal API call
-            test_response = self.pricing_client.get_products(
-                ServiceCode='AmazonEC2', 
-                MaxResults=1
-            )
-            self.aws_connected = True
-            self.connection_error = None
-            logger.info("✅ AWS Pricing API connection test successful")
-        except Exception as e:
-            self.aws_connected = False
-            self.connection_error = f"API test failed: {str(e)}"
-            logger.warning(f"⚠️ AWS API test failed: {e}")
-            raise
-    
-    def get_connection_status(self):
-            """Get detailed connection status for display."""
-            return {
-                'connected': self.aws_connected,
-                'error': self.connection_error,
-                'client_available': self.pricing_client is not None
-            }
-        # Enhanced connection status display function
-    def show_aws_connection_status():
-        """Show enhanced AWS connection status in the sidebar."""
-    try:
-        # Check AWS connection status through the cost calculator
-        cost_calculator = AWSCostCalculator()
-        status = cost_calculator.get_connection_status()
-        
-        if status['connected']:
-            aws_status = "🟢 Connected"
-            aws_help = "AWS Pricing API connected for real-time pricing"
-        elif status['error']:
-            aws_status = "🔴 Error"
-            aws_help = f"Connection failed: {status['error']}"
-        else:
-            aws_status = "🟡 Using Fallback"
-            aws_help = "Using fallback pricing data"
-        
-        st.markdown(f"**AWS Pricing API:** {aws_status}")
-        st.markdown(f"*{aws_help}*")
-    
-    
-    def _get_ec2_pricing_with_os(self, instance_type: str, operating_system: str = 'linux') -> dict:
-            """Get EC2 pricing with OS-specific adjustments."""
-        
-        # Get base Linux pricing
-        base_pricing = self._get_ec2_pricing(instance_type)
-        
-        # Windows licensing adds approximately 20-40% to the cost
-        if operating_system.lower() == 'windows':
-            windows_multiplier = 1.3  # 30% increase for Windows licensing
-            
-            for pricing_model in base_pricing:
-                if pricing_model not in ['source', 'last_updated']:
-                    base_pricing[pricing_model] = base_pricing[pricing_model] * windows_multiplier
-            
-            # Update metadata
-            base_pricing['source'] = base_pricing.get('source', 'fallback') + '_windows'
-        
-        return base_pricing
-
-    # Update your _calculate_compute_costs method to use OS-specific pricing
-    def _calculate_compute_costs(self, env: str, compute_recs: Dict, requirements: Dict, operating_system: str = 'linux') -> Dict[str, Any]:
-        """Calculate compute-related costs with OS-specific pricing."""
-        
-    instance_type = compute_recs['primary_instance']['type']
-    instance_count = self._get_instance_count(env)
-    
-    # EC2 instance costs with OS-specific pricing
-    instance_pricing = self._get_ec2_pricing_with_os(instance_type, operating_system)
-    
-    # Determine pricing model
-    pricing_model = 'on_demand'
-    if env in ['PROD', 'PREPROD']:
-        pricing_model = 'ri_1y'
-    
-    monthly_instance_cost = instance_pricing[pricing_model] * instance_count * 730  # hours per month
-     except Exception as e:
-        st.markdown("**AWS Pricing API:** 🔴 Error")
-        st.markdown(f"*Error checking connection: {str(e)}*")
-        logger.error(f"Error in show_aws_connection_status: {e}")
-    
-    
-    def __init__(self, region='us-east-1'):
-        self.region = region
-        self.pricing_client = None
-        self.aws_connected = False
-        
-        # Try to initialize AWS client with multiple credential sources
-        try:
-            # Option 1: Try Streamlit secrets first
-            if hasattr(st, 'secrets') and 'aws' in st.secrets:
-                self.pricing_client = boto3.client(
-                    'pricing',
-                    region_name='us-east-1',  # Pricing API only available in us-east-1
-                    aws_access_key_id=st.secrets['aws']['access_key_id'],
-                    aws_secret_access_key=st.secrets['aws']['secret_access_key']
-                )
-                logger.info("Using AWS credentials from Streamlit secrets")
-            else:
-                # Option 2: Use default credential chain (AWS CLI, environment variables, IAM roles)
-                self.pricing_client = boto3.client('pricing', region_name='us-east-1')
-                logger.info("Using AWS credentials from default credential chain")
-            
-            # Test the connection with a minimal API call
-            test_response = self.pricing_client.get_products(ServiceCode='AmazonEC2', MaxResults=1)
-            self.aws_connected = True
-            logger.info("✅ AWS Pricing API connected successfully")
-            
-        except Exception as e:
-            logger.warning(f"⚠️ AWS Pricing API connection failed: {e}")
-            logger.warning("🔄 Will use fallback pricing data")
-            self.aws_connected = False
         
         # Enhanced pricing data with more instance types
         self.pricing = {
@@ -1857,22 +1654,79 @@ class AWSCostCalculator:
                 'synthetics': 0.0012  # per canary run
             }
         }
-        return{
-        'ec2_instances': {
-            'cost': monthly_instance_cost,
-            'details': f"{instance_count}x {instance_type} ({pricing_model}) - {operating_system.title()}",
-            'breakdown': {
-                'instance_type': instance_type,
-                'instance_count': instance_count,
-                'pricing_model': pricing_model,
-                'operating_system': operating_system,
-                'unit_cost': instance_pricing[pricing_model],
-                'monthly_hours': 730,
-                'os_multiplier': 1.3 if operating_system.lower() == 'windows' else 1.0
-            }
-        },
-    }
-        
+    
+    def _initialize_aws_connection(self):
+        """Initialize AWS connection with enhanced error handling."""
+        try:
+            import boto3
+            from botocore.exceptions import NoCredentialsError, PartialCredentialsError, ClientError
+            
+            # Option 1: Try Streamlit secrets first
+            if hasattr(st, 'secrets') and 'aws' in st.secrets:
+                try:
+                    self.pricing_client = boto3.client(
+                        'pricing',
+                        region_name='us-east-1',  # Pricing API only available in us-east-1
+                        aws_access_key_id=st.secrets['aws']['access_key_id'],
+                        aws_secret_access_key=st.secrets['aws']['secret_access_key']
+                    )
+                    # Test the connection
+                    self._test_aws_connection()
+                    logger.info("✅ Using AWS credentials from Streamlit secrets")
+                    return
+                except Exception as e:
+                    logger.warning(f"Streamlit secrets AWS connection failed: {e}")
+                    self.connection_error = f"Secrets config error: {str(e)}"
+            
+            # Option 2: Use default credential chain
+            try:
+                self.pricing_client = boto3.client('pricing', region_name='us-east-1')
+                # Test the connection
+                self._test_aws_connection()
+                logger.info("✅ Using AWS credentials from default credential chain")
+                return
+            except NoCredentialsError:
+                self.connection_error = "No AWS credentials found"
+                logger.warning("⚠️ No AWS credentials found")
+            except PartialCredentialsError:
+                self.connection_error = "Incomplete AWS credentials"
+                logger.warning("⚠️ Incomplete AWS credentials")
+            except Exception as e:
+                self.connection_error = f"Default credentials error: {str(e)}"
+                logger.warning(f"⚠️ Default AWS credential chain failed: {e}")
+                
+        except ImportError:
+            self.connection_error = "boto3 not installed"
+            logger.warning("⚠️ boto3 not available")
+        except Exception as e:
+            self.connection_error = f"Unexpected error: {str(e)}"
+            logger.error(f"⚠️ Unexpected AWS connection error: {e}")
+    
+    def _test_aws_connection(self):
+        """Test AWS connection with minimal API call."""
+        try:
+            # Test with a minimal API call
+            test_response = self.pricing_client.get_products(
+                ServiceCode='AmazonEC2', 
+                MaxResults=1
+            )
+            self.aws_connected = True
+            self.connection_error = None
+            logger.info("✅ AWS Pricing API connection test successful")
+        except Exception as e:
+            self.aws_connected = False
+            self.connection_error = f"API test failed: {str(e)}"
+            logger.warning(f"⚠️ AWS API test failed: {e}")
+            raise
+    
+    def get_connection_status(self):
+        """Get detailed connection status for display."""
+        return {
+            'connected': self.aws_connected,
+            'error': self.connection_error,
+            'client_available': self.pricing_client is not None
+        }
+    
     def get_real_ec2_pricing(self, instance_type: str) -> Optional[Dict[str, float]]:
         """Get real EC2 pricing from AWS API."""
         if not self.aws_connected:
@@ -1918,54 +1772,73 @@ class AWSCostCalculator:
             logger.error(f"Error getting real pricing for {instance_type}: {e}")
             return None
 
-    def _get_ec2_pricing(self, instance_type: str) -> dict:
-        """Get EC2 pricing with real AWS API and enhanced fallback."""
+    def _get_ec2_pricing_with_os(self, instance_type: str, operating_system: str = 'linux') -> dict:
+        """Get EC2 pricing with OS-specific adjustments."""
         
-        # Try AWS API first
-        real_pricing = self.get_real_ec2_pricing(instance_type)
+        # Try to get real AWS pricing first
+        if self.aws_connected:
+            real_pricing = self.get_real_ec2_pricing(instance_type)
+            if real_pricing:
+                # Estimate other pricing models based on typical AWS discounts
+                on_demand_price = real_pricing['on_demand']
+                pricing = {
+                    'on_demand': on_demand_price,
+                    'ri_1y_no_upfront': on_demand_price * 0.65,  # ~35% discount
+                    'ri_3y_no_upfront': on_demand_price * 0.55,  # ~45% discount
+                    'spot': on_demand_price * 0.30,   # ~70% discount
+                    'source': 'aws_api',
+                    'last_updated': real_pricing['last_updated']
+                }
+            else:
+                pricing = self._get_fallback_pricing(instance_type)
+        else:
+            pricing = self._get_fallback_pricing(instance_type)
         
-        if real_pricing:
-            # Estimate other pricing models based on typical AWS discounts
-            on_demand_price = real_pricing['on_demand']
-            return {
-                'on_demand': on_demand_price,
-                'ri_1y': on_demand_price * 0.65,  # ~35% discount
-                'ri_3y': on_demand_price * 0.55,  # ~45% discount
-                'spot': on_demand_price * 0.30,   # ~70% discount
-                'source': 'aws_api',
-                'last_updated': real_pricing['last_updated']
-            }
+        # Apply Windows licensing cost
+        if operating_system.lower() == 'windows':
+            windows_multiplier = 1.3  # 30% increase for Windows licensing
+            
+            for pricing_model in pricing:
+                if pricing_model not in ['source', 'last_updated']:
+                    pricing[pricing_model] = pricing[pricing_model] * windows_multiplier
+            
+            pricing['source'] = pricing.get('source', 'fallback') + '_windows'
+        
+        return pricing
+
+    def _get_fallback_pricing(self, instance_type: str) -> dict:
+        """Get fallback pricing with enhanced instance types."""
         
         # Enhanced fallback pricing with more instance types
         fallback_prices = {
             # General Purpose - M6i instances
-            'm6i.large': {'on_demand': 0.0864, 'ri_1y': 0.0605, 'ri_3y': 0.0432, 'spot': 0.0259},
-            'm6i.xlarge': {'on_demand': 0.1728, 'ri_1y': 0.1210, 'ri_3y': 0.0864, 'spot': 0.0518},
-            'm6i.2xlarge': {'on_demand': 0.3456, 'ri_1y': 0.2419, 'ri_3y': 0.1728, 'spot': 0.1037},
-            'm6i.4xlarge': {'on_demand': 0.6912, 'ri_1y': 0.4838, 'ri_3y': 0.3456, 'spot': 0.2074},
-            'm6i.8xlarge': {'on_demand': 1.3824, 'ri_1y': 0.9677, 'ri_3y': 0.6912, 'spot': 0.4147},
+            'm6i.large': {'on_demand': 0.0864, 'ri_1y_no_upfront': 0.0605, 'ri_3y_no_upfront': 0.0432, 'spot': 0.0259},
+            'm6i.xlarge': {'on_demand': 0.1728, 'ri_1y_no_upfront': 0.1210, 'ri_3y_no_upfront': 0.0864, 'spot': 0.0518},
+            'm6i.2xlarge': {'on_demand': 0.3456, 'ri_1y_no_upfront': 0.2419, 'ri_3y_no_upfront': 0.1728, 'spot': 0.1037},
+            'm6i.4xlarge': {'on_demand': 0.6912, 'ri_1y_no_upfront': 0.4838, 'ri_3y_no_upfront': 0.3456, 'spot': 0.2074},
+            'm6i.8xlarge': {'on_demand': 1.3824, 'ri_1y_no_upfront': 0.9677, 'ri_3y_no_upfront': 0.6912, 'spot': 0.4147},
             
             # Memory Optimized - R6i instances  
-            'r6i.large': {'on_demand': 0.1008, 'ri_1y': 0.0706, 'ri_3y': 0.0504, 'spot': 0.0302},
-            'r6i.xlarge': {'on_demand': 0.2016, 'ri_1y': 0.1411, 'ri_3y': 0.1008, 'spot': 0.0605},
-            'r6i.2xlarge': {'on_demand': 0.4032, 'ri_1y': 0.2822, 'ri_3y': 0.2016, 'spot': 0.1210},
-            'r6i.4xlarge': {'on_demand': 0.8064, 'ri_1y': 0.5645, 'ri_3y': 0.4032, 'spot': 0.2419},
+            'r6i.large': {'on_demand': 0.1008, 'ri_1y_no_upfront': 0.0706, 'ri_3y_no_upfront': 0.0504, 'spot': 0.0302},
+            'r6i.xlarge': {'on_demand': 0.2016, 'ri_1y_no_upfront': 0.1411, 'ri_3y_no_upfront': 0.1008, 'spot': 0.0605},
+            'r6i.2xlarge': {'on_demand': 0.4032, 'ri_1y_no_upfront': 0.2822, 'ri_3y_no_upfront': 0.2016, 'spot': 0.1210},
+            'r6i.4xlarge': {'on_demand': 0.8064, 'ri_1y_no_upfront': 0.5645, 'ri_3y_no_upfront': 0.4032, 'spot': 0.2419},
             
             # Compute Optimized - C6i instances
-            'c6i.large': {'on_demand': 0.0765, 'ri_1y': 0.0536, 'ri_3y': 0.0383, 'spot': 0.0230},
-            'c6i.xlarge': {'on_demand': 0.1530, 'ri_1y': 0.1071, 'ri_3y': 0.0765, 'spot': 0.0459},
-            'c6i.2xlarge': {'on_demand': 0.3060, 'ri_1y': 0.2142, 'ri_3y': 0.1530, 'spot': 0.0918},
-            'c6i.4xlarge': {'on_demand': 0.6120, 'ri_1y': 0.4284, 'ri_3y': 0.3060, 'spot': 0.1836},
+            'c6i.large': {'on_demand': 0.0765, 'ri_1y_no_upfront': 0.0536, 'ri_3y_no_upfront': 0.0383, 'spot': 0.0230},
+            'c6i.xlarge': {'on_demand': 0.1530, 'ri_1y_no_upfront': 0.1071, 'ri_3y_no_upfront': 0.0765, 'spot': 0.0459},
+            'c6i.2xlarge': {'on_demand': 0.3060, 'ri_1y_no_upfront': 0.2142, 'ri_3y_no_upfront': 0.1530, 'spot': 0.0918},
+            'c6i.4xlarge': {'on_demand': 0.6120, 'ri_1y_no_upfront': 0.4284, 'ri_3y_no_upfront': 0.3060, 'spot': 0.1836},
             
             # Burstable - T3 instances
-            't3.micro': {'on_demand': 0.0104, 'ri_1y': 0.0062, 'ri_3y': 0.0041, 'spot': 0.0031},
-            't3.small': {'on_demand': 0.0208, 'ri_1y': 0.0125, 'ri_3y': 0.0083, 'spot': 0.0062},
-            't3.medium': {'on_demand': 0.0416, 'ri_1y': 0.0250, 'ri_3y': 0.0166, 'spot': 0.0125},
-            't3.large': {'on_demand': 0.0832, 'ri_1y': 0.0499, 'ri_3y': 0.0333, 'spot': 0.0250},
+            't3.micro': {'on_demand': 0.0104, 'ri_1y_no_upfront': 0.0062, 'ri_3y_no_upfront': 0.0041, 'spot': 0.0031},
+            't3.small': {'on_demand': 0.0208, 'ri_1y_no_upfront': 0.0125, 'ri_3y_no_upfront': 0.0083, 'spot': 0.0062},
+            't3.medium': {'on_demand': 0.0416, 'ri_1y_no_upfront': 0.0250, 'ri_3y_no_upfront': 0.0166, 'spot': 0.0125},
+            't3.large': {'on_demand': 0.0832, 'ri_1y_no_upfront': 0.0499, 'ri_3y_no_upfront': 0.0333, 'spot': 0.0250},
         }
         
         pricing = fallback_prices.get(instance_type, {
-            'on_demand': 0.1, 'ri_1y': 0.07, 'ri_3y': 0.05, 'spot': 0.03
+            'on_demand': 0.1, 'ri_1y_no_upfront': 0.07, 'ri_3y_no_upfront': 0.05, 'spot': 0.03
         })
         
         # Add metadata
@@ -1975,9 +1848,6 @@ class AWSCostCalculator:
         })
         
         return pricing
-
-    # Keep all the existing methods but update references to use the new pricing structure
-    # ... (rest of the existing methods remain the same)
 
     def _get_region_name(self, region_code: str) -> str:
         """Map AWS region code to full name."""
@@ -2018,42 +1888,45 @@ class AWSCostCalculator:
         return costs
     
     def _calculate_compute_costs(self, env: str, compute_recs: Dict, requirements: Dict) -> Dict[str, Any]:
-        """Calculate compute-related costs."""
+        """Calculate compute-related costs with OS-specific pricing."""
         
         instance_type = compute_recs['primary_instance']['type']
         instance_count = self._get_instance_count(env)
         
-        # EC2 instance costs
-        instance_pricing = self.pricing['compute']['ec2_instances'].get(instance_type, {
-        'on_demand': 0.1, 'ri_1y': 0.07, 'ri_3y': 0.05, 'spot': 0.03
-    })
+        # Get operating system from requirements or default to linux
+        operating_system = requirements.get('operating_system', 'linux')
+        
+        # EC2 instance costs with OS-specific pricing
+        instance_pricing = self._get_ec2_pricing_with_os(instance_type, operating_system)
         
         # Determine pricing model
         pricing_model = 'on_demand'
         if env in ['PROD', 'PREPROD']:
-            pricing_model = 'ri_1y'
+            pricing_model = 'ri_1y_no_upfront'
         
-        monthly_instance_cost = instance_pricing[pricing_model] * instance_count
+        monthly_instance_cost = instance_pricing[pricing_model] * instance_count * 730  # hours per month
         
         # Auto Scaling (no additional cost, but affects instance count)
         scaling_info = compute_recs.get('scaling', {})
         max_instances = scaling_info.get('max_instances', instance_count)
         
         # Elastic IP costs (if needed)
-        eip_cost = self.pricing['compute']['elastic_ip'] * instance_count if env in ['PROD', 'PREPROD'] else 0
+        eip_cost = self.pricing['compute']['elastic_ip'] * instance_count * 730 if env in ['PROD', 'PREPROD'] else 0
         
         total_compute = monthly_instance_cost + eip_cost
         
         return {
             'ec2_instances': {
                 'cost': monthly_instance_cost,
-                'details': f"{instance_count}x {instance_type} ({pricing_model})",
+                'details': f"{instance_count}x {instance_type} ({pricing_model}) - {operating_system.title()}",
                 'breakdown': {
                     'instance_type': instance_type,
                     'instance_count': instance_count,
                     'pricing_model': pricing_model,
+                    'operating_system': operating_system,
                     'unit_cost': instance_pricing[pricing_model],
-                    'max_instances_scaling': max_instances
+                    'monthly_hours': 730,
+                    'os_multiplier': instance_pricing.get('os_multiplier', 1.0)
                 }
             },
             'elastic_ip': {
@@ -2067,6 +1940,7 @@ class AWSCostCalculator:
             'total': total_compute,
             'optimization_notes': self._get_compute_optimization_notes(env, instance_type, pricing_model)
         }
+    
     
     def _calculate_network_costs(self, env: str, network_recs: Dict, requirements: Dict) -> Dict[str, Any]:
         """Calculate network-related costs."""
@@ -6335,24 +6209,30 @@ def get_env_characteristics(env: str) -> str:
     return characteristics.get(env, 'Standard environment characteristics')
 
 def show_aws_connection_status():
-    """Show AWS connection status in the sidebar."""
+    """Show enhanced AWS connection status in the sidebar."""
     try:
         # Check AWS connection status through the cost calculator
         cost_calculator = AWSCostCalculator()
+        status = cost_calculator.get_connection_status()
         
-        if cost_calculator.aws_connected:
+        if status['connected']:
             aws_status = "🟢 Connected"
             aws_help = "AWS Pricing API connected for real-time pricing"
+        elif status['error']:
+            aws_status = "🔴 Error"
+            aws_help = f"Connection failed: {status['error']}"
         else:
             aws_status = "🟡 Using Fallback"
-            aws_help = "Using fallback pricing data. Configure AWS credentials for real-time pricing"
+            aws_help = "Using fallback pricing data"
         
         st.markdown(f"**AWS Pricing API:** {aws_status}")
         st.markdown(f"*{aws_help}*")
-        
+    
     except Exception as e:
         st.markdown("**AWS Pricing API:** 🔴 Error")
-        st.markdown("*Error checking AWS connection*")
+        st.markdown(f"*Error checking connection: {str(e)}*")
+        logger.error(f"Error in show_aws_connection_status: {e}")
+
 
 def main():
     """Enhanced main application with vROPS integration and nested tab structure."""
