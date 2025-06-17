@@ -3176,7 +3176,7 @@ def _enhance_inputs_with_vrops(self, vrops_data: Dict):
         except Exception as e:
             logger.error(f"Error enhancing inputs with vROPS data: {e}")
 
-    def _calculate_standard_requirements(self, env: str) -> Dict[str, Any]:
+def _calculate_standard_requirements(self, env: str) -> Dict[str, Any]:
     """Calculate standard infrastructure requirements."""
     try:
         env_mult = self.ENV_MULTIPLIERS[env]
