@@ -1566,15 +1566,43 @@ class ClaudeAIMigrationAnalyzer:
             }
         }
 
+# REPLACE the existing AWSCostCalculator class (around line 1000-1500) with this improved version:
+
 class AWSCostCalculator:
-    """AWS service cost calculator with detailed pricing breakdown."""
+    """Enhanced AWS service cost calculator with real API integration and better error handling."""
     
     def __init__(self, region='us-east-1'):
-        # Initialize AWS Pricing client
-        self.pricing_client = boto3.client('pricing', region_name='us-east-1')
         self.region = region
+        self.pricing_client = None
+        self.aws_connected = False
         
-        # Initialize pricing data structure
+        # Try to initialize AWS client with multiple credential sources
+        try:
+            # Option 1: Try Streamlit secrets first
+            if hasattr(st, 'secrets') and 'aws' in st.secrets:
+                self.pricing_client = boto3.client(
+                    'pricing',
+                    region_name='us-east-1',  # Pricing API only available in us-east-1
+                    aws_access_key_id=st.secrets['aws']['access_key_id'],
+                    aws_secret_access_key=st.secrets['aws']['secret_access_key']
+                )
+                logger.info("Using AWS credentials from Streamlit secrets")
+            else:
+                # Option 2: Use default credential chain (AWS CLI, environment variables, IAM roles)
+                self.pricing_client = boto3.client('pricing', region_name='us-east-1')
+                logger.info("Using AWS credentials from default credential chain")
+            
+            # Test the connection with a minimal API call
+            test_response = self.pricing_client.get_products(ServiceCode='AmazonEC2', MaxResults=1)
+            self.aws_connected = True
+            logger.info("✅ AWS Pricing API connected successfully")
+            
+        except Exception as e:
+            logger.warning(f"⚠️ AWS Pricing API connection failed: {e}")
+            logger.warning("🔄 Will use fallback pricing data")
+            self.aws_connected = False
+        
+        # Enhanced pricing data with more instance types
         self.pricing = {
             'compute': {
                 'ec2_instances': {},
@@ -1641,61 +1669,111 @@ class AWSCostCalculator:
             }
         }
 
-    def get_real_pricing(self, service_code: str, filters: list) -> list:
-        """Get real pricing from AWS Pricing API."""
-        try:
-            response = self.pricing_client.get_products(
-                ServiceCode=service_code,
-                Filters=filters,
-                MaxResults=100
-            )
-            return response['PriceList']
-        except Exception as e:
-            logger.error(f"Error getting real pricing: {e}")
-            return []
-        
-    def _get_ec2_pricing(self, instance_type: str) -> dict:
-        """Get EC2 pricing from AWS Pricing API."""
-        filters = [
-            {'Type': 'TERM_MATCH', 'Field': 'instanceType', 'Value': instance_type},
-            {'Type': 'TERM_MATCH', 'Field': 'location', 'Value': self._get_region_name(self.region)},
-            {'Type': 'TERM_MATCH', 'Field': 'operatingSystem', 'Value': 'Linux'},
-            {'Type': 'TERM_MATCH', 'Field': 'preInstalledSw', 'Value': 'NA'},
-            {'Type': 'TERM_MATCH', 'Field': 'tenancy', 'Value': 'Shared'},
-        ]
-        
-        price_list = self.get_real_pricing('AmazonEC2', filters)
-        pricing = {}
-        
-        for price in price_list:
-            data = json.loads(price)
-            terms = data.get('terms', {})
-            on_demand = terms.get('OnDemand', {})
+    def get_real_ec2_pricing(self, instance_type: str) -> Optional[Dict[str, float]]:
+        """Get real EC2 pricing from AWS API."""
+        if not self.aws_connected:
+            return None
             
-            for term_id, term_data in on_demand.items():
-                price_dimensions = term_data.get('priceDimensions', {})
-                for dim_id, dim_data in price_dimensions.items():
-                    if 'USD' in dim_data.get('pricePerUnit', {}):
-                        usd_price = dim_data['pricePerUnit']['USD']
-                        pricing['on_demand'] = float(usd_price)
-                        break
-                if 'on_demand' in pricing:
-                    break
+        try:
+            filters = [
+                {'Type': 'TERM_MATCH', 'Field': 'instanceType', 'Value': instance_type},
+                {'Type': 'TERM_MATCH', 'Field': 'location', 'Value': self._get_region_name(self.region)},
+                {'Type': 'TERM_MATCH', 'Field': 'operatingSystem', 'Value': 'Linux'},
+                {'Type': 'TERM_MATCH', 'Field': 'preInstalledSw', 'Value': 'NA'},
+                {'Type': 'TERM_MATCH', 'Field': 'tenancy', 'Value': 'Shared'},
+            ]
+            
+            response = self.pricing_client.get_products(
+                ServiceCode='AmazonEC2',
+                Filters=filters,
+                MaxResults=10
+            )
+            
+            if response['PriceList']:
+                # Parse pricing data
+                for price_item in response['PriceList']:
+                    data = json.loads(price_item)
+                    terms = data.get('terms', {})
                     
-        # Fallback if no pricing found
-        if not pricing:
-            logger.warning(f"Using fallback pricing for {instance_type}")
-            fallback_prices = {
-                'm6i.large': {'on_demand': 0.0864, 'ri_1y': 0.0605, 'ri_3y': 0.0432, 'spot': 0.0259},
-                'm6i.xlarge': {'on_demand': 0.1728, 'ri_1y': 0.1210, 'ri_3y': 0.0864, 'spot': 0.0518},
-                'm6i.2xlarge': {'on_demand': 0.3456, 'ri_1y': 0.2419, 'ri_3y': 0.1728, 'spot': 0.1037},
-                'm6i.4xlarge': {'on_demand': 0.6912, 'ri_1y': 0.4838, 'ri_3y': 0.3456, 'spot': 0.2074},
-                'r6i.large': {'on_demand': 0.1008, 'ri_1y': 0.0706, 'ri_3y': 0.0504, 'spot': 0.0302},
-                'r6i.xlarge': {'on_demand': 0.2016, 'ri_1y': 0.1411, 'ri_3y': 0.1008, 'spot': 0.0605}
+                    # Get On-Demand pricing
+                    on_demand = terms.get('OnDemand', {})
+                    for term_data in on_demand.values():
+                        price_dimensions = term_data.get('priceDimensions', {})
+                        for dim_data in price_dimensions.values():
+                            usd_price = dim_data.get('pricePerUnit', {}).get('USD')
+                            if usd_price:
+                                return {
+                                    'on_demand': float(usd_price),
+                                    'source': 'aws_api',
+                                    'last_updated': datetime.now().isoformat()
+                                }
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error getting real pricing for {instance_type}: {e}")
+            return None
+
+    def _get_ec2_pricing(self, instance_type: str) -> dict:
+        """Get EC2 pricing with real AWS API and enhanced fallback."""
+        
+        # Try AWS API first
+        real_pricing = self.get_real_ec2_pricing(instance_type)
+        
+        if real_pricing:
+            # Estimate other pricing models based on typical AWS discounts
+            on_demand_price = real_pricing['on_demand']
+            return {
+                'on_demand': on_demand_price,
+                'ri_1y': on_demand_price * 0.65,  # ~35% discount
+                'ri_3y': on_demand_price * 0.55,  # ~45% discount
+                'spot': on_demand_price * 0.30,   # ~70% discount
+                'source': 'aws_api',
+                'last_updated': real_pricing['last_updated']
             }
-            return fallback_prices.get(instance_type, {'on_demand': 0.1, 'ri_1y': 0.07, 'ri_3y': 0.05, 'spot': 0.03})
+        
+        # Enhanced fallback pricing with more instance types
+        fallback_prices = {
+            # General Purpose - M6i instances
+            'm6i.large': {'on_demand': 0.0864, 'ri_1y': 0.0605, 'ri_3y': 0.0432, 'spot': 0.0259},
+            'm6i.xlarge': {'on_demand': 0.1728, 'ri_1y': 0.1210, 'ri_3y': 0.0864, 'spot': 0.0518},
+            'm6i.2xlarge': {'on_demand': 0.3456, 'ri_1y': 0.2419, 'ri_3y': 0.1728, 'spot': 0.1037},
+            'm6i.4xlarge': {'on_demand': 0.6912, 'ri_1y': 0.4838, 'ri_3y': 0.3456, 'spot': 0.2074},
+            'm6i.8xlarge': {'on_demand': 1.3824, 'ri_1y': 0.9677, 'ri_3y': 0.6912, 'spot': 0.4147},
+            
+            # Memory Optimized - R6i instances  
+            'r6i.large': {'on_demand': 0.1008, 'ri_1y': 0.0706, 'ri_3y': 0.0504, 'spot': 0.0302},
+            'r6i.xlarge': {'on_demand': 0.2016, 'ri_1y': 0.1411, 'ri_3y': 0.1008, 'spot': 0.0605},
+            'r6i.2xlarge': {'on_demand': 0.4032, 'ri_1y': 0.2822, 'ri_3y': 0.2016, 'spot': 0.1210},
+            'r6i.4xlarge': {'on_demand': 0.8064, 'ri_1y': 0.5645, 'ri_3y': 0.4032, 'spot': 0.2419},
+            
+            # Compute Optimized - C6i instances
+            'c6i.large': {'on_demand': 0.0765, 'ri_1y': 0.0536, 'ri_3y': 0.0383, 'spot': 0.0230},
+            'c6i.xlarge': {'on_demand': 0.1530, 'ri_1y': 0.1071, 'ri_3y': 0.0765, 'spot': 0.0459},
+            'c6i.2xlarge': {'on_demand': 0.3060, 'ri_1y': 0.2142, 'ri_3y': 0.1530, 'spot': 0.0918},
+            'c6i.4xlarge': {'on_demand': 0.6120, 'ri_1y': 0.4284, 'ri_3y': 0.3060, 'spot': 0.1836},
+            
+            # Burstable - T3 instances
+            't3.micro': {'on_demand': 0.0104, 'ri_1y': 0.0062, 'ri_3y': 0.0041, 'spot': 0.0031},
+            't3.small': {'on_demand': 0.0208, 'ri_1y': 0.0125, 'ri_3y': 0.0083, 'spot': 0.0062},
+            't3.medium': {'on_demand': 0.0416, 'ri_1y': 0.0250, 'ri_3y': 0.0166, 'spot': 0.0125},
+            't3.large': {'on_demand': 0.0832, 'ri_1y': 0.0499, 'ri_3y': 0.0333, 'spot': 0.0250},
+        }
+        
+        pricing = fallback_prices.get(instance_type, {
+            'on_demand': 0.1, 'ri_1y': 0.07, 'ri_3y': 0.05, 'spot': 0.03
+        })
+        
+        # Add metadata
+        pricing.update({
+            'source': 'fallback',
+            'last_updated': datetime.now().isoformat()
+        })
         
         return pricing
+
+    # Keep all the existing methods but update references to use the new pricing structure
+    # ... (rest of the existing methods remain the same)
 
     def _get_region_name(self, region_code: str) -> str:
         """Map AWS region code to full name."""
@@ -4059,6 +4137,20 @@ def render_enhanced_configuration():
     if st.session_state.enhanced_results:
         st.success("✅ Analysis completed! Check the 'Results', 'Heat Map', and 'Technical Reports' tabs above for detailed analysis.")
         st.info("💡 Visit the 'Reports' tab to generate PDF and Excel reports.")
+        
+def show_pricing_source_indicator(pricing_data: Dict[str, Any]):
+    """Show pricing source indicator in the main interface."""
+    
+    source = pricing_data.get('source', 'unknown')
+    last_updated = pricing_data.get('last_updated', 'Unknown')
+    
+    if source == 'aws_api':
+        st.success(f"💰 Real-time AWS pricing (Updated: {last_updated[:16]})")
+    elif source == 'fallback':
+        st.info(f"💰 Fallback pricing data (Generated: {last_updated[:16]})")
+        st.caption("💡 Configure AWS credentials for real-time pricing")
+    else:
+        st.warning("💰 Unknown pricing source")
 
 def run_enhanced_analysis():
     """Run enhanced analysis with optional vROPS data."""
@@ -4244,6 +4336,13 @@ def render_enhanced_results():
         cost_breakdown = prod_results.get('cost_breakdown', {})
         total_costs = cost_breakdown.get('total_costs', {})
         
+        # ADD THIS: Show pricing source information
+        selected_instance = cost_breakdown.get('selected_instance', {})
+        if selected_instance:
+            calculator = AWSCostCalculator()
+            instance_pricing = calculator._get_ec2_pricing(selected_instance.get('type', 'm6i.large'))
+            show_pricing_source_indicator(instance_pricing)
+        
         if total_costs:
             col1, col2 = st.columns(2)
             
@@ -4283,6 +4382,15 @@ def render_enhanced_results():
                     if service_cost_data:
                         df_service_costs = pd.DataFrame(service_cost_data)
                         st.dataframe(df_service_costs, use_container_width=True, hide_index=True)
+                        
+                        # ADD THIS: Show if using real AWS pricing
+                    if selected_instance:
+                        source = instance_pricing.get('source', 'unknown')
+                        if source == 'aws_api':
+                            st.success("✅ Real-time AWS pricing")
+                        else:
+                            st.info("ℹ️ Using fallback pricing")                     
+                                               
                         
                         # Show total from service breakdown
                         total_services = sum(service_costs[cat]['total'] for cat in categories if cat in service_costs)
@@ -5685,6 +5793,9 @@ def main():
         
         st.markdown(f"**Claude AI:** {claude_status}")
         st.markdown(f"*{claude_help}*")
+        
+         # ADD THIS: AWS Connection Status
+        show_aws_connection_status()
         
         # vROPS Connection Status
         vrops_status = st.session_state.vrops_connection_status
