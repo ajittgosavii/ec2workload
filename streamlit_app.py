@@ -3149,10 +3149,10 @@ class EnhancedEnterpriseEC2Calculator:
                 'vrops_data': vrops_data if vrops_data and vrops_data.get('status') == 'success' else None
             }
         
-        return enhanced_results
+            return enhanced_results
     except Exception as e:
-        logger.error(f"Error in enhanced requirements calculation: {e}")
-        return self._get_fallback_requirements(env)
+            logger.error(f"Error in enhanced requirements calculation: {e}")
+            return self._get_fallback_requirements(env)
 
 def _enhance_inputs_with_vrops(self, vrops_data: Dict):
         """Enhance workload inputs with vROPS sizing recommendations."""
