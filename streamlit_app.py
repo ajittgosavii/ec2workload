@@ -3150,7 +3150,7 @@ class EnhancedEnterpriseEC2Calculator:
             }
         
             return enhanced_results
-    except Exception as e:
+    #except Exception as e:
             logger.error(f"Error in enhanced requirements calculation: {e}")
             return self._get_fallback_requirements(env)
 
