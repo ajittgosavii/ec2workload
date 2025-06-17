@@ -3214,64 +3214,35 @@ class EnhancedEnterpriseEC2Calculator:
             logger.error(f"Error initializing calculator: {e}")
             raise
 
-def calculate_enhanced_requirements(self, env: str, vrops_data: Dict = None) -> Dict[str, Any]:
-    """Calculate requirements with Claude AI analysis and optional vROPS data."""
-    
-    try:
-        # If vROPS data is available, use it to override/enhance inputs
-        if vrops_data and vrops_data.get('status') == 'success':
-            self._enhance_inputs_with_vrops(vrops_data)
+    def calculate_enhanced_requirements(self, env: str, vrops_data: Dict = None) -> Dict[str, Any]:
+        """Calculate requirements with Claude AI analysis and optional vROPS data."""
         
-        # Standard requirements calculation
-        requirements = self._calculate_standard_requirements(env)
-        
-        # Claude AI migration analysis with vROPS data
-        claude_analysis = self.claude_analyzer.analyze_workload_complexity(self.inputs, env, vrops_data)
-        
-        # Enhanced results
-        enhanced_results = {
-            **requirements,
-            'claude_analysis': claude_analysis,
-            'environment': env,
-            'vrops_data': vrops_data if vrops_data and vrops_data.get('status') == 'success' else None
-        }
-        
-        return enhanced_results
-        
-    except Exception as e:
-        logger.error(f"Error in enhanced requirements calculation: {e}")
-        return self._get_fallback_requirements(env)
-
-def _enhance_inputs_with_vrops(self, vrops_data: Dict):
-    """Enhance workload inputs with vROPS sizing recommendations."""
-    try:
-        aws_sizing = vrops_data.get('aws_sizing', {})
-        
-        # Update CPU and memory based on vROPS recommendations
-        if aws_sizing.get('recommended_vcpus'):
-            self.inputs['on_prem_cores'] = aws_sizing['recommended_vcpus']
-        
-        if aws_sizing.get('recommended_memory_gb'):
-            self.inputs['on_prem_ram_gb'] = aws_sizing['recommended_memory_gb']
-        
-        if aws_sizing.get('recommended_storage_gb'):
-            self.inputs['storage_current_gb'] = aws_sizing['recommended_storage_gb']
-        
-        if aws_sizing.get('estimated_iops'):
-            self.inputs['peak_iops'] = aws_sizing['estimated_iops']
-        
-        # Update utilization metrics from performance data
-        performance_summary = vrops_data.get('performance_summary', {})
-        if performance_summary.get('cpu_efficiency'):
-            self.inputs['peak_cpu_percent'] = performance_summary['cpu_efficiency']
-        
-        if performance_summary.get('memory_efficiency'):
-            self.inputs['peak_ram_percent'] = performance_summary['memory_efficiency']
+        try:
+            # If vROPS data is available, use it to override/enhance inputs
+            if vrops_data and vrops_data.get('status') == 'success':
+                self._enhance_inputs_with_vrops(vrops_data)
             
-    except Exception as e:
-        logger.error(f"Error enhancing inputs with vROPS data: {e}")
-        
-def _enhance_inputs_with_vrops(self, vrops_data: Dict):
+            # Standard requirements calculation
+            requirements = self._calculate_standard_requirements(env)
+            
+            # Claude AI migration analysis with vROPS data
+            claude_analysis = self.claude_analyzer.analyze_workload_complexity(self.inputs, env, vrops_data)
+            
+            # Enhanced results
+            enhanced_results = {
+                **requirements,
+                'claude_analysis': claude_analysis,
+                'environment': env,
+                'vrops_data': vrops_data if vrops_data and vrops_data.get('status') == 'success' else None
+            }
+            
+            return enhanced_results
+            
+        except Exception as e:
+            logger.error(f"Error in enhanced requirements calculation: {e}")
+            return self._get_fallback_requirements(env)
+
+    def _enhance_inputs_with_vrops(self, vrops_data: Dict):
         """Enhance workload inputs with vROPS sizing recommendations."""
         try:
             aws_sizing = vrops_data.get('aws_sizing', {})
@@ -3300,100 +3271,39 @@ def _enhance_inputs_with_vrops(self, vrops_data: Dict):
         except Exception as e:
             logger.error(f"Error enhancing inputs with vROPS data: {e}")
 
-def _calculate_standard_requirements(self, env: str) -> Dict[str, Any]:
-    """Calculate standard infrastructure requirements."""
-    try:
-        env_mult = self.ENV_MULTIPLIERS[env]
-        
-        required_vcpus = max(math.ceil(self.inputs["on_prem_cores"] * 1.2 * env_mult["cpu_ram"]), 2)
-        required_ram = max(math.ceil(self.inputs["on_prem_ram_gb"] * 1.3 * env_mult["cpu_ram"]), 4)
-        required_storage = math.ceil(self.inputs["storage_current_gb"] * 1.2 * env_mult["storage"])
-        
-        return {
-            "requirements": {
-                "vCPUs": required_vcpus,
-                "RAM_GB": required_ram,
-                "storage_GB": required_storage,
-                "multi_az": env in ["PROD", "PREPROD"]
-            },
-            "cost_breakdown": self._calculate_basic_costs(required_vcpus, required_ram, required_storage, env),
-            "tco_analysis": self._calculate_tco(required_vcpus, required_ram, env)
-        }
-    except Exception as e:
-        logger.error(f"Error calculating standard requirements: {e}")
-        return self._get_fallback_requirements(env)
-
-def _calculate_basic_costs(self, vcpus: int, ram_gb: int, storage_gb: int, env: str) -> Dict[str, Any]:
-    """Calculate basic costs with realistic EC2 pricing including OS differentiation."""
-    try:
-        selected_instance = self._select_best_instance(vcpus, ram_gb)
-        instance_type = selected_instance['type']
-        
-        # Get OS-specific pricing
-        operating_system = self.inputs.get('operating_system', 'linux')
-        pricing = self._get_ec2_pricing_with_os(instance_type, operating_system)
-        
-        monthly_instance_cost = {
-            'on_demand': pricing['on_demand'] * 730,
-            'ri_1y_no_upfront': pricing['ri_1y_no_upfront'] * 730,
-            'ri_3y_no_upfront': pricing['ri_3y_no_upfront'] * 730,
-            'spot': pricing['spot'] * 730
-        }
-        
-        storage_cost_per_gb = 0.08
-        monthly_storage_cost = storage_gb * storage_cost_per_gb
-        monthly_network_cost = 50
-        
-        total_costs = {}
-        for pricing_model, instance_cost in monthly_instance_cost.items():
-            total_costs[pricing_model] = instance_cost + monthly_storage_cost + monthly_network_cost
-        
-        return {
-            "total_costs": total_costs,
-            "instance_costs": monthly_instance_cost,
-            "storage_costs": {"primary_storage": monthly_storage_cost},
-            "network_costs": {"data_transfer": monthly_network_cost},
-            "selected_instance": selected_instance,
-            "operating_system": operating_system,
-            "pricing_source": pricing.get('source', 'fallback')
-        }
-    except Exception as e:
-        logger.error(f"Error calculating basic costs: {e}")
-        return {
-            "total_costs": {"on_demand": 1000, "ri_1y_no_upfront": 700},
-            "selected_instance": {'type': 'm6i.large', 'vCPU': 2, 'RAM': 8},
-            "operating_system": self.inputs.get('operating_system', 'linux')
-        }
-
-def _get_ec2_pricing_with_os(self, instance_type: str, operating_system: str = 'linux') -> dict:
-    """Get EC2 pricing with OS-specific adjustments."""
-    
-    # Get base Linux pricing
-    base_pricing = self._get_fallback_pricing(instance_type)
-    
-    # Windows licensing adds approximately 30% to the cost
-    if operating_system.lower() == 'windows':
-        windows_multiplier = 1.3  # 30% increase for Windows licensing
-        
-        for pricing_model in base_pricing:
-            if pricing_model not in ['source', 'last_updated']:
-                base_pricing[pricing_model] = base_pricing[pricing_model] * windows_multiplier
-        
-        # Update metadata
-        base_pricing['source'] = base_pricing.get('source', 'fallback') + '_windows'
-        base_pricing['os_multiplier'] = windows_multiplier
-    else:
-        base_pricing['os_multiplier'] = 1.0
-    
-    return base_pricing
+    def _calculate_standard_requirements(self, env: str) -> Dict[str, Any]:
+        """Calculate standard infrastructure requirements."""
+        try:
+            env_mult = self.ENV_MULTIPLIERS[env]
+            
+            required_vcpus = max(math.ceil(self.inputs["on_prem_cores"] * 1.2 * env_mult["cpu_ram"]), 2)
+            required_ram = max(math.ceil(self.inputs["on_prem_ram_gb"] * 1.3 * env_mult["cpu_ram"]), 4)
+            required_storage = math.ceil(self.inputs["storage_current_gb"] * 1.2 * env_mult["storage"])
+            
+            return {
+                "requirements": {
+                    "vCPUs": required_vcpus,
+                    "RAM_GB": required_ram,
+                    "storage_GB": required_storage,
+                    "multi_az": env in ["PROD", "PREPROD"],
+                    "operating_system": self.inputs.get('operating_system', 'linux')
+                },
+                "cost_breakdown": self._calculate_basic_costs(required_vcpus, required_ram, required_storage, env),
+                "tco_analysis": self._calculate_tco(required_vcpus, required_ram, env)
+            }
+        except Exception as e:
+            logger.error(f"Error calculating standard requirements: {e}")
+            return self._get_fallback_requirements(env)
 
     def _calculate_basic_costs(self, vcpus: int, ram_gb: int, storage_gb: int, env: str) -> Dict[str, Any]:
-        """Calculate basic costs with realistic EC2 pricing."""
+        """Calculate basic costs with realistic EC2 pricing including OS differentiation."""
         try:
             selected_instance = self._select_best_instance(vcpus, ram_gb)
             instance_type = selected_instance['type']
             
-            pricing = self._get_fallback_pricing(instance_type)
+            # Get OS-specific pricing
+            operating_system = self.inputs.get('operating_system', 'linux')
+            pricing = self._get_ec2_pricing_with_os(instance_type, operating_system)
             
             monthly_instance_cost = {
                 'on_demand': pricing['on_demand'] * 730,
@@ -3415,120 +3325,168 @@ def _get_ec2_pricing_with_os(self, instance_type: str, operating_system: str = '
                 "instance_costs": monthly_instance_cost,
                 "storage_costs": {"primary_storage": monthly_storage_cost},
                 "network_costs": {"data_transfer": monthly_network_cost},
-                "selected_instance": selected_instance
+                "selected_instance": selected_instance,
+                "operating_system": operating_system,
+                "pricing_source": pricing.get('source', 'fallback')
             }
         except Exception as e:
             logger.error(f"Error calculating basic costs: {e}")
             return {
                 "total_costs": {"on_demand": 1000, "ri_1y_no_upfront": 700},
-                "selected_instance": {'type': 'm6i.large', 'vCPU': 2, 'RAM': 8}
+                "selected_instance": {'type': 'm6i.large', 'vCPU': 2, 'RAM': 8},
+                "operating_system": self.inputs.get('operating_system', 'linux')
             }
 
-def _select_best_instance(self, required_vcpus: int, required_ram_gb: int) -> Dict[str, Any]:
-    """Select the best matching instance type."""
-    try:
-        best_instance = None
-        best_score = 0
+    def _get_ec2_pricing_with_os(self, instance_type: str, operating_system: str = 'linux') -> dict:
+        """Get EC2 pricing with OS-specific adjustments."""
         
-        for instance in self.INSTANCE_TYPES:
-            if instance['vCPU'] >= required_vcpus and instance['RAM'] >= required_ram_gb:
-                cpu_efficiency = required_vcpus / instance['vCPU']
-                ram_efficiency = required_ram_gb / instance['RAM']
-                overall_efficiency = (cpu_efficiency + ram_efficiency) / 2
-                
-                if overall_efficiency > best_score:
-                    best_score = overall_efficiency
-                    best_instance = instance.copy()
-                    best_instance['efficiency_score'] = overall_efficiency
+        # Get base Linux pricing
+        base_pricing = self._get_fallback_pricing(instance_type)
         
-        if best_instance is None:
-            best_instance = {
-                'type': 'm6i.large',
-                'vCPU': 2,
-                'RAM': 8,
-                'family': 'general',
-                'efficiency_score': 0.5
-            }
+        # Windows licensing adds approximately 30% to the cost
+        if operating_system.lower() == 'windows':
+            windows_multiplier = 1.3  # 30% increase for Windows licensing
+            
+            for pricing_model in base_pricing:
+                if pricing_model not in ['source', 'last_updated']:
+                    base_pricing[pricing_model] = base_pricing[pricing_model] * windows_multiplier
+            
+            # Update metadata
+            base_pricing['source'] = base_pricing.get('source', 'fallback') + '_windows'
+            base_pricing['os_multiplier'] = windows_multiplier
+        else:
+            base_pricing['os_multiplier'] = 1.0
         
-        return best_instance
-    except Exception as e:
-        logger.error(f"Error selecting best instance: {e}")
-        return {'type': 'm6i.large', 'vCPU': 2, 'RAM': 8, 'family': 'general'}
+        return base_pricing
 
-def _calculate_tco(self, vcpus: int, ram_gb: int, env: str) -> Dict[str, Any]:
-    """Calculate TCO analysis with OS-specific pricing."""
-    try:
-        selected_instance = self._select_best_instance(vcpus, ram_gb)
-        operating_system = self.inputs.get('operating_system', 'linux')
-        pricing = self._get_ec2_pricing_with_os(selected_instance['type'], operating_system)
+    def _get_fallback_pricing(self, instance_type: str) -> dict:
+        """Get fallback pricing with enhanced instance types."""
         
-        on_demand_monthly = pricing['on_demand'] * 730
-        ri_1y_monthly = pricing['ri_1y_no_upfront'] * 730
-        ri_3y_monthly = pricing['ri_3y_no_upfront'] * 730
-        
-        storage_monthly = max(self.inputs.get('storage_current_gb', 500), 100) * 0.08
-        network_monthly = 50
-        
-        total_on_demand = on_demand_monthly + storage_monthly + network_monthly
-        total_ri_1y = ri_1y_monthly + storage_monthly + network_monthly
-        total_ri_3y = ri_3y_monthly + storage_monthly + network_monthly
-        
-        costs = {
-            'on_demand': total_on_demand,
-            'ri_1y_no_upfront': total_ri_1y,
-            'ri_3y_no_upfront': total_ri_3y
+        # Enhanced fallback pricing with more instance types
+        fallback_prices = {
+            # General Purpose - M6i instances
+            'm6i.large': {'on_demand': 0.0864, 'ri_1y_no_upfront': 0.0605, 'ri_3y_no_upfront': 0.0432, 'spot': 0.0259},
+            'm6i.xlarge': {'on_demand': 0.1728, 'ri_1y_no_upfront': 0.1210, 'ri_3y_no_upfront': 0.0864, 'spot': 0.0518},
+            'm6i.2xlarge': {'on_demand': 0.3456, 'ri_1y_no_upfront': 0.2419, 'ri_3y_no_upfront': 0.1728, 'spot': 0.1037},
+            'm6i.4xlarge': {'on_demand': 0.6912, 'ri_1y_no_upfront': 0.4838, 'ri_3y_no_upfront': 0.3456, 'spot': 0.2074},
+            
+            # Memory Optimized - R6i instances  
+            'r6i.large': {'on_demand': 0.1008, 'ri_1y_no_upfront': 0.0706, 'ri_3y_no_upfront': 0.0504, 'spot': 0.0302},
+            'r6i.xlarge': {'on_demand': 0.2016, 'ri_1y_no_upfront': 0.1411, 'ri_3y_no_upfront': 0.1008, 'spot': 0.0605},
+            'r6i.2xlarge': {'on_demand': 0.4032, 'ri_1y_no_upfront': 0.2822, 'ri_3y_no_upfront': 0.2016, 'spot': 0.1210},
+            'r6i.4xlarge': {'on_demand': 0.8064, 'ri_1y_no_upfront': 0.5645, 'ri_3y_no_upfront': 0.4032, 'spot': 0.2419},
         }
         
-        best_option = min(costs.keys(), key=lambda k: costs[k])
-        best_cost = costs[best_option]
-        savings = total_on_demand - best_cost
+        pricing = fallback_prices.get(instance_type, {
+            'on_demand': 0.1, 'ri_1y_no_upfront': 0.07, 'ri_3y_no_upfront': 0.05, 'spot': 0.03
+        })
         
-        return {
-            "monthly_cost": best_cost,
-            "monthly_savings": savings,
-            "best_pricing_option": best_option,
-            "roi_3_years": (savings * 36 / total_on_demand) * 100 if total_on_demand > 0 else 0,
-            "operating_system": operating_system,
-            "os_impact": f"{'30% Windows licensing surcharge applied' if operating_system.lower() == 'windows' else 'Linux pricing (no additional licensing)'}"
-        }
-    except Exception as e:
-        logger.error(f"Error calculating TCO: {e}")
-        return {
-            "monthly_cost": 1000, 
-            "monthly_savings": 200, 
-            "best_pricing_option": "ri_1y_no_upfront",
-            "operating_system": self.inputs.get('operating_system', 'linux')
-        }
+        # Add metadata
+        pricing.update({
+            'source': 'fallback',
+            'last_updated': datetime.now().isoformat()
+        })
+        
+        return pricing
+
+    def _select_best_instance(self, required_vcpus: int, required_ram_gb: int) -> Dict[str, Any]:
+        """Select the best matching instance type."""
+        try:
+            best_instance = None
+            best_score = 0
+            
+            for instance in self.INSTANCE_TYPES:
+                if instance['vCPU'] >= required_vcpus and instance['RAM'] >= required_ram_gb:
+                    cpu_efficiency = required_vcpus / instance['vCPU']
+                    ram_efficiency = required_ram_gb / instance['RAM']
+                    overall_efficiency = (cpu_efficiency + ram_efficiency) / 2
+                    
+                    if overall_efficiency > best_score:
+                        best_score = overall_efficiency
+                        best_instance = instance.copy()
+                        best_instance['efficiency_score'] = overall_efficiency
+            
+            if best_instance is None:
+                best_instance = {
+                    'type': 'm6i.large',
+                    'vCPU': 2,
+                    'RAM': 8,
+                    'family': 'general',
+                    'efficiency_score': 0.5
+                }
+            
+            return best_instance
+        except Exception as e:
+            logger.error(f"Error selecting best instance: {e}")
+            return {'type': 'm6i.large', 'vCPU': 2, 'RAM': 8, 'family': 'general'}
+
+    def _calculate_tco(self, vcpus: int, ram_gb: int, env: str) -> Dict[str, Any]:
+        """Calculate TCO analysis with OS-specific pricing."""
+        try:
+            selected_instance = self._select_best_instance(vcpus, ram_gb)
+            operating_system = self.inputs.get('operating_system', 'linux')
+            pricing = self._get_ec2_pricing_with_os(selected_instance['type'], operating_system)
+            
+            on_demand_monthly = pricing['on_demand'] * 730
+            ri_1y_monthly = pricing['ri_1y_no_upfront'] * 730
+            ri_3y_monthly = pricing['ri_3y_no_upfront'] * 730
+            
+            storage_monthly = max(self.inputs.get('storage_current_gb', 500), 100) * 0.08
+            network_monthly = 50
+            
+            total_on_demand = on_demand_monthly + storage_monthly + network_monthly
+            total_ri_1y = ri_1y_monthly + storage_monthly + network_monthly
+            total_ri_3y = ri_3y_monthly + storage_monthly + network_monthly
+            
+            costs = {
+                'on_demand': total_on_demand,
+                'ri_1y_no_upfront': total_ri_1y,
+                'ri_3y_no_upfront': total_ri_3y
+            }
+            
+            best_option = min(costs.keys(), key=lambda k: costs[k])
+            best_cost = costs[best_option]
+            savings = total_on_demand - best_cost
+            
+            return {
+                "monthly_cost": best_cost,
+                "monthly_savings": savings,
+                "best_pricing_option": best_option,
+                "roi_3_years": (savings * 36 / total_on_demand) * 100 if total_on_demand > 0 else 0,
+                "operating_system": operating_system,
+                "os_impact": f"{'30% Windows licensing surcharge applied' if operating_system.lower() == 'windows' else 'Linux pricing (no additional licensing)'}"
+            }
+        except Exception as e:
+            logger.error(f"Error calculating TCO: {e}")
+            return {
+                "monthly_cost": 1000, 
+                "monthly_savings": 200, 
+                "best_pricing_option": "ri_1y_no_upfront",
+                "operating_system": self.inputs.get('operating_system', 'linux')
+            }
 
     def _get_fallback_requirements(self, env: str) -> Dict[str, Any]:
         """Fallback requirements when calculation fails."""
-    return {
-        'requirements': {'vCPUs': 2, 'RAM_GB': 8, 'storage_GB': 100},
-        'cost_breakdown': {
-            'total_costs': {'on_demand': 500},
-            'operating_system': self.inputs.get('operating_system', 'linux')
-        },
-        'tco_analysis': {
-            'monthly_cost': 500, 
-            'monthly_savings': 150,
-            'operating_system': self.inputs.get('operating_system', 'linux')
-        },
-        'claude_analysis': self.claude_analyzer._get_fallback_analysis(),
-        'environment': env,
-        'vrops_data': None
-    }
-
-    def _get_fallback_requirements(self, env: str) -> Dict[str, Any]:
-        """Fallback requirements."""
         return {
-            'requirements': {'vCPUs': 2, 'RAM_GB': 8, 'storage_GB': 100},
-            'cost_breakdown': {'total_costs': {'on_demand': 500}},
-            'tco_analysis': {'monthly_cost': 500, 'monthly_savings': 150},
+            'requirements': {
+                'vCPUs': 2, 
+                'RAM_GB': 8, 
+                'storage_GB': 100,
+                'operating_system': self.inputs.get('operating_system', 'linux')
+            },
+            'cost_breakdown': {
+                'total_costs': {'on_demand': 500},
+                'operating_system': self.inputs.get('operating_system', 'linux')
+            },
+            'tco_analysis': {
+                'monthly_cost': 500, 
+                'monthly_savings': 150,
+                'operating_system': self.inputs.get('operating_system', 'linux')
+            },
             'claude_analysis': self.claude_analyzer._get_fallback_analysis(),
             'environment': env,
             'vrops_data': None
         }
-    
 class EnvironmentHeatMapGenerator:
     """Generate environment heat maps for workload analysis."""
     
