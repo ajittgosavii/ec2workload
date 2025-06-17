@@ -3090,7 +3090,7 @@ class EnhancedEnterpriseEC2Calculator:
             logger.error(f"Error initializing calculator: {e}")
             raise
 
-    def calculate_enhanced_requirements(self, env: str, vrops_data: Dict = None) -> Dict[str, Any]:
+def calculate_enhanced_requirements(self, env: str, vrops_data: Dict = None) -> Dict[str, Any]:
     """Calculate requirements with Claude AI analysis and optional vROPS data."""
     
     try:
