@@ -1673,7 +1673,7 @@ class AWSCostCalculator:
                 except Exception as e:
                     logger.warning(f"Streamlit secrets AWS connection failed: {e}")
                     self.connection_error = f"Secrets config error: {str(e)}"
-    def _test_aws_connection(self):
+def _test_aws_connection(self):
         """Test AWS connection with minimal API call."""
         try:
             # Test with a minimal API call
@@ -1690,7 +1690,7 @@ class AWSCostCalculator:
             logger.warning(f"⚠️ AWS API test failed: {e}")
             raise
     
-    def get_connection_status(self):
+def get_connection_status(self):
         """Get detailed connection status for display."""
         return {
             'connected': self.aws_connected,
@@ -1698,7 +1698,7 @@ class AWSCostCalculator:
             'client_available': self.pricing_client is not None
         }
     # Enhanced connection status display function
-    def show_aws_connection_status():
+def show_aws_connection_status():
     """Show enhanced AWS connection status in the sidebar."""
     try:
         # Check AWS connection status through the cost calculator
@@ -1719,7 +1719,7 @@ class AWSCostCalculator:
         st.markdown(f"*{aws_help}*")
     
     
-    def _get_ec2_pricing_with_os(self, instance_type: str, operating_system: str = 'linux') -> dict:
+def _get_ec2_pricing_with_os(self, instance_type: str, operating_system: str = 'linux') -> dict:
         """Get EC2 pricing with OS-specific adjustments."""
     
     # Get base Linux pricing
