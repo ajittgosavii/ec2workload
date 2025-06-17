@@ -3150,11 +3150,11 @@ class EnhancedEnterpriseEC2Calculator:
             }
         
         return enhanced_results
-        except Exception as e:
+    except Exception as e:
         logger.error(f"Error in enhanced requirements calculation: {e}")
         return self._get_fallback_requirements(env)
 
-    def _enhance_inputs_with_vrops(self, vrops_data: Dict):
+def _enhance_inputs_with_vrops(self, vrops_data: Dict):
         """Enhance workload inputs with vROPS sizing recommendations."""
         try:
             aws_sizing = vrops_data.get('aws_sizing', {})
