@@ -1571,7 +1571,7 @@ class ClaudeAIMigrationAnalyzer:
 class AWSCostCalculator:
     """Enhanced AWS service cost calculator with real API integration and better error handling."""
     
-    def _get_ec2_pricing_with_os(self, instance_type: str, operating_system: str = 'linux') -> dict:
+def _get_ec2_pricing_with_os(self, instance_type: str, operating_system: str = 'linux') -> dict:
     """Get EC2 pricing with OS-specific adjustments."""
     
     # Get base Linux pricing
