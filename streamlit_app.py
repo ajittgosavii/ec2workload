@@ -1570,9 +1570,157 @@ class ClaudeAIMigrationAnalyzer:
 
 class AWSCostCalculator:
     """Enhanced AWS service cost calculator with real API integration and better error handling."""
+# Enhanced AWS Pricing API Connection Fix
+# Add this to your existing AWSCostCalculator class or replace the existing __init__ method
+
+class AWSCostCalculator:
+    """Enhanced AWS service cost calculator with improved error handling and connection status."""
     
-def _get_ec2_pricing_with_os(self, instance_type: str, operating_system: str = 'linux') -> dict:
-    """Get EC2 pricing with OS-specific adjustments."""
+    def __init__(self, region='us-east-1'):
+        self.region = region
+        self.pricing_client = None
+        self.aws_connected = False
+        self.connection_error = None
+        
+        # Try to initialize AWS client with multiple credential sources
+        self._initialize_aws_connection()
+        
+        # Enhanced pricing data with more instance types (keeping your existing structure)
+        self.pricing = {
+            'compute': {
+                'ec2_instances': {},
+                'elastic_ip': 0.005  # per hour
+            },
+            'network': {
+                'alb': 0.0225,  # per ALB per hour
+                'nlb': 0.0225,  # per NLB per hour
+                'nat_gateway': 0.045,  # per NAT per hour
+                'cloudfront': {'per_gb': 0.085},
+                'route53': {'hosted_zone': 0.50},
+                'data_transfer': {'out_to_internet_up_to_10tb': 0.09},
+                'vpn_gateway': 0.05  # per hour
+            },
+            'storage': {
+                'ebs': {
+                    'gp3': 0.08,  # per GB-month
+                    'io2': 0.125,  # per GB-month
+                    'io2_iops': 0.065,  # per provisioned IOPS
+                    'snapshots': 0.05  # per GB-month
+                },
+                's3': {
+                    'standard': 0.023,  # per GB-month
+                    'standard_ia': 0.0125,  # per GB-month
+                    'glacier': 0.004  # per GB-month
+                }
+            },
+            'database': {
+                'aurora_mysql': {
+                    'db.r6g.large': 0.274,  # per hour
+                    'db.r6g.xlarge': 0.548
+                },
+                'rds_mysql': {
+                    'db.r6g.large': 0.252,  # per hour
+                    'db.r6g.xlarge': 0.504
+                },
+                'storage': {
+                    'aurora_storage': 0.10,  # per GB-month
+                    'aurora_io': 0.20,  # per million requests
+                    'rds_gp2': 0.115  # per GB-month
+                },
+                'backup_storage': 0.095,  # per GB-month
+                'rds_proxy': 0.015  # per vCPU-hour
+            },
+            'security': {
+                'secrets_manager': 0.40,  # per secret per month
+                'kms': 1.00,  # per key per month
+                'config': 0.003,  # per configuration item
+                'cloudtrail': 0.10,  # per 100,000 events
+                'guardduty': 0.10,  # per GB analyzed
+                'security_hub': 0.0010,  # per security check
+                'waf': 0.60  # per web ACL per month
+            },
+            'monitoring': {
+                'cloudwatch': {
+                    'metrics': 0.30,  # per custom metric
+                    'dashboards': 3.00,  # per dashboard
+                    'alarms': 0.10,  # per alarm
+                    'logs_ingestion': 0.50,  # per GB
+                    'logs_storage': 0.03  # per GB-month
+                },
+                'xray': 0.000005,  # per trace
+                'synthetics': 0.0012  # per canary run
+            }
+        }
+    def _initialize_aws_connection(self):
+        """Initialize AWS connection with enhanced error handling."""
+        try:
+            import boto3
+            from botocore.exceptions import NoCredentialsError, PartialCredentialsError, ClientError
+            
+            # Option 1: Try Streamlit secrets first
+            if hasattr(st, 'secrets') and 'aws' in st.secrets:
+                try:
+                    self.pricing_client = boto3.client(
+                        'pricing',
+                        region_name='us-east-1',  # Pricing API only available in us-east-1
+                        aws_access_key_id=st.secrets['aws']['access_key_id'],
+                        aws_secret_access_key=st.secrets['aws']['secret_access_key']
+                    )
+                    # Test the connection
+                    self._test_aws_connection()
+                    logger.info("✅ Using AWS credentials from Streamlit secrets")
+                    return
+                except Exception as e:
+                    logger.warning(f"Streamlit secrets AWS connection failed: {e}")
+                    self.connection_error = f"Secrets config error: {str(e)}"
+    def _test_aws_connection(self):
+        """Test AWS connection with minimal API call."""
+        try:
+            # Test with a minimal API call
+            test_response = self.pricing_client.get_products(
+                ServiceCode='AmazonEC2', 
+                MaxResults=1
+            )
+            self.aws_connected = True
+            self.connection_error = None
+            logger.info("✅ AWS Pricing API connection test successful")
+        except Exception as e:
+            self.aws_connected = False
+            self.connection_error = f"API test failed: {str(e)}"
+            logger.warning(f"⚠️ AWS API test failed: {e}")
+            raise
+    
+    def get_connection_status(self):
+        """Get detailed connection status for display."""
+        return {
+            'connected': self.aws_connected,
+            'error': self.connection_error,
+            'client_available': self.pricing_client is not None
+        }
+    # Enhanced connection status display function
+    def show_aws_connection_status():
+    """Show enhanced AWS connection status in the sidebar."""
+    try:
+        # Check AWS connection status through the cost calculator
+        cost_calculator = AWSCostCalculator()
+        status = cost_calculator.get_connection_status()
+        
+        if status['connected']:
+            aws_status = "🟢 Connected"
+            aws_help = "AWS Pricing API connected for real-time pricing"
+        elif status['error']:
+            aws_status = "🔴 Error"
+            aws_help = f"Connection failed: {status['error']}"
+        else:
+            aws_status = "🟡 Using Fallback"
+            aws_help = "Using fallback pricing data"
+        
+        st.markdown(f"**AWS Pricing API:** {aws_status}")
+        st.markdown(f"*{aws_help}*")
+    
+    
+    def _get_ec2_pricing_with_os(self, instance_type: str, operating_system: str = 'linux') -> dict:
+        """Get EC2 pricing with OS-specific adjustments."""
     
     # Get base Linux pricing
     base_pricing = self._get_ec2_pricing(instance_type)
@@ -1606,7 +1754,10 @@ def _calculate_compute_costs(self, env: str, compute_recs: Dict, requirements: D
         pricing_model = 'ri_1y'
     
     monthly_instance_cost = instance_pricing[pricing_model] * instance_count * 730  # hours per month
-    
+     except Exception as e:
+        st.markdown("**AWS Pricing API:** 🔴 Error")
+        st.markdown(f"*Error checking connection: {str(e)}*")
+        logger.error(f"Error in show_aws_connection_status: {e}")
     
     
     def __init__(self, region='us-east-1'):
